@@ -1,0 +1,19 @@
+<div class="main-layout">
+    <app-sidebar />
+    <div class="main-layout-content">
+        <router-outlet />
+    </div>
+</div>
+
+<style>
+    .main-layout {
+        display: flex;
+        min-height: 100vh;
+    }
+
+    .main-layout-content {
+        flex: 1;
+        padding: 32px;
+        background-color: #f5f5f5;
+    }
+</style>

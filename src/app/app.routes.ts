@@ -1,10 +1,34 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './guards/auth.guard';
-import { HomeComponent } from './home/home.component';
+import { MainLayoutComponent } from './layouts/main-layout/main-layout.component';
+import { HomePageComponent } from './features/home/pages/home-page.component';
+import { CompanyPageComponent } from './features/company/pages/company-page.component'
+
+import { SignupPageComponent } from './features/auth/pages/signup-page.component';
 
 export const routes: Routes = [
     {
-        path: 'home', component: HomeComponent, canActivate: [authGuard],
+        path: 'signup',
+        component: SignupPageComponent,
     },
-    { path: '', redirectTo: 'home', pathMatch: 'full', }
+    {
+        path: '',
+        component: MainLayoutComponent,
+        canActivate: [authGuard],
+        children: [
+            {
+                path: 'home',
+                component: HomePageComponent,
+            },
+            {
+                path: 'company',
+                component: CompanyPageComponent,
+            },
+            {
+                path: '',
+                redirectTo: 'home',
+                pathMatch: 'full',
+            }
+        ]
+    },
 ];

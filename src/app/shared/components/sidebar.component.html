@@ -1,0 +1,47 @@
+<aside class="sidebar">
+    <div>
+        <h1 class="app-title">社会保険管理システム</h1>
+
+        <nav class="nav">
+            <a routerLink="/home" routerLinkActive="active">ホーム</a>
+            <a routerLink="/company" routerLinkActive="active">会社・事業所情報</a>
+            <a routerLink="/employees" routerLinkActive="active">従業員管理</a>
+            <a routerLink="/compensation" routerLinkActive="active">報酬情報入力</a>
+            <a routerLink="/premium" routerLinkActive="active">保険料計算</a>
+            <a routerLink="/notifications" routerLinkActive="active">通知</a>
+            <a routerLink="/settings" routerLinkActive="active">設定</a>
+        </nav>
+    </div>
+
+    <div class="sidebar-bottom">
+        <p>管理者</p>
+        <button class="logout-btn" (click)="onLogout()">ログアウト</button>
+    </div>
+</aside>
+
+<style>
+    .sidebar {
+        width: 260px;
+
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .nav {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    /* サイドバー下部 */
+    .sidebar-bottom {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        align-items: center;
+    }
+    .logout-btn {
+        cursor: pointer;
+    }
+</style>

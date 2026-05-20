@@ -12,10 +12,10 @@ export const authGuard: CanActivateFn = (): Promise<boolean | UrlTree>=> {
             unsub();
 
             // ログインしていない場合は、ログイン画面にリダイレクト
-            if (!user) {
-                resolve(router.createUrlTree(['/login']));
-                return;
-            }
+            // if (!user) {
+            //     resolve(router.createUrlTree(['/login']));
+            //     return;
+            // }
             resolve(true);
         })
     })
