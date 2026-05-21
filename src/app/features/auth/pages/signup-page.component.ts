@@ -5,8 +5,6 @@ import { SignupInput, AppUserInput } from '../models/auth.model';
 import { AuthService } from '../services/auth.service';
 import { UserService } from '../../users/services/user.service';
 
-import { getAuth } from 'firebase/auth';
-
 @Component({
     selector: 'app-signup-page',
     standalone: true,
@@ -90,13 +88,19 @@ export class SignupPageComponent {
             // Firestoreにユーザーを作成
             const appUserInput: AppUserInput = {
                 uid: user.uid,
-                ...input,
+                lastName: input.lastName,
+                firstName: input.firstName,
+                email: input.email,
+                
                 role: 'admin',
                 status: 'active',
+
                 companyId: companyId,
                 employeeId: null,
-            }
+            };
             await this.userService.createUser(appUserInput);
+
+            this.router.navigate(['/home']);
         } catch (error) {
             console.error('サインインに失敗しました。', error);
         }

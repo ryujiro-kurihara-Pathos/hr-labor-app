@@ -9,6 +9,11 @@ import { InitialAdminSignupInput } from '../models/auth.model';
 })
 
 export class AuthService {
+    // ログイン
+    async login() {
+        
+    }
+
     // ログアウト
     async logout(): Promise<void> {
         await signOut(auth);
@@ -31,6 +36,4 @@ export class AuthService {
 
         return user;
     }
-
-
 }
