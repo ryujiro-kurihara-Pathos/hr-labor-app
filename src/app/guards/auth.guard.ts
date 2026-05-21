@@ -1,7 +1,7 @@
-import { CanActivateFn, Router, UrlTree } from '@angular/router';
 import { inject } from '@angular/core';
+import { CanActivateFn, Router, UrlTree } from '@angular/router';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../firebase';
+import { auth } from '../core/firebase';
 
 export const authGuard: CanActivateFn = (): Promise<boolean | UrlTree>=> {
     const router = inject(Router);
@@ -12,10 +12,10 @@ export const authGuard: CanActivateFn = (): Promise<boolean | UrlTree>=> {
             unsub();
 
             // ログインしていない場合は、ログイン画面にリダイレクト
-            // if (!user) {
-            //     resolve(router.createUrlTree(['/login']));
-            //     return;
-            // }
+            if (!user) {
+                resolve(router.createUrlTree(['/login']));
+                return;
+            }
             resolve(true);
         })
     })

@@ -1,10 +1,157 @@
 <div class="signup-page">
     <div class="signup-card">
         <div class="signup-header">
-            <h1>管理者アカウント作成</h1>
-            <p>
-                新しくこのシステムを利用開始する会社の管理者を登録します。
-            </p>
+            <p>新規登録</p>
         </div>
-    </div>
+
+        <div class="step-area">
+            <div class="step" [class.active]="currentStep === 1">
+                1. ユーザー情報
+            </div>
+
+            <div class="step" [class.active]="currentStep === 2">
+                2. 会社情報
+            </div>
+        </div>
+
+        @if(currentStep === 1) {
+            <div class="form-page">
+                <h1>ユーザー情報入力</h1>
+            </div>
+
+            <div class="formfield">
+                <label>姓</label>
+                <input type="text" name="lastName" [(ngModel)]="lastName">
+            </div>
+
+            <div class="formfield">
+                <label>名</label>
+                <input type="text" name="firstName" [(ngModel)]="firstName">
+            </div>
+
+            <div class="formfield">
+                <label>メールアドレス</label>
+                <input type="text" name="email" [(ngModel)]="email">
+            </div>
+
+            <div class="formfield">
+                <label>パスワード</label>
+                <input type="text" name="password" [(ngModel)]="password">
+            </div>
+
+            <div class="formfield">
+                <label>パスワード確認</label>
+                <input type="text" name="confirmPassword" [(ngModel)]="confirmPassword">
+            </div>
+
+            <button type="button" class="form-btn" (click)="goToCompanyForm()">
+                次へ
+            </button>
+
+            <button type="button" (click)="goToLoginPage()">ログインする</button>
+        }
+
+        @if(currentStep === 2) {
+            <div class="form-page">
+                <h1>会社情報入力</h1>
+            </div>
+
+            <div class="formfield">
+                <label>会社名</label>
+                <input type="text" name="companyName" [(ngModel)]="companyName">
+            </div>
+
+            <div class="formfield">
+                <label>代表者名</label>
+                <input type="text" name="representativeName" [(ngModel)]="representativeName">
+            </div>
+
+            <div class="formfield">
+                <label>会社所在地</label>
+                <input type="text" name="companyAddress" [(ngModel)]="companyAddress">
+            </div>
+
+            <div class="button-area">
+                <button type="button" class="form-btn sub-button" (click)="backToUserForm()">
+                    戻る
+                </button>
+    
+                <button type="button" class="form-btn" (click)="onSignup()">
+                    登録する
+                </button>
+            </div>
+        }
 </div>
+
+<style>
+    .signup-page {
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: #f5f6f8;
+    }
+    .signup-card {
+        width: 420px;
+        padding: 32px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    }
+    .step-area {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 24px;
+    }
+    .step {
+        flex: 1;
+        padding: 8px 8px;
+        border-radius: 6px;
+        background-color: #e5e7eb;
+        color: #666;
+        text-align: center;
+        font-size: 13px;
+    }
+    .step.active {
+        background: #2f6fed;
+        color: #fff;
+    }
+    .form-page {
+        display: flex;
+        flex-direction: column;
+    }
+    .form-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 16px;
+    }
+    .form-field label {
+        font-size: 14px;
+        font-weight: 600;
+    }
+    .form-field input {
+        height: 40px;
+        padding: 0 12px;
+    }
+
+    .form-btn {
+        width: 100%;
+        height: 42px;
+        border: none;
+        border-radius: 8px;
+        background-color: #2f6fed;
+        color: #fff;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .button-area {
+        display: flex;
+        gap: 12px;
+    }
+    .sub-button {
+        background-color: #e5e7eb;
+        color: #333;
+    }
+</style>

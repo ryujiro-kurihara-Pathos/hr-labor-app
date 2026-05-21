@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, Router } from '@angular/router';
 
 import { AuthService } from '../../features/auth/services/auth.service';
+import { getAuth } from 'firebase/auth';
 
 @Component({
     selector: 'app-sidebar',
@@ -21,5 +22,9 @@ export class SidebarComponent {
         } catch (error) {
             console.error('ログアウトに失敗しました。', error);
         }
+    }
+
+    test() {
+        console.log(getAuth().currentUser);
     }
 }
