@@ -17,6 +17,7 @@ import { InitialAdminSignupInput } from '../models/auth.model';
 
 export class AuthService {
     // ログイン
+<<<<<<< HEAD
     async login(email: string, password: string): Promise<User> {
         const userCredential = await signInWithEmailAndPassword(
             auth,
@@ -24,6 +25,10 @@ export class AuthService {
             password,
         );
         return userCredential.user;
+=======
+    async login() {
+        
+>>>>>>> b66b9da22dae6075d8d69a015b6aa16cb8fc4d5b
     }
 
     // ログアウト
@@ -48,6 +53,7 @@ export class AuthService {
 
         return user;
     }
+<<<<<<< HEAD
 
     // Authユーザーの取得
     getCurrentAuthUser(): User | null {
@@ -58,4 +64,6 @@ export class AuthService {
     watchAuthState(callback: (user: User | null) => void) {
         return onAuthStateChanged(auth, callback);
     }
+=======
+>>>>>>> b66b9da22dae6075d8d69a015b6aa16cb8fc4d5b
 }
