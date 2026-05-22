@@ -19,7 +19,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 // Firestore, Authenticationの初期化
-export const db = getFirestore(app);
+export const db = getFirestore(app, 'hr-labor-app');
 export const auth = getAuth(app);
 
 // デバイスの言語を使用する

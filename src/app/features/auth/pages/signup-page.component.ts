@@ -1,23 +1,26 @@
 import { Component, inject } from '@angular/core';
-import { Router } from '@angular/router';
+import { RouterLink, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { SignupInput, AppUserInput } from '../models/auth.model';
+
 import { AuthService } from '../services/auth.service';
 import { UserService } from '../../users/services/user.service';
+import { CompanyService } from '../../company/services/company.service';
 
-import { getAuth } from 'firebase/auth';
+import { SignupInput, AppUserInput } from '../models/auth.model';
+import { CompanyInput } from '../../company/models/company.model';
 
 @Component({
     selector: 'app-signup-page',
     standalone: true,
-    imports: [FormsModule],
+    imports: [FormsModule, RouterLink],
     templateUrl: './signup-page.component.html',
 })
 
 export class SignupPageComponent {
-    private readonly router = inject(Router);
     private readonly authService = inject(AuthService);
     private readonly userService = inject(UserService);
+    private readonly companyService = inject(CompanyService);
+    private readonly router = inject(Router);
 
     // 現在のステップ
     // 1: ユーザー情報, 2: 会社情報
@@ -30,9 +33,11 @@ export class SignupPageComponent {
             || this.isFormEmpty(this.email) 
             || this.isFormEmpty(this.password) 
             || this.isFormEmpty(this.confirmPassword)) {
+                this.errorMessage = 'ユーザー情報を入力してください';
                 return;
             }
         this.currentStep = 2;
+        this.errorMessage = '';
     }
     backToUserForm() {
         this.currentStep = 1;
@@ -51,25 +56,19 @@ export class SignupPageComponent {
     representativeName = '';
     companyAddress = '';
 
-    // ログインページに遷移
-    goToLoginPage() {
-        this.router.navigate(['/login']);
-    }
-
-    // フォームが空白かどうか
-    isFormEmpty(value: string): boolean {
-        return value.trim() === '';
-    }
+    errorMessage = '';
+    isLoading = false;
 
     // サインイン
     async onSignup() {
-        try {
-            if(this.isFormEmpty(this.companyName) 
-                || this.isFormEmpty(this.representativeName)
-                || this.isFormEmpty(this.companyAddress)) {
-                return;
-            }
+        this.errorMessage = '';
 
+        if(this.isFormEmpty(this.companyName) || this.isFormEmpty(this.representativeName) || this.isFormEmpty(this.companyAddress)) {
+            this.errorMessage = '会社情報を入力してください';
+            return;
+        }
+
+        try {
             // Authenticationにユーザーを作成
             const input: SignupInput = {
                 lastName: this.lastName,
@@ -85,7 +84,14 @@ export class SignupPageComponent {
             const user = await this.authService.createInitialAdminUser(input);
 
             // Firestoreに会社を作成
-            const companyId = '';
+            const companyInput: CompanyInput = {
+                name: this.companyName,
+                representativeName: this.representativeName,
+                address: this.companyAddress,
+                createdBy: user.uid,
+            }
+            const company = await this.companyService.createCompany(companyInput);
+            const companyId = company.id;
 
             // Firestoreにユーザーを作成
             const appUserInput: AppUserInput = {
@@ -97,8 +103,16 @@ export class SignupPageComponent {
                 employeeId: null,
             }
             await this.userService.createUser(appUserInput);
+
+            // ログイン画面に遷移
+            await this.router.navigate(['/login']);
         } catch (error) {
             console.error('サインインに失敗しました。', error);
         }
+    }
+
+    // フォームが空白かどうか
+    isFormEmpty(value: string): boolean {
+        return value.trim() === '';
     }
 }

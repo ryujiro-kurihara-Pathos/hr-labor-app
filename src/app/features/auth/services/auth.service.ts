@@ -1,6 +1,13 @@
 import { Injectable } from '@angular/core';
 
-import { signOut, createUserWithEmailAndPassword, updateProfile, User } from 'firebase/auth';
+import {
+    signInWithEmailAndPassword,
+    signOut,
+    createUserWithEmailAndPassword,
+    updateProfile,
+    User,
+    onAuthStateChanged,
+} from 'firebase/auth';
 import { auth } from '../../../core/firebase';
 import { InitialAdminSignupInput } from '../models/auth.model';
 
@@ -9,6 +16,16 @@ import { InitialAdminSignupInput } from '../models/auth.model';
 })
 
 export class AuthService {
+    // ログイン
+    async login(email: string, password: string): Promise<User> {
+        const userCredential = await signInWithEmailAndPassword(
+            auth,
+            email,
+            password,
+        );
+        return userCredential.user;
+    }
+
     // ログアウト
     async logout(): Promise<void> {
         await signOut(auth);
@@ -32,5 +49,13 @@ export class AuthService {
         return user;
     }
 
+    // Authユーザーの取得
+    getCurrentAuthUser(): User | null {
+        return auth.currentUser;
+    }
 
+    // ログイン状態の監視
+    watchAuthState(callback: (user: User | null) => void) {
+        return onAuthStateChanged(auth, callback);
+    }
 }

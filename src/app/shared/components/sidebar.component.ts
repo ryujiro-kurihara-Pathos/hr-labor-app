@@ -1,8 +1,9 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, Input } from '@angular/core';
 import { RouterLink, RouterLinkActive, Router } from '@angular/router';
 
 import { AuthService } from '../../features/auth/services/auth.service';
-import { getAuth } from 'firebase/auth';
+
+import { AppUser } from '../../features/auth/models/auth.model';
 
 @Component({
     selector: 'app-sidebar',
@@ -15,6 +16,8 @@ export class SidebarComponent {
     private readonly authService = inject(AuthService);
     private readonly router = inject(Router);
 
+    @Input() currentUser: AppUser | null = null
+
     async onLogout(): Promise<void> {
         try {
             await this.authService.logout();
@@ -22,9 +25,5 @@ export class SidebarComponent {
         } catch (error) {
             console.error('ログアウトに失敗しました。', error);
         }
-    }
-
-    test() {
-        console.log(getAuth().currentUser);
     }
 }

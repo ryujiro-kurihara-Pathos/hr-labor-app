@@ -1,1 +1,7 @@
-<p>company-page works!</p>
+@if(isLoading()) {
+    <p>Loading...</p>
+} @else {
+    <p>{{ company()?.name }}</p>
+    <p>{{ company()?.representativeName }}</p>
+    <p>{{ company()?.address }}</p>
+}

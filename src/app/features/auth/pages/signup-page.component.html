@@ -44,11 +44,15 @@
                 <input type="text" name="confirmPassword" [(ngModel)]="confirmPassword">
             </div>
 
+            @if(errorMessage) {
+                <p class="error-message">{{ errorMessage }}</p>
+            }
+
             <button type="button" class="form-btn" (click)="goToCompanyForm()">
                 次へ
             </button>
 
-            <button type="button" (click)="goToLoginPage()">ログインする</button>
+            <a routerLink="/login">ログインする</a>
         }
 
         @if(currentStep === 2) {
@@ -71,13 +75,24 @@
                 <input type="text" name="companyAddress" [(ngModel)]="companyAddress">
             </div>
 
+            @if(errorMessage) {
+                <p class="error-message">{{ errorMessage }}</p>
+            }
+
             <div class="button-area">
                 <button type="button" class="form-btn sub-button" (click)="backToUserForm()">
                     戻る
                 </button>
     
-                <button type="button" class="form-btn" (click)="onSignup()">
-                    登録する
+                <button type="button" class="form-btn" (click)="onSignup()" [disabled]="isLoading">
+                    @if(isLoading) {
+                        <span class="spinner"></span>
+                        <span class="loading-content">
+                            登録中
+                        </span>
+                    } @else {
+                        登録する
+                    }
                 </button>
             </div>
         }
@@ -145,6 +160,32 @@
         font-size: 15px;
         font-weight: 600;
         cursor: pointer;
+    }
+    .form-btn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    .loading-content {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.4);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
     }
     .button-area {
         display: flex;

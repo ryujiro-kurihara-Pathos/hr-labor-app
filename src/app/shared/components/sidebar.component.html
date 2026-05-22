@@ -15,6 +15,7 @@
 
     <div class="sidebar-bottom">
         <p>管理者</p>
+        <p>{{ currentUser?.lastName }} {{ currentUser?.firstName }}</p>
         <button class="logout-btn" (click)="onLogout()">ログアウト</button>
     </div>
 </aside>
