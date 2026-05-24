@@ -6,12 +6,9 @@ import { AuthService } from '../services/auth.service';
 import { UserService } from '../../users/services/user.service';
 import { CompanyService } from '../../company/services/company.service';
 
-<<<<<<< HEAD
 import { SignupInput, AppUserInput } from '../models/auth.model';
 import { CompanyInput } from '../../company/models/company.model';
 
-=======
->>>>>>> b66b9da22dae6075d8d69a015b6aa16cb8fc4d5b
 @Component({
     selector: 'app-signup-page',
     standalone: true,
@@ -72,6 +69,8 @@ export class SignupPageComponent {
         }
 
         try {
+            this.isLoading = true;
+
             // Authenticationにユーザーを作成
             const input: SignupInput = {
                 lastName: this.lastName,
@@ -111,12 +110,8 @@ export class SignupPageComponent {
             };
             await this.userService.createUser(appUserInput);
 
-<<<<<<< HEAD
             // ログイン画面に遷移
             await this.router.navigate(['/login']);
-=======
-            this.router.navigate(['/home']);
->>>>>>> b66b9da22dae6075d8d69a015b6aa16cb8fc4d5b
         } catch (error) {
             console.error('サインインに失敗しました。', error);
         }

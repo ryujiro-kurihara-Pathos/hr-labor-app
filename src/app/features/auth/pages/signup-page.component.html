@@ -1,9 +1,12 @@
 <div class="signup-page">
+    <!-- カード -->
     <div class="signup-card">
+        <!-- ヘッダー -->
         <div class="signup-header">
             <p>新規登録</p>
         </div>
 
+        <!-- ステップ -->
         <div class="step-area">
             <div class="step" [class.active]="currentStep === 1">
                 1. ユーザー情報
@@ -14,6 +17,7 @@
             </div>
         </div>
 
+        <!-- ユーザー情報入力 -->
         @if(currentStep === 1) {
             <div class="form-page">
                 <h1>ユーザー情報入力</h1>
@@ -44,17 +48,21 @@
                 <input type="text" name="confirmPassword" [(ngModel)]="confirmPassword">
             </div>
 
+            <!-- エラーメッセージ -->
             @if(errorMessage) {
                 <p class="error-message">{{ errorMessage }}</p>
             }
 
+            <!-- 次へボタン -->
             <button type="button" class="form-btn" (click)="goToCompanyForm()">
                 次へ
             </button>
 
+            <!-- ログインリンク -->
             <a routerLink="/login">ログインする</a>
         }
 
+        <!-- 会社情報入力 -->
         @if(currentStep === 2) {
             <div class="form-page">
                 <h1>会社情報入力</h1>
@@ -75,19 +83,22 @@
                 <input type="text" name="companyAddress" [(ngModel)]="companyAddress">
             </div>
 
+            <!-- エラーメッセージ -->
             @if(errorMessage) {
                 <p class="error-message">{{ errorMessage }}</p>
             }
 
             <div class="button-area">
+                <!-- 戻るボタン -->
                 <button type="button" class="form-btn sub-button" (click)="backToUserForm()">
                     戻る
                 </button>
     
+                <!-- 登録ボタン -->
                 <button type="button" class="form-btn" (click)="onSignup()" [disabled]="isLoading">
                     @if(isLoading) {
-                        <span class="spinner"></span>
                         <span class="loading-content">
+                            <span class="spinner"></span>
                             登録中
                         </span>
                     } @else {
@@ -194,5 +205,9 @@
     .sub-button {
         background-color: #e5e7eb;
         color: #333;
+    }
+
+    .error-message {
+        color: #dc2626;
     }
 </style>
