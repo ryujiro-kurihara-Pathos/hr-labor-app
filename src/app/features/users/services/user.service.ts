@@ -18,7 +18,7 @@ import {
 export class UserService {
     // Firestoreにユーザーを登録
     async createUser(userInput: AppUserInput) {
-        const docRef = doc(collection(db, 'users'));
+        const docRef = doc(db, 'users', userInput.uid);
         const user: AppUser = {
             ...userInput,
             createdAt: serverTimestamp() as Timestamp,

@@ -98,6 +98,7 @@ export class SignupPageComponent {
 
             // Firestoreにユーザーを作成
             const appUserInput: AppUserInput = {
+                uid: user.uid,
                 lastName: input.lastName,
                 firstName: input.firstName,
                 email: input.email,

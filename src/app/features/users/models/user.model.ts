@@ -5,6 +5,7 @@ export type UserRole = 'admin' | 'labor' | 'employee';
 export type UserStatus = 'active' | 'inactive';
 
 export type AppUser = {
+    uid: string; // ユーザーID
     lastName: string; // 姓
     firstName: string; // 名
     email: string; // メールアドレス
