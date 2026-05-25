@@ -4,7 +4,7 @@ import { RouterOutlet, Router } from '@angular/router';
 import { Unsubscribe } from 'firebase/auth';
 import { AuthService } from '../../features/auth/services/auth.service';
 import { UserService } from '../../features/users/services/user.service';
-import { AppUser } from '../../features/auth/models/auth.model';
+import { AppUser } from '../../features/users/models/user.model';
 import { SidebarComponent } from '../../shared/components/sidebar.component';
 
 @Component({
@@ -24,18 +24,29 @@ export class MainLayoutComponent {
     // 現在のユーザー
     currentUser = signal<AppUser | null>(null);
 
-    ngOnInit() {
-        this.unsubscribeAuth = this.authService.watchAuthState(async (firebaseUser) => {
-            if(!firebaseUser) {
+    // 初期処理
+    async ngOnInit() {
+        // ログイン状態の監視
+        this.unsubscribeAuth = this.authService.watchAuthState(async (authUser) => {
+            // Authユーザーが存在しない場合は、ログイン画面にリダイレクト
+            if(!authUser) {
                 this.currentUser.set(null);
                 await this.router.navigate(['/login']);
                 return;
             }
 
-            const appUser = await this.userService.getUserByUid(firebaseUser.uid);
-
+            // Appユーザーの取得
+            const appUser = await this.userService.getUserByUid(authUser.uid);
+            // Appユーザーが存在しない場合は、ログイン画面にリダイレクト
             if(!appUser) {
                 this.currentUser.set(null);
+                await this.router.navigate(['/login']);
+                return;
+            }
+
+            // inactiveなユーザーの場合は、ログイン画面にリダイレクト
+            if(appUser.status === 'inactive') {
+                await this.authService.logout();
                 await this.router.navigate(['/login']);
                 return;
             }

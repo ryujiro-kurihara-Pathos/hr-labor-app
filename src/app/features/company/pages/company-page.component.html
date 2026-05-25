@@ -4,4 +4,15 @@
     <p>{{ company()?.name }}</p>
     <p>{{ company()?.representativeName }}</p>
     <p>{{ company()?.address }}</p>
+
+    <h2>事業所一覧</h2>
+    <button (click)="openOfficeModal()">事業所を登録</button>
+
+    @if(isOfficeModalOpen()) {
+        <app-office-modal
+            (close)="closeOfficeModal()"
+            (submit)="onCreateOffice($event)"
+            [isLoading]="isOfficeSaving()"
+        />
+    }
 }

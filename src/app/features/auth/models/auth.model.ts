@@ -6,37 +6,15 @@ export type LoginInput = {
 };
 
 export type SignupInput = {
-    lastName: string;
-    firstName: string;
-    email: string;
-    password: string;
-    confirmPassword: string;
+    lastName: string; // 姓
+    firstName: string; // 名
+    email: string; // メールアドレス
+    password: string; // パスワード
+    confirmPassword: string; // 確認用パスワード
 
-    companyName: string;
-    representativeName: string;
-    companyAddress: string;
+    companyName: string; // 会社名
+    representativeName: string; // 代表者名
+    companyAddress: string; // 会社所在地
 };
 
 export type InitialAdminSignupInput = Omit<SignupInput, 'confirmPassword'>;
-
-export type UserRole = 'admin' | 'labor' | 'employee';
-
-export type UserStatus = 'active' | 'inactive';
-
-export type AppUser = {
-    uid: string;
-    lastName: string;
-    firstName: string;
-    email: string;
-
-    role: UserRole;
-    status: UserStatus;
-
-    createdAt: Timestamp;
-    updatedAt: Timestamp;
-
-    companyId: string;
-    employeeId: string | null
-}
-
-export type AppUserInput = Omit<AppUser, 'createdAt' | 'updatedAt'>;

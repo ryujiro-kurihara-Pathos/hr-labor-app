@@ -1,12 +1,14 @@
 import { Injectable } from '@angular/core';
 
 import { db } from '../../../core/firebase';
-import { AppUser, AppUserInput } from '../../auth/models/auth.model';
+import { AppUser, AppUserInput } from '../models/user.model';
 import {
     doc,
     serverTimestamp,
     setDoc,
     getDoc,
+    collection,
+    Timestamp,
  } from 'firebase/firestore';
 
 @Injectable({
@@ -16,7 +18,12 @@ import {
 export class UserService {
     // Firestoreにユーザーを登録
     async createUser(userInput: AppUserInput) {
-        const docRef = doc(db, 'users', userInput.uid);
+        const docRef = doc(collection(db, 'users'));
+        const user: AppUser = {
+            ...userInput,
+            createdAt: serverTimestamp() as Timestamp,
+            updatedAt: serverTimestamp() as Timestamp,
+        }
         await setDoc(docRef, {
             ...userInput,
             createdAt: serverTimestamp(),

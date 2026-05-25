@@ -6,7 +6,8 @@ import { AuthService } from '../services/auth.service';
 import { UserService } from '../../users/services/user.service';
 import { CompanyService } from '../../company/services/company.service';
 
-import { SignupInput, AppUserInput } from '../models/auth.model';
+import { SignupInput } from '../models/auth.model';
+import { AppUserInput } from '../../users/models/user.model';
 import { CompanyInput } from '../../company/models/company.model';
 
 @Component({
@@ -97,7 +98,6 @@ export class SignupPageComponent {
 
             // Firestoreにユーザーを作成
             const appUserInput: AppUserInput = {
-                uid: user.uid,
                 lastName: input.lastName,
                 firstName: input.firstName,
                 email: input.email,

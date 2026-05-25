@@ -3,7 +3,7 @@ import { RouterLink, RouterLinkActive, Router } from '@angular/router';
 
 import { AuthService } from '../../features/auth/services/auth.service';
 
-import { AppUser } from '../../features/auth/models/auth.model';
+import { AppUser } from '../../features/users/models/user.model';
 
 @Component({
     selector: 'app-sidebar',
