@@ -42,6 +42,13 @@ export class CompanyService {
         
         if(!docSnap.exists()) return null;
 
-        return docSnap.data() as Company;
+        const company = {
+            id: companyId,
+            ...docSnap.data(),
+        } as Company;
+
+        console.log(company);
+
+        return company;
     }
 }

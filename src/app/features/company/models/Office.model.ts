@@ -3,7 +3,6 @@ import { Timestamp } from 'firebase/firestore';
 export type HealthInsuranceType = 'kyokai' | 'union';
 
 export type Office = {
-    id: string;
     companyId: string; // 会社ID
 
     name: string; // 事業所名
@@ -14,4 +13,4 @@ export type Office = {
     updatedAt: Timestamp;
 }
 
-export type OfficeInput = Omit<Office, 'id' | 'createdAt' | 'updatedAt'>;
+export type OfficeInput = Omit<Office, 'createdAt' | 'updatedAt'>;

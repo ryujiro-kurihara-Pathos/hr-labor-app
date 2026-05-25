@@ -7,7 +7,7 @@ import { UserService } from '../../users/services/user.service';
 import { CompanyService } from '../services/company.service';
 
 import { OfficeModalComponent, OfficeFormData } from '../components/office-modal.component';
-import { OfficeService } from '../services/Office.service';
+import { OfficeService } from '../services/office.service';
 
 @Component({
     selector: 'app-company-page',
@@ -84,22 +84,27 @@ export class CompanyPageComponent {
 
     // 事業所を登録
     async onCreateOffice(form: OfficeFormData) {
+        // 会社情報の取得
         const company = this.company();
         if (!company) {
             this.errorMessage.set('会社情報が読み込まれていません');
             return;
         }
 
+        // ローディング
         this.isOfficeSaving.set(true);
         this.errorMessage.set('');
 
         try {
+            // Firestoreに事業所を作成
             await this.officeService.createOffice({
                 companyId: company.id,
                 name: form.name,
                 address: form.address,
                 healthInsuranceType: form.healthInsuranceType,
             });
+
+            // モーダルを閉じる
             this.closeOfficeModal();
         } catch (error) {
             console.error('事業所の登録に失敗しました。', error);

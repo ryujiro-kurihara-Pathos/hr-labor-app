@@ -7,7 +7,7 @@ import {
     serverTimestamp,
     Timestamp,
 } from 'firebase/firestore';
-import { Office, OfficeInput } from '../models/Office.model';
+import { Office, OfficeInput } from '../models/office.model';
 import { db } from '../../../core/firebase';
 
 @Injectable({ providedIn: 'root' })
@@ -20,7 +20,6 @@ export class OfficeService {
         // 事業所ドキュメントの作成
         const docRef = doc(collection(db, 'offices'));
         const office: Office = {
-            id: docRef.id,
             ...officeInput,
             createdAt: createdAt,
             updatedAt: createdAt,
