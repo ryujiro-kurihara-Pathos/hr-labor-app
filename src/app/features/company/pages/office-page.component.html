@@ -1,0 +1,7 @@
+@if(isLoading()) {
+    <p>Loading...</p>
+} @else {
+    <p>{{ office()?.name }}</p>
+    <p>{{ office()?.address }}</p>
+    <p>{{ office()?.healthInsuranceType }}</p>
+}

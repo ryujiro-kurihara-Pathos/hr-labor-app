@@ -1,0 +1,140 @@
+<p>従業員の追加</p>
+
+<p>本人情報</p>
+
+<div class="form-row">
+    <div class="form-row-label">
+        <label for="joined-year">入社日</label>
+        <span class="required-badge">必須</span>
+    </div>
+    <div class="date-selects">
+        <select
+            id="joined-year"
+            name="joinedYear"
+            class="date-select date-select-year"
+            [(ngModel)]="joinedYear"
+            (ngModelChange)="updateJoinedDate()"
+        >
+            @for (year of joinYears; track year) {
+                <option [value]="year">
+                    {{ year }}
+                </option>
+            }
+        </select>
+        <span class="date-unit">年</span>
+
+        <select
+            id="joined-month"
+            name="joinedMonth"
+            class="date-select date-select-month"
+            [(ngModel)]="joinedMonth"
+            (ngModelChange)="updateJoinedDate()"
+        >
+            @for (month of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]; track month) {
+                <option [value]="month">{{ month }}</option>
+            }
+        </select>
+        <span class="date-unit">月</span>
+
+        <select
+            id="joined-day"
+            name="joinedDay"
+            class="date-select date-select-day"
+            [(ngModel)]="joinedDay"
+            (ngModelChange)="updateJoinedDate()"
+        >
+            @for (day of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]; track day) {
+                <option [value]="day">{{ day }}</option>
+            }
+        </select>
+        <span class="date-unit">日</span>
+    </div>
+    <input type="hidden" name="joinedDate" [(ngModel)]="employee.joinedDate" />
+</div>
+
+<p>姓</p>
+<input type="text" name="lastName" [(ngModel)]="employee.lastName">
+
+<p>名</p>
+<input type="text" name="firstName" [(ngModel)]="employee.firstName">
+
+<p>生年月日</p>
+<input type="date" name="birthDate" [(ngModel)]="employee.birthDate">
+
+<p>{{ errorMessage() }}</p>
+
+<p>登録</p>
+<button class="form-btn" type="button" (click)="onCreateEmployee()">登録</button>
+
+<style>
+    .form-row {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 12px 16px;
+        background: #f3f4f6;
+        border-radius: 8px;
+    }
+
+    .form-row-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+        min-width: 120px;
+    }
+
+    .form-row-label label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #111827;
+    }
+
+    .required-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 8px;
+        border-radius: 4px;
+        background: #fecaca;
+        color: #b91c1c;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1.4;
+    }
+
+    .date-selects {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .date-select {
+        height: 40px;
+        padding: 0 32px 0 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: #fff;
+        font-size: 14px;
+        color: #111827;
+        cursor: pointer;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M3 4.5L6 7.5L9 4.5'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+    }
+
+    .date-select-year {
+        min-width: 160px;
+    }
+
+    .date-select-month,
+    .date-select-day {
+        min-width: 72px;
+    }
+
+    .date-unit {
+        font-size: 14px;
+        color: #374151;
+    }
+</style>

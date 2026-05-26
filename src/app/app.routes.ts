@@ -9,6 +9,8 @@ import { MainLayoutComponent } from './layouts/main-layout/main-layout.component
 import { HomePageComponent } from './features/home/pages/home-page.component';
 import { CompanyPageComponent } from './features/company/pages/company-page.component'
 import { EmployeePageComponent } from './features/employee/pages/employee-page.component';
+import { OfficePageComponent } from './features/company/pages/office-page.component';
+import { EmployeeCreatePageComponent } from './features/employee/pages/employee-create-page.component';
 
 export const routes: Routes = [
     {
@@ -45,8 +47,16 @@ export const routes: Routes = [
                 component: CompanyPageComponent,
             },
             {
+                path: 'company/offices/:officeId',
+                component: OfficePageComponent,
+            },
+            {
                 path: 'employees',
                 component: EmployeePageComponent,
+            },
+            {
+                path: 'employees/new',
+                component: EmployeeCreatePageComponent,
             }
         ]
     },

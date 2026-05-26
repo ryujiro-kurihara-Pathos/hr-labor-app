@@ -47,8 +47,11 @@ export class CompanyService {
             ...docSnap.data(),
         } as Company;
 
+<<<<<<< HEAD
         console.log(company);
 
+=======
+>>>>>>> 68d0afc (update 0526)
         return company;
     }
 }

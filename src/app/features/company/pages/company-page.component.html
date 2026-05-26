@@ -9,10 +9,41 @@
     <button (click)="openOfficeModal()">事業所を登録</button>
 
     @if(isOfficeModalOpen()) {
-        <app-office-modal
+        <app-office-create-modal
             (close)="closeOfficeModal()"
             (submit)="onCreateOffice($event)"
             [isLoading]="isOfficeSaving()"
         />
     }
+
+    @if(isLoadingOffices()) {
+        <p>Loading...</p>
+    } @else {
+        <div class="office-list">
+            @for(office of offices(); track office.id) {
+                <div class="office-card" [routerLink]="['/company/offices', office.id]">
+                    <p>{{ office.name }}</p>
+                    <p>{{ office.address }}</p>
+                    <p>{{ office.healthInsuranceType }}</p>
+                </div>
+            }
+        </div>
+    }
 }
+
+<style>
+    .office-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .office-card {
+        padding: 16px;
+        background-color: #fff;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        cursor: pointer;
+    }
+    .office-card:hover {
+        background-color: #f0f0f0;
+    }
+</style>

@@ -1,1 +1,8 @@
 <h1>Employee Page</h1>
+
+<button class="add-employee-btn" routerLink="/employees/new">従業員を追加</button>
+
+@for (employee of employees(); track employee.employeeNumber) {
+    <p>{{ employee.lastName }} {{ employee.firstName }}</p>
+    <p>{{ employee.joinedDate }}</p>
+}

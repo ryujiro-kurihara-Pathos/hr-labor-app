@@ -10,20 +10,27 @@ export type OfficeFormData = {
 };
 
 @Component({
-    selector: 'app-office-modal',
+    selector: 'app-office-create-modal',
     standalone: true,
     imports: [FormsModule],
-    templateUrl: './office-modal.component.html',
+    templateUrl: './office-create-modal.component.html',
 })
 
-export class OfficeModalComponent {
+export class OfficeCreateModalComponent {
+    // アウトプット
+    close = output<void>();
+    submit = output<OfficeFormData>();
+    
     // ローディング
     isLoading = input(false);
 
+<<<<<<< HEAD:src/app/features/company/components/office-modal.component.ts
     // 親コンポーネントからのイベント
     close = output<void>();
     submit = output<OfficeFormData>();
 
+=======
+>>>>>>> 68d0afc (update 0526):src/app/features/company/components/office-create-modal.component.ts
     // フォームデータ
     name = '';
     address = '';

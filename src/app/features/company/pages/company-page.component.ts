@@ -6,13 +6,19 @@ import { AuthService } from '../../auth/services/auth.service';
 import { UserService } from '../../users/services/user.service';
 import { CompanyService } from '../services/company.service';
 
+<<<<<<< HEAD
 import { OfficeModalComponent, OfficeFormData } from '../components/office-modal.component';
 import { OfficeService } from '../services/office.service';
+=======
+import { OfficeCreateModalComponent, OfficeFormData } from '../components/office-create-modal.component';
+import { OfficeService } from '../services/office.service';
+import { Office } from '../models/office.model';
+>>>>>>> 68d0afc (update 0526)
 
 @Component({
     selector: 'app-company-page',
     standalone: true,
-    imports: [RouterLink, RouterLinkActive, OfficeModalComponent],
+    imports: [RouterLink, RouterLinkActive, OfficeCreateModalComponent],
     templateUrl: './company-page.component.html',
 })
 
@@ -23,18 +29,22 @@ export class CompanyPageComponent {
     private readonly officeService = inject(OfficeService);
     private readonly router = inject(Router);
 
-    // 会社情報
+    //// 会社情報
     company = signal<Company | null>(null);
 
     isLoading = signal<boolean>(false);
     errorMessage = signal<string>('');
 
+    // 事業所一覧
+    offices = signal<Office[]>([]);
+
     // 初期処理
     async ngOnInit() {
         await this.loadCompany();
+        await this.loadOffices();
     }
 
-    // 会社情報の取得
+    // 会社情報のロード
     async loadCompany(): Promise<void> {
         this.isLoading.set(true);
         this.errorMessage.set('');
@@ -69,8 +79,8 @@ export class CompanyPageComponent {
         }
     }
 
-    // 事業所の登録
-    // モーダル
+    //// 事業所
+    // 登録モーダル
     isOfficeModalOpen = signal<boolean>(false);
     isOfficeSaving = signal<boolean>(false);
 
@@ -82,9 +92,13 @@ export class CompanyPageComponent {
         this.isOfficeModalOpen.set(false);
     }
 
-    // 事業所を登録
+    // 事業所の登録
     async onCreateOffice(form: OfficeFormData) {
+<<<<<<< HEAD
         // 会社情報の取得
+=======
+        // 会社情報の有無
+>>>>>>> 68d0afc (update 0526)
         const company = this.company();
         if (!company) {
             this.errorMessage.set('会社情報が読み込まれていません');
@@ -96,14 +110,23 @@ export class CompanyPageComponent {
         this.errorMessage.set('');
 
         try {
+<<<<<<< HEAD
             // Firestoreに事業所を作成
+=======
+            // 事業所の作成
+>>>>>>> 68d0afc (update 0526)
             await this.officeService.createOffice({
                 companyId: company.id,
                 name: form.name,
                 address: form.address,
                 healthInsuranceType: form.healthInsuranceType,
             });
+<<<<<<< HEAD
 
+=======
+            // 事業所のロード
+            await this.loadOffices();
+>>>>>>> 68d0afc (update 0526)
             // モーダルを閉じる
             this.closeOfficeModal();
         } catch (error) {
@@ -111,6 +134,32 @@ export class CompanyPageComponent {
             this.errorMessage.set('事業所の登録に失敗しました');
         } finally {
             this.isOfficeSaving.set(false);
+        }
+    }
+
+    // 事業所のローディング
+    isLoadingOffices = signal<boolean>(false);
+    errorMessageOffices = signal<string>('');
+
+    // 事業所のロード
+    async loadOffices(): Promise<void> {
+        const company = this.company();
+        if(!company) return;
+        
+        this.isLoadingOffices.set(true);
+        this.errorMessageOffices.set('');
+        this.offices.set([]);
+
+        try {
+            // 事業所の取得
+            const offices = await this.officeService.getOfficesByCompanyId(company.id);
+            this.offices.set(offices);
+        } catch (error) {
+            this.offices.set([]);
+            console.error('事業所の取得に失敗しました', error);
+            this.errorMessageOffices.set('事業所の取得に失敗しました');
+        } finally {
+            this.isLoadingOffices.set(false);
         }
     }
 }
