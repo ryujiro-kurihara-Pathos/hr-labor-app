@@ -24,13 +24,10 @@ export class OfficeCreateModalComponent {
     // ローディング
     isLoading = input(false);
 
-<<<<<<< HEAD:src/app/features/company/components/office-modal.component.ts
     // 親コンポーネントからのイベント
-    close = output<void>();
-    submit = output<OfficeFormData>();
+    // close = output<void>();
+    // submit = output<OfficeFormData>();
 
-=======
->>>>>>> 68d0afc (update 0526):src/app/features/company/components/office-create-modal.component.ts
     // フォームデータ
     name = '';
     address = '';
