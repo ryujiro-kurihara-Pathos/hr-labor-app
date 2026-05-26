@@ -1,7 +1,256 @@
-@if(isLoading()) {
-    <p>Loading...</p>
-} @else {
-    <p>{{ office()?.name }}</p>
-    <p>{{ office()?.address }}</p>
-    <p>{{ office()?.healthInsuranceType }}</p>
-}
+<div class="office-page">
+    @if(isLoading()) {
+        <p class="loading">読み込み中...</p>
+    } @else if (!office()) {
+        <p class="error-message">{{ errorMessage() || '事業所が見つかりませんでした' }}</p>
+    } @else {
+        <div class="office-card">
+            <div class="page-header">
+                <h1>事業所詳細</h1>
+                @if (office()?.status === 'disabled') {
+                    <span class="status-badge disabled">無効化</span>
+                }
+                @if (!isEditing()) {
+                    <button type="button" class="btn edit-btn" (click)="startEdit()">編集</button>
+                }
+            </div>
+
+            @if (isEditing()) {
+                <div class="form-field">
+                    <label for="office-name">事業所名</label>
+                    <input
+                        id="office-name"
+                        type="text"
+                        name="name"
+                        [(ngModel)]="name"
+                    />
+                </div>
+
+                <div class="form-field">
+                    <label for="office-address">所在地</label>
+                    <input
+                        id="office-address"
+                        type="text"
+                        name="address"
+                        [(ngModel)]="address"
+                    />
+                </div>
+
+                <div class="form-field">
+                    <label for="health-insurance-type">健康保険の種類</label>
+                    <select
+                        id="health-insurance-type"
+                        name="healthInsuranceType"
+                        [(ngModel)]="healthInsuranceType"
+                    >
+                        <option value="kyokai">協会けんぽ</option>
+                        <option value="union">組合健保</option>
+                    </select>
+                </div>
+
+                @if (errorMessage()) {
+                    <p class="error-message">{{ errorMessage() }}</p>
+                }
+
+                <div class="button-area">
+                    <button
+                        type="button"
+                        class="btn sub-btn"
+                        (click)="cancelEdit()"
+                        [disabled]="isSaving()"
+                    >
+                        キャンセル
+                    </button>
+                    <button
+                        type="button"
+                        class="btn primary-btn"
+                        (click)="saveOffice()"
+                        [disabled]="isSaving()"
+                    >
+                        @if (isSaving()) {
+                            保存中...
+                        } @else {
+                            保存する
+                        }
+                    </button>
+                </div>
+            } @else {
+                <dl class="detail-list">
+                    <div class="detail-row">
+                        <dt>事業所名</dt>
+                        <dd>{{ office()!.name }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>所在地</dt>
+                        <dd>{{ office()!.address }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>健康保険の種類</dt>
+                        <dd>{{ healthInsuranceLabel(office()!.healthInsuranceType) }}</dd>
+                    </div>
+                </dl>
+
+                @if (errorMessage()) {
+                    <p class="error-message">{{ errorMessage() }}</p>
+                }
+
+                @if (office()?.status === 'disabled') {
+                    <button type="button" class="btn sub-btn" (click)="enableOffice()">
+                        事業所を有効化
+                    </button>
+                } @else {
+                    <button type="button" class="btn sub-btn" (click)="disableOffice()">
+                        事業所を無効化
+                    </button>
+                }
+                <button type="button" class="btn delete-btn" (click)="deleteOffice()">
+                    事業所を削除する
+                </button>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .office-page {
+        max-width: 520px;
+        margin: 0 auto;
+        padding: 24px 16px;
+    }
+
+    .loading {
+        margin: 0;
+        color: #6b7280;
+        font-size: 14px;
+    }
+
+    .office-card {
+        padding: 28px 32px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+
+    h1 {
+        margin: 0;
+        font-size: 22px;
+    }
+
+    .detail-list {
+        margin: 0 0 24px;
+    }
+
+    .detail-row {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 14px 0;
+        border-bottom: 1px solid #f3f4f6;
+    }
+
+    .detail-row:last-child {
+        border-bottom: none;
+    }
+
+    .detail-row dt {
+        margin: 0;
+        color: #6b7280;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .detail-row dd {
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.5;
+    }
+
+    .form-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 16px;
+    }
+
+    .form-field label {
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    input,
+    select {
+        height: 40px;
+        padding: 0 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 14px;
+    }
+
+    select {
+        cursor: pointer;
+        background: #fff;
+    }
+
+    .error-message {
+        margin: 0 0 12px;
+        color: #dc2626;
+        font-size: 14px;
+    }
+
+    .button-area {
+        display: flex;
+        gap: 12px;
+        margin-top: 8px;
+    }
+
+    .btn {
+        height: 42px;
+        padding: 0 16px;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .btn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    .edit-btn {
+        background: #e5e7eb;
+        color: #333;
+    }
+
+    .primary-btn {
+        flex: 1;
+        background: #2f6fed;
+        color: #fff;
+    }
+
+    .sub-btn {
+        flex: 1;
+        background: #e5e7eb;
+        color: #333;
+    }
+
+    .delete-btn {
+        width: 100%;
+        background: #fff;
+        color: #dc2626;
+        border: 1px solid #fecaca;
+    }
+
+    .delete-btn:hover:not(:disabled) {
+        background: #fef2f2;
+    }
+</style>

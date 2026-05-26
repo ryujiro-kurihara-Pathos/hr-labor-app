@@ -7,9 +7,11 @@ import {
     getDocs,
     query,
     where,
-    serverTimestamp,
     Timestamp,
     getDoc,
+    deleteDoc,
+    updateDoc,
+    serverTimestamp,
 } from 'firebase/firestore';
 import { Office, OfficeInput } from '../models/office.model';
 import { db } from '../../../core/firebase';
@@ -25,6 +27,7 @@ export class OfficeService {
         // 事業所ドキュメントの作成
         const docRef = doc(collection(db, 'offices'));
         const office: Office = {
+            id: docRef.id,
             ...officeInput,
             createdAt: createdAt,
             updatedAt: createdAt,
@@ -48,7 +51,7 @@ export class OfficeService {
         // 事業所の配列を作成
         const offices: Office[] = [];
         docSnap.forEach((doc) => {
-            offices.push(doc.data() as Office);
+            offices.push({ id: doc.id, ...doc.data() } as Office);
         });
         
         return offices;
@@ -67,5 +70,37 @@ export class OfficeService {
         } as Office;
 
         return office;
+    }
+
+    async updateOffice(officeId: string, officeInput: OfficeInput): Promise<void> {
+        const docRef = doc(db, 'offices', officeId);
+        await updateDoc(docRef, {
+            ...officeInput,
+            updatedAt: serverTimestamp(),
+        });
+    }
+
+    // 事業所の削除
+    async deleteOffice(officeId: string): Promise<void> {
+        const docRef = doc(db, 'offices', officeId);
+        await deleteDoc(docRef);
+    }
+
+    // 事業所の無効化
+    async disableOffice(officeId: string): Promise<void> {
+        const docRef = doc(db, 'offices', officeId);
+        await updateDoc(docRef, {
+            status: 'disabled',
+            updatedAt: serverTimestamp(),
+        });
+    }
+
+    // 事業所の有効化
+    async enableOffice(officeId: string): Promise<void> {
+        const docRef = doc(db, 'offices', officeId);
+        await updateDoc(docRef, {
+            status: 'active',
+            updatedAt: serverTimestamp(),
+        });
     }
 }

@@ -1,6 +1,7 @@
 @if(isLoading()) {
     <p>Loading...</p>
 } @else {
+    <h2>会社情報</h2>
     <p>{{ company()?.name }}</p>
     <p>{{ company()?.representativeName }}</p>
     <p>{{ company()?.address }}</p>
@@ -22,6 +23,9 @@
         <div class="office-list">
             @for(office of offices(); track office.id) {
                 <div class="office-card" [routerLink]="['/company/offices', office.id]">
+                    @if(office.status === 'disabled') {
+                        <span class="status-badge disabled">無効化</span>
+                    }
                     <p>{{ office.name }}</p>
                     <p>{{ office.address }}</p>
                     <p>{{ office.healthInsuranceType }}</p>

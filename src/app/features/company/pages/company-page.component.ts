@@ -6,14 +6,9 @@ import { AuthService } from '../../auth/services/auth.service';
 import { UserService } from '../../users/services/user.service';
 import { CompanyService } from '../services/company.service';
 
-<<<<<<< HEAD
-import { OfficeModalComponent, OfficeFormData } from '../components/office-modal.component';
-import { OfficeService } from '../services/office.service';
-=======
 import { OfficeCreateModalComponent, OfficeFormData } from '../components/office-create-modal.component';
-import { OfficeService } from '../services/office.service';
+import { OfficeService } from '../services/Office.service';
 import { Office } from '../models/office.model';
->>>>>>> 68d0afc (update 0526)
 
 @Component({
     selector: 'app-company-page',
@@ -94,11 +89,7 @@ export class CompanyPageComponent {
 
     // 事業所の登録
     async onCreateOffice(form: OfficeFormData) {
-<<<<<<< HEAD
-        // 会社情報の取得
-=======
         // 会社情報の有無
->>>>>>> 68d0afc (update 0526)
         const company = this.company();
         if (!company) {
             this.errorMessage.set('会社情報が読み込まれていません');
@@ -110,23 +101,18 @@ export class CompanyPageComponent {
         this.errorMessage.set('');
 
         try {
-<<<<<<< HEAD
-            // Firestoreに事業所を作成
-=======
             // 事業所の作成
->>>>>>> 68d0afc (update 0526)
-            await this.officeService.createOffice({
+            const office = {
                 companyId: company.id,
                 name: form.name,
                 address: form.address,
                 healthInsuranceType: form.healthInsuranceType,
-            });
-<<<<<<< HEAD
-
-=======
+                status: 'active',
+            } as Office;
+            
+            await this.officeService.createOffice(office);
             // 事業所のロード
             await this.loadOffices();
->>>>>>> 68d0afc (update 0526)
             // モーダルを閉じる
             this.closeOfficeModal();
         } catch (error) {
