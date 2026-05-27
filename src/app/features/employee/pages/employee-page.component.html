@@ -1,8 +1,36 @@
 <h1>Employee Page</h1>
 
+<select
+    [ngModel]="selectedOfficeId()"
+    (ngModelChange)="selectedOfficeId.set($event)"
+>
+    <option value="">すべての事業所</option>
+    @for (office of officeNameById() | keyvalue; track office.key) {
+        <option [value]="office.key">{{ office.value }}</option>
+    }
+</select>
+
+<input
+    type="text"
+    [ngModel]="keyword()"
+    (ngModelChange)="keyword.set($event)"
+    placeholder="検索キーワード"
+>
+
 <button class="add-employee-btn" routerLink="/employees/new">従業員を追加</button>
 
-@for (employee of employees(); track employee.employeeNumber) {
-    <p>{{ employee.lastName }} {{ employee.firstName }}</p>
-    <p>{{ employee.joinedDate }}</p>
+@for (employee of filteredEmployees(); track employee.id) {
+    <div class="employee-card" [routerLink]="['/employees', employee.id]">
+        <p>{{ employee.lastName }} {{ employee.firstName }}</p>
+        <p>{{ officeNameById()[employee.officeId] ?? employee.officeId }}</p>
+        <p>{{ employee.joinedDate }}</p>
+    </div>
 }
+
+<style>
+    .employee-card {
+        padding: 16px;
+        background-color: #fff;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+</style>

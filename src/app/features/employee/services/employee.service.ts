@@ -3,6 +3,8 @@ import { Injectable } from '@angular/core';
 import {
     doc,
     setDoc,
+    getDoc,
+    updateDoc,
     collection,
     Timestamp,
     serverTimestamp,
@@ -23,6 +25,7 @@ export class EmployeeService {
         const docRef = doc(collection(db, 'employees'));
         const createdAt = serverTimestamp() as Timestamp;
         const employee: Employee = {
+            id: docRef.id,
             ...employeeInput,
             createdAt: createdAt,
             updatedAt: createdAt,
@@ -40,11 +43,27 @@ export class EmployeeService {
         if(docSnap.empty) return [];
 
         const employees: Employee[] = [];
-        docSnap.forEach((doc) => {
-            employees.push(doc.data() as Employee);
+        docSnap.forEach((docSnap) => {
+            employees.push({ id: docSnap.id, ...docSnap.data() } as Employee);
         });
         return employees;
     }
 
     // employeeIdから従業員を取得
+    async getEmployeeById(employeeId: string): Promise<Employee | null> {
+        const docRef = doc(db, 'employees', employeeId);
+        const docSnap = await getDoc(docRef);
+
+        if (!docSnap.exists()) return null;
+
+        return { id: employeeId, ...docSnap.data() } as Employee;
+    }
+
+    async updateEmployee(employeeId: string, employeeInput: EmployeeInput): Promise<void> {
+        const docRef = doc(db, 'employees', employeeId);
+        await updateDoc(docRef, {
+            ...employeeInput,
+            updatedAt: serverTimestamp(),
+        });
+    }
 }

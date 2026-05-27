@@ -11,6 +11,7 @@ import { CompanyPageComponent } from './features/company/pages/company-page.comp
 import { EmployeePageComponent } from './features/employee/pages/employee-page.component';
 import { OfficePageComponent } from './features/company/pages/office-page.component';
 import { EmployeeCreatePageComponent } from './features/employee/pages/employee-create-page.component';
+import { EmployeeDetailPageComponent } from './features/employee/pages/employee-detail-page.component';
 
 export const routes: Routes = [
     {
@@ -57,6 +58,10 @@ export const routes: Routes = [
             {
                 path: 'employees/new',
                 component: EmployeeCreatePageComponent,
+            },
+            {
+                path: 'employees/:employeeId',
+                component: EmployeeDetailPageComponent,
             }
         ]
     },

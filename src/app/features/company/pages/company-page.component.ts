@@ -7,7 +7,7 @@ import { UserService } from '../../users/services/user.service';
 import { CompanyService } from '../services/company.service';
 
 import { OfficeCreateModalComponent, OfficeFormData } from '../components/office-create-modal.component';
-import { OfficeService } from '../services/Office.service';
+import { OfficeService } from '../services/office.service';
 import { Office } from '../models/office.model';
 
 @Component({

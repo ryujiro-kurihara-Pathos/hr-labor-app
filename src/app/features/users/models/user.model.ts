@@ -5,6 +5,7 @@ export type UserRole = 'admin' | 'labor' | 'employee';
 export type UserStatus = 'active' | 'inactive';
 
 export type AppUser = {
+    id: string; // ドキュメントID（uid と同じ）
     uid: string; // ユーザーID
     lastName: string; // 姓
     firstName: string; // 名
@@ -20,4 +21,4 @@ export type AppUser = {
     employeeId: string | null; // 従業員ID
 }
 
-export type AppUserInput = Omit<AppUser, 'createdAt' | 'updatedAt'>;
+export type AppUserInput = Omit<AppUser, 'id' | 'createdAt' | 'updatedAt'>;

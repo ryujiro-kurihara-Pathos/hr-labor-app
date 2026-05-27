@@ -1,0 +1,260 @@
+<div class="employee-detail-page">
+    @if (isLoading()) {
+        <p class="loading">読み込み中...</p>
+    } @else if (!employee()) {
+        <p class="error-message">{{ errorMessage() || '従業員が見つかりませんでした' }}</p>
+        <a routerLink="/employees" class="back-link">従業員一覧へ</a>
+    } @else {
+        <div class="employee-card">
+            <div class="page-header">
+                <h1>従業員詳細</h1>
+                @if (!isEditing()) {
+                    <button type="button" class="btn edit-btn" (click)="startEdit()">編集</button>
+                }
+            </div>
+
+            @if (isEditing()) {
+                <div class="form-field">
+                    <label for="last-name">姓</label>
+                    <input id="last-name" type="text" name="lastName" [(ngModel)]="lastName" />
+                </div>
+                <div class="form-field">
+                    <label for="first-name">名</label>
+                    <input id="first-name" type="text" name="firstName" [(ngModel)]="firstName" />
+                </div>
+                <div class="form-field">
+                    <label for="employee-number">社員番号</label>
+                    <input id="employee-number" type="text" name="employeeNumber" [(ngModel)]="employeeNumber" />
+                </div>
+                <div class="form-field">
+                    <label for="birth-date">生年月日</label>
+                    <input id="birth-date" type="date" name="birthDate" [(ngModel)]="birthDate" />
+                </div>
+                <div class="form-field">
+                    <label for="joined-date">入社日</label>
+                    <input id="joined-date" type="date" name="joinedDate" [(ngModel)]="joinedDate" />
+                </div>
+                <div class="form-field">
+                    <label for="department">部署</label>
+                    <input id="department" type="text" name="department" [(ngModel)]="department" />
+                </div>
+                <div class="form-field">
+                    <label for="position">役職</label>
+                    <input id="position" type="text" name="position" [(ngModel)]="position" />
+                </div>
+                <div class="form-field">
+                    <label for="status">在籍状態</label>
+                    <select id="status" name="status" [(ngModel)]="status">
+                        <option value="active">在籍</option>
+                        <option value="retired">退職</option>
+                    </select>
+                </div>
+
+                @if (errorMessage()) {
+                    <p class="error-message">{{ errorMessage() }}</p>
+                }
+
+                <div class="button-area">
+                    <button
+                        type="button"
+                        class="btn sub-btn"
+                        (click)="cancelEdit()"
+                        [disabled]="isSaving()"
+                    >
+                        キャンセル
+                    </button>
+                    <button
+                        type="button"
+                        class="btn primary-btn"
+                        (click)="saveEmployee()"
+                        [disabled]="isSaving()"
+                    >
+                        @if (isSaving()) {
+                            保存中...
+                        } @else {
+                            保存する
+                        }
+                    </button>
+                </div>
+            } @else {
+                <dl class="detail-list">
+                    <div class="detail-row">
+                        <dt>氏名</dt>
+                        <dd>{{ employee()!.lastName }} {{ employee()!.firstName }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>社員番号</dt>
+                        <dd>{{ employee()!.employeeNumber || '—' }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>事業所</dt>
+                        <dd>{{ officeName() }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>生年月日</dt>
+                        <dd>{{ employee()!.birthDate }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>入社日</dt>
+                        <dd>{{ employee()!.joinedDate }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>部署</dt>
+                        <dd>{{ employee()!.department || '—' }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>役職</dt>
+                        <dd>{{ employee()!.position || '—' }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>在籍状態</dt>
+                        <dd>{{ statusLabel(employee()!.status) }}</dd>
+                    </div>
+                </dl>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .employee-detail-page {
+        max-width: 520px;
+        margin: 0 auto;
+        padding: 24px 16px;
+    }
+
+    .loading {
+        margin: 0;
+        color: #6b7280;
+        font-size: 14px;
+    }
+
+    .employee-card {
+        padding: 28px 32px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+
+    h1 {
+        margin: 0;
+        font-size: 22px;
+    }
+
+    .back-link {
+        font-size: 14px;
+        color: #2563eb;
+        text-decoration: none;
+    }
+
+    .back-link:hover {
+        text-decoration: underline;
+    }
+
+    .detail-list {
+        margin: 0;
+    }
+
+    .detail-row {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 14px 0;
+        border-bottom: 1px solid #f3f4f6;
+    }
+
+    .detail-row:last-child {
+        border-bottom: none;
+    }
+
+    .detail-row dt {
+        margin: 0;
+        color: #6b7280;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .detail-row dd {
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.5;
+    }
+
+    .form-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 16px;
+    }
+
+    .form-field label {
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    input,
+    select {
+        height: 40px;
+        padding: 0 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 14px;
+    }
+
+    select {
+        cursor: pointer;
+        background: #fff;
+    }
+
+    .error-message {
+        margin: 0 0 12px;
+        color: #dc2626;
+        font-size: 14px;
+    }
+
+    .button-area {
+        display: flex;
+        gap: 12px;
+        margin-top: 8px;
+    }
+
+    .btn {
+        height: 42px;
+        padding: 0 16px;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .btn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    .edit-btn {
+        background: #e5e7eb;
+        color: #333;
+    }
+
+    .primary-btn {
+        flex: 1;
+        background: #2f6fed;
+        color: #fff;
+    }
+
+    .sub-btn {
+        flex: 1;
+        background: #e5e7eb;
+        color: #333;
+    }
+</style>

@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { HealthInsuranceType, Office } from '../models/office.model';
-import { OfficeService } from '../services/Office.service';
+import { OfficeService } from '../services/office.service';
 
 @Component({
     selector: 'app-office-page',

@@ -72,6 +72,7 @@ export class OfficeService {
         return office;
     }
 
+    // 事業所の更新
     async updateOffice(officeId: string, officeInput: OfficeInput): Promise<void> {
         const docRef = doc(db, 'offices', officeId);
         await updateDoc(docRef, {

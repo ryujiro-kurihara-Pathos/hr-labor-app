@@ -20,6 +20,7 @@ export class UserService {
     async createUser(userInput: AppUserInput) {
         const docRef = doc(db, 'users', userInput.uid);
         const user: AppUser = {
+            id: userInput.uid,
             ...userInput,
             createdAt: serverTimestamp() as Timestamp,
             updatedAt: serverTimestamp() as Timestamp,
@@ -38,6 +39,6 @@ export class UserService {
         
         if(!docSnap.exists()) return null;
 
-        return docSnap.data() as AppUser;
+        return { id: uid, ...docSnap.data() } as AppUser;
     }
 }

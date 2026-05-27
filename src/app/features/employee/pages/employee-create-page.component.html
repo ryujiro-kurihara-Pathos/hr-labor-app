@@ -1,70 +1,128 @@
-<p>従業員の追加</p>
+@if(isLoading()) {
+    <p>Loading...</p>
+} @else {
+    <p>従業員の追加</p>
 
-<p>本人情報</p>
+    <p>本人情報</p>
 
-<div class="form-row">
-    <div class="form-row-label">
-        <label for="joined-year">入社日</label>
-        <span class="required-badge">必須</span>
+    <div class="form-row">
+        <div class="form-row-label">
+            <label for="joined-year">入社日</label>
+            <span class="required-badge">必須</span>
+        </div>
+        <div class="date-selects">
+            <select
+                id="joined-year"
+                name="joinedYear"
+                class="date-select date-select-year"
+                [(ngModel)]="joinedYear"
+                (ngModelChange)="updateJoinedDate()"
+            >
+                @for (year of joinYears; track year) {
+                    <option [value]="year">
+                        {{ year }}
+                    </option>
+                }
+            </select>
+            <span class="date-unit">年</span>
+
+            <select
+                id="joined-month"
+                name="joinedMonth"
+                class="date-select date-select-month"
+                [(ngModel)]="joinedMonth"
+                (ngModelChange)="updateJoinedDate()"
+            >
+                @for (month of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]; track month) {
+                    <option [value]="month">{{ month }}</option>
+                }
+            </select>
+            <span class="date-unit">月</span>
+
+            <select
+                id="joined-day"
+                name="joinedDay"
+                class="date-select date-select-day"
+                [(ngModel)]="joinedDay"
+                (ngModelChange)="updateJoinedDate()"
+            >
+                @for (day of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]; track day) {
+                    <option [value]="day">{{ day }}</option>
+                }
+            </select>
+            <span class="date-unit">日</span>
+        </div>
+        <input type="hidden" name="joinedDate" [(ngModel)]="employee.joinedDate" />
     </div>
-    <div class="date-selects">
-        <select
-            id="joined-year"
-            name="joinedYear"
-            class="date-select date-select-year"
-            [(ngModel)]="joinedYear"
-            (ngModelChange)="updateJoinedDate()"
-        >
-            @for (year of joinYears; track year) {
-                <option [value]="year">
-                    {{ year }}
-                </option>
-            }
-        </select>
-        <span class="date-unit">年</span>
 
-        <select
-            id="joined-month"
-            name="joinedMonth"
-            class="date-select date-select-month"
-            [(ngModel)]="joinedMonth"
-            (ngModelChange)="updateJoinedDate()"
-        >
-            @for (month of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]; track month) {
-                <option [value]="month">{{ month }}</option>
-            }
-        </select>
-        <span class="date-unit">月</span>
+    <p>姓</p>
+    <input type="text" name="lastName" [(ngModel)]="employee.lastName">
 
-        <select
-            id="joined-day"
-            name="joinedDay"
-            class="date-select date-select-day"
-            [(ngModel)]="joinedDay"
-            (ngModelChange)="updateJoinedDate()"
-        >
-            @for (day of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]; track day) {
-                <option [value]="day">{{ day }}</option>
-            }
-        </select>
-        <span class="date-unit">日</span>
+    <p>名</p>
+    <input type="text" name="firstName" [(ngModel)]="employee.firstName">
+
+    <div class="form-row">
+        <div class="form-row-label">
+            <label for="birth-year">生年月日</label>
+            <span class="required-badge">必須</span>
+        </div>
+        <div class="date-selects">
+            <select
+                id="birth-year"
+                name="birthYear"
+                class="date-select date-select-year"
+                [(ngModel)]="birthYear"
+                (ngModelChange)="updateBirthDate()"
+            >
+                @for (year of birthYears; track year) {
+                    <option [value]="year">
+                        {{ year }}
+                    </option>
+                }
+            </select>
+            <span class="date-unit">年</span>
+
+            <select
+                id="birth-month"
+                name="birthMonth"
+                class="date-select date-select-month"
+                [(ngModel)]="birthMonth"
+                (ngModelChange)="updateBirthDate()"
+            >
+                @for (month of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]; track month) {
+                    <option [value]="month">{{ month }}</option>
+                }
+            </select>
+            <span class="date-unit">月</span>
+
+            <select
+                id="birth-day"
+                name="birthDay"
+                class="date-select date-select-day"
+                [(ngModel)]="birthDay"
+                (ngModelChange)="updateBirthDate()"
+            >
+                @for (day of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]; track day) {
+                    <option [value]="day">{{ day }}</option>
+                }
+            </select>
+            <span class="date-unit">日</span>
+        </div>
+        <input type="hidden" name="birthDate" [(ngModel)]="employee.birthDate" />
     </div>
-    <input type="hidden" name="joinedDate" [(ngModel)]="employee.joinedDate" />
-</div>
 
-<p>姓</p>
-<input type="text" name="lastName" [(ngModel)]="employee.lastName">
+    <p>事業所</p>
+    <select name="officeId" [(ngModel)]="employee.officeId">
+        @for (office of offices(); track office.id) {
+            <option [value]="office.id">{{ office.name }}</option>
+        }
+    </select>
 
-<p>名</p>
-<input type="text" name="firstName" [(ngModel)]="employee.firstName">
+    <p>{{ errorMessage() }}</p>
 
-<p>生年月日</p>
-<input type="date" name="birthDate" [(ngModel)]="employee.birthDate">
-
-<p>{{ errorMessage() }}</p>
-
-<p>登録</p>
-<button class="form-btn" type="button" (click)="onCreateEmployee()">登録</button>
+    <p>登録</p>
+    <button class="form-btn" type="button" (click)="onCreateEmployee()">登録</button>
+}
 
 <style>
     .form-row {
