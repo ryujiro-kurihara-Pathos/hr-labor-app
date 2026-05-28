@@ -35,6 +35,14 @@ export class EmployeeDetailPageComponent {
     position = '';
     status: EmployeeStatus = 'active';
 
+    // 社会保険 加入要件（UIのみ・保存なし）
+    employmentType = ''; // 例: fulltime / parttime / contract など（いったん自由入力）
+    weeklyScheduledWorkHours = ''; // number入力だが空を許容するため文字列
+    monthlyScheduledWorkDays = '';
+    prescribedWage = '';
+    isStudent = false;
+    expectedEmploymentOver2Months = false;
+
     async ngOnInit() {
         const employeeId = this.route.snapshot.params['employeeId'];
 
@@ -125,6 +133,55 @@ export class EmployeeDetailPageComponent {
 
     statusLabel(status: EmployeeStatus): string {
         return status === 'active' ? '在籍' : '退職';
+    }
+
+    // ---- 社会保険：簡易判定（プロトタイプ用） ----
+    judgeHealthInsurance(): '対象' | '対象外' | '判定不可' {
+        const w = this.toNumberOrNull(this.weeklyScheduledWorkHours);
+        const d = this.toNumberOrNull(this.monthlyScheduledWorkDays);
+        const wage = this.toNumberOrNull(this.prescribedWage);
+        if (w === null || d === null || wage === null) return '判定不可';
+        if (w <= 0 || d <= 0 || wage < 0) return '判定不可';
+
+        // 参考ルール（簡易）
+        const ok =
+            w >= 20 &&
+            d >= 11 &&
+            wage >= 88000 &&
+            this.expectedEmploymentOver2Months &&
+            !this.isStudent;
+        return ok ? '対象' : '対象外';
+    }
+
+    judgePensionInsurance(): '対象' | '対象外' | '判定不可' {
+        // 健康保険と同じ入力要件で暫定判定（簡易）
+        return this.judgeHealthInsurance();
+    }
+
+    judgeCareInsurance(): '対象' | '対象外' | '判定不可' {
+        const birth = this.employee()?.birthDate ?? '';
+        const age = this.ageToday(birth);
+        if (age === null) return '判定不可';
+        // 参考ルール（簡易）：40歳以上65歳未満を対象
+        return age >= 40 && age < 65 ? '対象' : '対象外';
+    }
+
+    private toNumberOrNull(value: string): number | null {
+        const v = value.trim();
+        if (!v) return null;
+        const n = Number(v);
+        return Number.isFinite(n) ? n : null;
+    }
+
+    private ageToday(birthDate: string): number | null {
+        if (!birthDate) return null;
+        const d = new Date(birthDate);
+        if (Number.isNaN(d.getTime())) return null;
+        const today = new Date();
+        let age = today.getFullYear() - d.getFullYear();
+        const m = today.getMonth() - d.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+        return age;
     }
 
     private syncFormFromEmployee(employee: Employee): void {

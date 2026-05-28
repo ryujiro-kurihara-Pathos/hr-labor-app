@@ -112,6 +112,61 @@
                     </div>
                 </dl>
             }
+
+            <h2 class="section-title">社会保険（加入要件入力・参考判定）</h2>
+            <p class="section-note">
+                ここで入力した情報は、現時点では保存しません（UIのみ）。判定は参考です。
+            </p>
+
+            <div class="form-field">
+                <label for="employment-type">雇用区分</label>
+                <input id="employment-type" type="text" name="employmentType" [(ngModel)]="employmentType" placeholder="例: 正社員 / パート" />
+            </div>
+            <div class="form-field">
+                <label for="weekly-hours">週の所定労働時間</label>
+                <input id="weekly-hours" type="number" name="weeklyScheduledWorkHours" [(ngModel)]="weeklyScheduledWorkHours" placeholder="例: 20" />
+            </div>
+            <div class="form-field">
+                <label for="monthly-days">月の所定労働日数</label>
+                <input id="monthly-days" type="number" name="monthlyScheduledWorkDays" [(ngModel)]="monthlyScheduledWorkDays" placeholder="例: 11" />
+            </div>
+            <div class="form-field">
+                <label for="wage">所定内賃金（月額）</label>
+                <input id="wage" type="number" name="prescribedWage" [(ngModel)]="prescribedWage" placeholder="例: 88000" />
+            </div>
+            <div class="form-field checkbox-field">
+                <label>
+                    <input type="checkbox" name="isStudent" [(ngModel)]="isStudent" />
+                    学生
+                </label>
+            </div>
+            <div class="form-field checkbox-field">
+                <label>
+                    <input type="checkbox" name="expectedEmploymentOver2Months" [(ngModel)]="expectedEmploymentOver2Months" />
+                    雇用見込みが2カ月超
+                </label>
+            </div>
+
+            <div class="result-box">
+                <div class="result-row">
+                    <span class="result-label">健康保険</span>
+                    <span class="result-badge" [class.ok]="judgeHealthInsurance() === '対象'" [class.ng]="judgeHealthInsurance() === '対象外'">
+                        {{ judgeHealthInsurance() }}
+                    </span>
+                </div>
+                <div class="result-row">
+                    <span class="result-label">厚生年金</span>
+                    <span class="result-badge" [class.ok]="judgePensionInsurance() === '対象'" [class.ng]="judgePensionInsurance() === '対象外'">
+                        {{ judgePensionInsurance() }}
+                    </span>
+                </div>
+                <div class="result-row">
+                    <span class="result-label">介護保険（年齢）</span>
+                    <span class="result-badge" [class.ok]="judgeCareInsurance() === '対象'" [class.ng]="judgeCareInsurance() === '対象外'">
+                        {{ judgeCareInsurance() }}
+                    </span>
+                </div>
+            </div>
         </div>
     }
 </div>
@@ -147,6 +202,76 @@
     h1 {
         margin: 0;
         font-size: 22px;
+    }
+
+    .section-title {
+        margin: 28px 0 10px;
+        font-size: 18px;
+    }
+
+    .section-note {
+        margin: 0 0 14px;
+        color: #6b7280;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .result-box {
+        margin: 8px 0 18px;
+        padding: 12px 14px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+    }
+
+    .result-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 0;
+        border-bottom: 1px solid #eef2f7;
+    }
+
+    .result-row:last-child {
+        border-bottom: none;
+    }
+
+    .result-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #111827;
+    }
+
+    .result-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 72px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 700;
+        background: #e5e7eb;
+        color: #374151;
+    }
+
+    .result-badge.ok {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .result-badge.ng {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .checkbox-field label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 600;
     }
 
     .back-link {
