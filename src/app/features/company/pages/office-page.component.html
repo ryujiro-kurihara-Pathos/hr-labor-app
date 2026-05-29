@@ -48,6 +48,52 @@
                     </select>
                 </div>
 
+                <h2 class="section-title">社会保険（通常の労働者の基準）</h2>
+                <p class="section-note">
+                    パート・アルバイトの加入要件判定（4分の3ルール）で参照します。未入力の項目は絶対基準のみで判定します。
+                </p>
+
+                <div class="form-field">
+                    <label for="regular-weekly-hours">週の所定労働時間</label>
+                    <input
+                        id="regular-weekly-hours"
+                        type="number"
+                        name="regularWeeklyScheduledWorkHours"
+                        [(ngModel)]="regularWeeklyScheduledWorkHours"
+                        placeholder="例: 40"
+                    />
+                </div>
+                <div class="form-field">
+                    <label for="regular-monthly-hours">月の所定労働時間</label>
+                    <input
+                        id="regular-monthly-hours"
+                        type="number"
+                        name="regularMonthlyScheduledWorkHours"
+                        [(ngModel)]="regularMonthlyScheduledWorkHours"
+                        placeholder="例: 160"
+                    />
+                </div>
+                <div class="form-field">
+                    <label for="regular-weekly-days">週の所定労働日数</label>
+                    <input
+                        id="regular-weekly-days"
+                        type="number"
+                        name="regularWeeklyScheduledWorkDays"
+                        [(ngModel)]="regularWeeklyScheduledWorkDays"
+                        placeholder="例: 5"
+                    />
+                </div>
+                <div class="form-field">
+                    <label for="regular-monthly-days">月の所定労働日数</label>
+                    <input
+                        id="regular-monthly-days"
+                        type="number"
+                        name="regularMonthlyScheduledWorkDays"
+                        [(ngModel)]="regularMonthlyScheduledWorkDays"
+                        placeholder="例: 20"
+                    />
+                </div>
+
                 @if (errorMessage()) {
                     <p class="error-message">{{ errorMessage() }}</p>
                 }
@@ -87,6 +133,26 @@
                     <div class="detail-row">
                         <dt>健康保険の種類</dt>
                         <dd>{{ healthInsuranceLabel(office()!.healthInsuranceType) }}</dd>
+                    </div>
+                </dl>
+
+                <h2 class="section-title">社会保険（通常の労働者の基準）</h2>
+                <dl class="detail-list">
+                    <div class="detail-row">
+                        <dt>週の所定労働時間</dt>
+                        <dd>{{ displayNumber(office()!.regularWeeklyScheduledWorkHours) }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>月の所定労働時間</dt>
+                        <dd>{{ displayNumber(office()!.regularMonthlyScheduledWorkHours) }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>週の所定労働日数</dt>
+                        <dd>{{ displayNumber(office()!.regularWeeklyScheduledWorkDays) }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>月の所定労働日数</dt>
+                        <dd>{{ displayNumber(office()!.regularMonthlyScheduledWorkDays) }}</dd>
                     </div>
                 </dl>
 
@@ -142,6 +208,18 @@
     h1 {
         margin: 0;
         font-size: 22px;
+    }
+
+    .section-title {
+        margin: 28px 0 10px;
+        font-size: 18px;
+    }
+
+    .section-note {
+        margin: 0 0 14px;
+        color: #6b7280;
+        font-size: 13px;
+        line-height: 1.5;
     }
 
     .detail-list {

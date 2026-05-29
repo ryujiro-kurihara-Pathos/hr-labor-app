@@ -3,6 +3,10 @@ import { Injectable } from '@angular/core';
 import {
     doc,
     setDoc,
+    getDocs,
+    updateDoc,
+    query,
+    where,
     collection,
     serverTimestamp,
     Timestamp,
@@ -32,5 +36,23 @@ export class SocialInsuranceStatusService {
         return socialInsuranceStatus;
     }
 
-    
+    // employeeIdから社会保険情報を取得
+    async getByEmployeeId(employeeId: string): Promise<SocialInsuranceStatus | null> {
+        const docRef = collection(db, 'socialInsuranceStatuses');
+        const q = query(docRef, where('employeeId', '==', employeeId));
+        const docSnap = await getDocs(q);
+        if (docSnap.empty) return null;
+
+        const snapshot = docSnap.docs[0];
+        return { id: snapshot.id, ...snapshot.data() } as SocialInsuranceStatus;
+    }
+
+    // 社会保険情報を更新
+    async updateSocialInsuranceStatus(id: string, socialInsuranceStatusInput: SocialInsuranceStatusInput): Promise<void> {
+        const docRef = doc(db, 'socialInsuranceStatuses', id);
+        await updateDoc(docRef, {
+            ...socialInsuranceStatusInput,
+            updatedAt: serverTimestamp(),
+        });
+    }
 }

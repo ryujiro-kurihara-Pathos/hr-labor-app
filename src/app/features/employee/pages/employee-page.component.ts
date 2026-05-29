@@ -3,7 +3,7 @@ import { KeyValuePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
-import { Employee } from '../models/employee.models';
+import { Employee, EmployeeStatus } from '../models/employee.models';
 import { EmployeeService } from '../services/employee.service';
 import { AuthService } from '../../auth/services/auth.service';
 import { UserService } from '../../users/services/user.service';
@@ -83,17 +83,28 @@ export class EmployeePageComponent {
     // 事業所絞り込み（空文字はすべて）
     selectedOfficeId = signal<string>('');
 
+    // 在籍状態絞り込み（空文字はすべて）
+    selectedStatus = signal<'' | EmployeeStatus>('');
+
     // 検索結果
     filteredEmployees = computed(() => this.searchEmployees());
+
+    statusLabel(status: EmployeeStatus): string {
+        return status === 'active' ? '在籍' : '退職';
+    }
 
     // 従業員を検索（keyword / selectedOfficeId / employees が変わるたび呼ばれる）
     searchEmployees(): Employee[] {
         const keyword = this.keyword().trim().toLowerCase();
         const officeId = this.selectedOfficeId();
+        const status = this.selectedStatus();
         let list = this.employees();
 
         if (officeId) {
             list = list.filter((employee) => employee.officeId === officeId);
+        }
+        if (status) {
+            list = list.filter((employee) => employee.status === status);
         }
         if (!keyword) return list;
         return list.filter(

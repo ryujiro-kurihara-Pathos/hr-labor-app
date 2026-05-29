@@ -11,6 +11,12 @@ export type Office = {
     address: string; // 所在地
     healthInsuranceType: HealthInsuranceType; // 健康保険の種類
 
+    // 社会保険：当該事業所の通常の労働者の基準（加入要件判定用）
+    regularWeeklyScheduledWorkHours: number | null; // 週の所定労働時間
+    regularMonthlyScheduledWorkHours: number | null; // 月の所定労働時間
+    regularWeeklyScheduledWorkDays: number | null; // 週の所定労働日数
+    regularMonthlyScheduledWorkDays: number | null; // 月の所定労働日数
+
     status: OfficeStatus; // 事業所のステータス
 
     createdAt: Timestamp;

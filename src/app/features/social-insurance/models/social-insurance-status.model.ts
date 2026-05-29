@@ -1,12 +1,11 @@
 import { Timestamp } from 'firebase/firestore';
 
-export type insuranceJoinStatus = 'active' | 'inactive';
+export type insuranceJoinStatus = 'active' | 'inactive' | 'unknown';
 
 export type SocialInsuranceStatus = {
     id: string;                                    // ドキュメントID
 
-    // 会社・従業員紐づけ
-    companyId: string;                             // 会社ID
+    // 従業員紐づけ
     employeeId: string;                            // 従業員ID
 
     // 会社状況

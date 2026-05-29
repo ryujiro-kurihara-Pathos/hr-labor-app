@@ -28,6 +28,10 @@ export class OfficePageComponent {
     name = '';
     address = '';
     healthInsuranceType: HealthInsuranceType = 'kyokai';
+    regularWeeklyScheduledWorkHours = '';
+    regularMonthlyScheduledWorkHours = '';
+    regularWeeklyScheduledWorkDays = '';
+    regularMonthlyScheduledWorkDays = '';
 
     // 初期処理
     async ngOnInit() {
@@ -53,9 +57,7 @@ export class OfficePageComponent {
             const office = await this.officeService.getOfficeById(officeId);
             this.office.set(office);
             if (office) {
-                this.name = office.name;
-                this.address = office.address;
-                this.healthInsuranceType = office.healthInsuranceType;
+                this.syncFormFromOffice(office);
             }
         } catch (error) {
             console.error('事業所の取得に失敗しました', error);
@@ -70,14 +72,20 @@ export class OfficePageComponent {
         return type === 'kyokai' ? '協会けんぽ' : '組合健保';
     }
 
+    displayValue(value: string): string {
+        return value.trim() ? value : '—';
+    }
+
+    displayNumber(value: number | null | undefined): string {
+        return value !== null && value !== undefined ? String(value) : '—';
+    }
+
     // 編集開始
     startEdit(): void {
         const office = this.office();
         if (!office) return;
 
-        this.name = office.name;
-        this.address = office.address;
-        this.healthInsuranceType = office.healthInsuranceType;
+        this.syncFormFromOffice(office);
         this.errorMessage.set('');
         this.isEditing.set(true);
     }
@@ -86,9 +94,7 @@ export class OfficePageComponent {
     cancelEdit(): void {
         const office = this.office();
         if (office) {
-            this.name = office.name;
-            this.address = office.address;
-            this.healthInsuranceType = office.healthInsuranceType;
+            this.syncFormFromOffice(office);
         }
         this.errorMessage.set('');
         this.isEditing.set(false);
@@ -103,18 +109,31 @@ export class OfficePageComponent {
         this.errorMessage.set('');
 
         try {
+            const regularWeeklyScheduledWorkHours = this.toNullableNumber(this.regularWeeklyScheduledWorkHours);
+            const regularMonthlyScheduledWorkHours = this.toNullableNumber(this.regularMonthlyScheduledWorkHours);
+            const regularWeeklyScheduledWorkDays = this.toNullableNumber(this.regularWeeklyScheduledWorkDays);
+            const regularMonthlyScheduledWorkDays = this.toNullableNumber(this.regularMonthlyScheduledWorkDays);
+
             await this.officeService.updateOffice(office.id, {
                 companyId: office.companyId,
                 name: this.name,
                 address: this.address,
                 healthInsuranceType: this.healthInsuranceType,
-                status: 'active',
+                regularWeeklyScheduledWorkHours,
+                regularMonthlyScheduledWorkHours,
+                regularWeeklyScheduledWorkDays,
+                regularMonthlyScheduledWorkDays,
+                status: office.status,
             });
             this.office.set({
                 ...office,
                 name: this.name,
                 address: this.address,
                 healthInsuranceType: this.healthInsuranceType,
+                regularWeeklyScheduledWorkHours,
+                regularMonthlyScheduledWorkHours,
+                regularWeeklyScheduledWorkDays,
+                regularMonthlyScheduledWorkDays,
             });
             this.isEditing.set(false);
         } catch (error) {
@@ -183,5 +202,26 @@ export class OfficePageComponent {
         } finally {
             this.isLoading.set(false);
         }
+    }
+
+    private syncFormFromOffice(office: Office): void {
+        this.name = office.name;
+        this.address = office.address;
+        this.healthInsuranceType = office.healthInsuranceType;
+        this.regularWeeklyScheduledWorkHours = this.numberToFormValue(office.regularWeeklyScheduledWorkHours);
+        this.regularMonthlyScheduledWorkHours = this.numberToFormValue(office.regularMonthlyScheduledWorkHours);
+        this.regularWeeklyScheduledWorkDays = this.numberToFormValue(office.regularWeeklyScheduledWorkDays);
+        this.regularMonthlyScheduledWorkDays = this.numberToFormValue(office.regularMonthlyScheduledWorkDays);
+    }
+
+    private numberToFormValue(value: number | null | undefined): string {
+        return value !== null && value !== undefined ? String(value) : '';
+    }
+
+    private toNullableNumber(value: string): number | null {
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+        const num = Number(trimmed);
+        return Number.isFinite(num) ? num : null;
     }
 }

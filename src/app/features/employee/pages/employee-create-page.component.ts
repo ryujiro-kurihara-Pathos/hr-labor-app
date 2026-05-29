@@ -127,17 +127,16 @@ export class EmployeeCreatePageComponent {
 
             // 社会保険情報を作成
             const socialInsuranceStatusInput: SocialInsuranceStatusInput = {
-                companyId: this.employee.companyId,
                 employeeId: employee.id,
-                healthInsuranceStatus: 'active',
-                pensionInsuranceStatus: 'active',
-                careInsuranceStatus: 'active',
-                healthInsuranceStartDate: null,
-                healthInsuranceEndDate: null,
-                pensionInsuranceStartDate: null,
-                pensionInsuranceEndDate: null,
-                careInsuranceStartDate: null,
-                careInsuranceEndDate: null,
+                healthInsuranceStatus: 'unknown',   // 健康保険
+                pensionInsuranceStatus: 'unknown',  // 厚生年金
+                careInsuranceStatus: 'unknown',     // 介護保険
+                healthInsuranceStartDate: null,     // 健康保険の資格取得日
+                healthInsuranceEndDate: null,       // 健康保険の資格喪失日
+                pensionInsuranceStartDate: null,    // 厚生年金の資格取得日
+                pensionInsuranceEndDate: null,      // 厚生年金の資格喪失日
+                careInsuranceStartDate: null,       // 介護保険の対象開始日
+                careInsuranceEndDate: null,         // 介護保険の対象終了日
             }
             await this.socialInsuranceStatusService.createSocialInsuranceStatus(socialInsuranceStatusInput);
 

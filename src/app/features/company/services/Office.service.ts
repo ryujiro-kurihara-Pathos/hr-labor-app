@@ -51,7 +51,7 @@ export class OfficeService {
         // 事業所の配列を作成
         const offices: Office[] = [];
         docSnap.forEach((doc) => {
-            offices.push({ id: doc.id, ...doc.data() } as Office);
+            offices.push(this.normalizeOffice(doc.id, doc.data()));
         });
         
         return offices;
@@ -64,12 +64,7 @@ export class OfficeService {
 
         if(!docSnap.exists()) return null;
 
-        const office = {
-            id: officeId,
-            ...docSnap.data(),
-        } as Office;
-
-        return office;
+        return this.normalizeOffice(officeId, docSnap.data());
     }
 
     // 事業所の更新
@@ -103,5 +98,28 @@ export class OfficeService {
             status: 'active',
             updatedAt: serverTimestamp(),
         });
+    }
+
+    private normalizeOffice(id: string, data: Record<string, unknown>): Office {
+        return {
+            id,
+            companyId: String(data['companyId'] ?? ''),
+            name: String(data['name'] ?? ''),
+            address: String(data['address'] ?? ''),
+            healthInsuranceType: (data['healthInsuranceType'] as Office['healthInsuranceType']) ?? 'kyokai',
+            regularWeeklyScheduledWorkHours: this.toNullableNumber(data['regularWeeklyScheduledWorkHours']),
+            regularMonthlyScheduledWorkHours: this.toNullableNumber(data['regularMonthlyScheduledWorkHours']),
+            regularWeeklyScheduledWorkDays: this.toNullableNumber(data['regularWeeklyScheduledWorkDays']),
+            regularMonthlyScheduledWorkDays: this.toNullableNumber(data['regularMonthlyScheduledWorkDays']),
+            status: (data['status'] as Office['status']) ?? 'active',
+            createdAt: data['createdAt'] as Office['createdAt'],
+            updatedAt: data['updatedAt'] as Office['updatedAt'],
+        };
+    }
+
+    private toNullableNumber(value: unknown): number | null {
+        if (value === null || value === undefined || value === '') return null;
+        const num = Number(value);
+        return Number.isFinite(num) ? num : null;
     }
 }

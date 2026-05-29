@@ -107,6 +107,10 @@ export class CompanyPageComponent {
                 name: form.name,
                 address: form.address,
                 healthInsuranceType: form.healthInsuranceType,
+                regularWeeklyScheduledWorkHours: null,
+                regularMonthlyScheduledWorkHours: null,
+                regularWeeklyScheduledWorkDays: null,
+                regularMonthlyScheduledWorkDays: null,
                 status: 'active',
             } as Office;
             
