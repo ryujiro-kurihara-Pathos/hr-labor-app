@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Timestamp } from 'firebase/firestore';
 
-import { Employee, EmployeeInput, EmployeeStatus } from '../models/employee.models';
+import { Employee, EmployeeInput, EmployeeStatus, EmploymentType } from '../models/employee.models';
 import { EmployeeService } from '../services/employee.service';
 import { Office } from '../../company/models/office.model';
 import { OfficeService } from '../../company/services/office.service';
@@ -11,10 +11,9 @@ import { SocialInsuranceStatusService } from '../../social-insurance/services/so
 import { insuranceJoinStatus, SocialInsuranceStatus, SocialInsuranceStatusInput } from '../../social-insurance/models/social-insurance-status.model';
 
 type SocialInsuranceDraft = {
-    employmentType: string;
-    weeklyScheduledWorkHours: string;
-    monthlyScheduledWorkDays: string;
-    prescribedWage: string;
+    weeklyScheduledWorkHours: string | number;
+    monthlyScheduledWorkDays: string | number;
+    prescribedWage: string | number;
     isStudent: boolean;
     expectedEmploymentOver2Months: boolean;
 };
@@ -52,12 +51,12 @@ export class EmployeeDetailPageComponent {
     joinedDate = '';
     department = '';
     position = '';
+    employmentType: EmploymentType = null;
 
     // 社会保険 加入要件（UIのみ・保存なし）
-    employmentType = '';
-    weeklyScheduledWorkHours = ''; // number入力だが空を許容するため文字列
-    monthlyScheduledWorkDays = '';
-    prescribedWage = '';
+    weeklyScheduledWorkHours: string | number = ''; // number入力だが空を許容するため文字列
+    monthlyScheduledWorkDays: string | number = '';
+    prescribedWage: string | number = '';
     isStudent = false;
     expectedEmploymentOver2Months = false;
 
@@ -150,6 +149,7 @@ export class EmployeeDetailPageComponent {
             firstName: this.firstName,
             birthDate: this.birthDate,
             joinedDate: this.joinedDate,
+            employmentType: this.employmentType,
             department: this.department,
             position: this.position,
             status: employee.status,
@@ -254,6 +254,7 @@ export class EmployeeDetailPageComponent {
             firstName: employee.firstName,
             birthDate: employee.birthDate,
             joinedDate: employee.joinedDate,
+            employmentType: employee.employmentType,
             department: employee.department,
             position: employee.position,
             status: 'retired',
@@ -292,6 +293,7 @@ export class EmployeeDetailPageComponent {
             firstName: employee.firstName,
             birthDate: employee.birthDate,
             joinedDate: employee.joinedDate,
+            employmentType: employee.employmentType,
             department: employee.department,
             position: employee.position,
             status: 'active',
@@ -312,8 +314,17 @@ export class EmployeeDetailPageComponent {
         }
     }
 
-    displayValue(value: string): string {
-        return value.trim() ? value : '—';
+    displayValue(value: string | number | null | undefined): string {
+        if (value === null || value === undefined) return '—';
+        if (typeof value === 'number') return String(value);
+        const trimmed = value.trim();
+        return trimmed ? trimmed : '—';
+    }
+
+    employmentTypeLabel(type: EmploymentType): string {
+        if (type === 'full-time') return '正社員';
+        if (type === 'part-time') return 'パート・アルバイト';
+        return '—';
     }
 
     displayOfficeNumber(value: number | null | undefined): string {
@@ -325,11 +336,11 @@ export class EmployeeDetailPageComponent {
     }
 
     hasEmploymentType(): boolean {
-        return this.employmentType.trim() !== '';
+        return this.employmentType !== null;
     }
 
     isPartTimeEmployment(): boolean {
-        return this.employmentType === 'パート' || this.employmentType === 'アルバイト';
+        return this.employmentType === 'part-time';
     }
 
     onEmploymentTypeChange(): void {
@@ -348,16 +359,23 @@ export class EmployeeDetailPageComponent {
     // 3. 4分の3を満たさない → 短時間労働者の条件 → すべて満たせば対象
     // 4. どちらも満たさない → 対象外
     judgeHealthInsurance(): insuranceJoinStatus {
+        // 雇用区分がない場合は判定不可
         if (!this.hasEmploymentType()) return 'unknown';
+        // 正社員は原則対象
         if (!this.isPartTimeEmployment()) return 'active';
 
+        // パート・アルバイトの場合は4分の3基準をチェック
+        // 週の所定労働時間、月の所定労働日数、所定内賃金
         const weeklyHours = this.toNumberOrNull(this.weeklyScheduledWorkHours);
         const monthlyDays = this.toNumberOrNull(this.monthlyScheduledWorkDays);
         const wage = this.toNumberOrNull(this.prescribedWage);
+        // 入力がない場合、入力が不正な場合は判定不可
         if (weeklyHours === null || monthlyDays === null || wage === null) return 'unknown';
         if (weeklyHours <= 0 || monthlyDays <= 0 || wage < 0) return 'unknown';
 
+        // 4分の3基準をチェック
         if (this.meetsThreeQuartersRule(weeklyHours, monthlyDays)) return 'active';
+        // 短時間労働者の条件をチェック
         if (this.meetsShortTimeWorkerConditions(weeklyHours, monthlyDays, wage)) return 'active';
 
         return 'inactive';
@@ -414,8 +432,10 @@ export class EmployeeDetailPageComponent {
         return age >= 40 && age < 65 ? 'active' : 'inactive';
     }
 
-    // 文字列を数値に変換する
-    private toNumberOrNull(value: string): number | null {
+    // 文字列・数値入力を数値に変換する（type="number" の ngModel は number になる）
+    private toNumberOrNull(value: string | number | null | undefined): number | null {
+        if (value === null || value === undefined) return null;
+        if (typeof value === 'number') return Number.isFinite(value) ? value : null;
         const val = value.trim();
         if (!val) return null;
         const num = Number(val);
@@ -443,6 +463,7 @@ export class EmployeeDetailPageComponent {
         this.joinedDate = employee.joinedDate;
         this.department = employee.department;
         this.position = employee.position;
+        this.employmentType = employee.employmentType;
     }
 
     private todayDateString(): string {
@@ -455,7 +476,6 @@ export class EmployeeDetailPageComponent {
 
     private createEmptySocialInsuranceDraft(): SocialInsuranceDraft {
         return {
-            employmentType: '',
             weeklyScheduledWorkHours: '',
             monthlyScheduledWorkDays: '',
             prescribedWage: '',
@@ -466,7 +486,6 @@ export class EmployeeDetailPageComponent {
 
     private captureSocialInsuranceDraft(): SocialInsuranceDraft {
         return {
-            employmentType: this.employmentType,
             weeklyScheduledWorkHours: this.weeklyScheduledWorkHours,
             monthlyScheduledWorkDays: this.monthlyScheduledWorkDays,
             prescribedWage: this.prescribedWage,
@@ -476,7 +495,6 @@ export class EmployeeDetailPageComponent {
     }
 
     private applySocialInsuranceDraft(draft: SocialInsuranceDraft): void {
-        this.employmentType = draft.employmentType;
         this.weeklyScheduledWorkHours = draft.weeklyScheduledWorkHours;
         this.monthlyScheduledWorkDays = draft.monthlyScheduledWorkDays;
         this.prescribedWage = draft.prescribedWage;

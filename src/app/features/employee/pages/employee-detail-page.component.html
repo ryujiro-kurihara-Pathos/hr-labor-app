@@ -178,10 +178,9 @@
                         [(ngModel)]="employmentType"
                         (ngModelChange)="onEmploymentTypeChange()"
                     >
-                        <option value="">選択してください</option>
-                        <option value="正社員">正社員</option>
-                        <option value="パート">パート</option>
-                        <option value="アルバイト">アルバイト</option>
+                        <option [ngValue]="null">選択してください</option>
+                        <option ngValue="full-time">正社員</option>
+                        <option ngValue="part-time">パート・アルバイト</option>
                     </select>
                 </div>
                 @if (isPartTimeEmployment()) {
@@ -239,7 +238,7 @@
                 <dl class="detail-list">
                     <div class="detail-row">
                         <dt>雇用区分</dt>
-                        <dd>{{ displayValue(employmentType) }}</dd>
+                        <dd>{{ employmentTypeLabel(employmentType) }}</dd>
                     </div>
                 </dl>
 

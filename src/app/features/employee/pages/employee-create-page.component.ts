@@ -38,6 +38,7 @@ export class EmployeeCreatePageComponent {
         firstName: '',
         birthDate: '',
         joinedDate: '',
+        employmentType: null,
         department: '',
         position: '',
         status: 'active',
