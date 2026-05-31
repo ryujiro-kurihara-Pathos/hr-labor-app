@@ -129,6 +129,11 @@ export class EmployeeCreatePageComponent {
             // 社会保険情報を作成
             const socialInsuranceStatusInput: SocialInsuranceStatusInput = {
                 employeeId: employee.id,
+                weeklyScheduledWorkHours: null,
+                monthlyScheduledWorkDays: null,
+                prescribedWage: null,
+                isStudent: false,
+                expectedEmploymentOver2Months: false,
                 healthInsuranceStatus: 'unknown',   // 健康保険
                 pensionInsuranceStatus: 'unknown',  // 厚生年金
                 careInsuranceStatus: 'unknown',     // 介護保険

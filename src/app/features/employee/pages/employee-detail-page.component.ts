@@ -53,7 +53,7 @@ export class EmployeeDetailPageComponent {
     position = '';
     employmentType: EmploymentType = null;
 
-    // 社会保険 加入要件（UIのみ・保存なし）
+    // 社会保険 加入要件
     weeklyScheduledWorkHours: string | number = ''; // number入力だが空を許容するため文字列
     monthlyScheduledWorkDays: string | number = '';
     prescribedWage: string | number = '';
@@ -99,11 +99,11 @@ export class EmployeeDetailPageComponent {
             this.office.set(office);
             this.officeName.set(office?.name ?? employee.officeId);
             this.syncFormFromEmployee(employee);
-            this.resetSocialInsuranceFields();
 
             // 社会保険情報を取得
             const socialInsuranceStatus = await this.socialInsuranceStatusService.getByEmployeeId(employeeId);
             this.socialInsuranceStatus.set(socialInsuranceStatus);
+            this.syncFormFromSocialInsuranceStatus(socialInsuranceStatus);
         } catch (error) {
             console.error('従業員の取得に失敗しました', error);
             this.errorMessage.set('従業員の取得に失敗しました');
@@ -160,6 +160,11 @@ export class EmployeeDetailPageComponent {
         const currentSocialInsuranceStatus = this.socialInsuranceStatus();
         const socialInsuranceStatusInput: SocialInsuranceStatusInput = {
             employeeId: employee.id,
+            weeklyScheduledWorkHours: this.toNumberOrNull(this.weeklyScheduledWorkHours),
+            monthlyScheduledWorkDays: this.toNumberOrNull(this.monthlyScheduledWorkDays),
+            prescribedWage: this.toNumberOrNull(this.prescribedWage),
+            isStudent: this.isStudent,
+            expectedEmploymentOver2Months: this.expectedEmploymentOver2Months,
             healthInsuranceStatus: this.judgeHealthInsurance(),
             pensionInsuranceStatus: this.judgePensionInsurance(),
             careInsuranceStatus: this.judgeCareInsurance(),
@@ -466,6 +471,19 @@ export class EmployeeDetailPageComponent {
         this.employmentType = employee.employmentType;
     }
 
+    private syncFormFromSocialInsuranceStatus(status: SocialInsuranceStatus | null): void {
+        this.weeklyScheduledWorkHours = this.numberToFormValue(status?.weeklyScheduledWorkHours);
+        this.monthlyScheduledWorkDays = this.numberToFormValue(status?.monthlyScheduledWorkDays);
+        this.prescribedWage = this.numberToFormValue(status?.prescribedWage);
+        this.isStudent = status?.isStudent ?? false;
+        this.expectedEmploymentOver2Months = status?.expectedEmploymentOver2Months ?? false;
+        this.socialInsuranceSnapshot = this.captureSocialInsuranceDraft();
+    }
+
+    private numberToFormValue(value: number | null | undefined): string | number {
+        return value !== null && value !== undefined ? value : '';
+    }
+
     private todayDateString(): string {
         const today = new Date();
         const y = today.getFullYear();
@@ -502,9 +520,4 @@ export class EmployeeDetailPageComponent {
         this.expectedEmploymentOver2Months = draft.expectedEmploymentOver2Months;
     }
 
-    private resetSocialInsuranceFields(): void {
-        const empty = this.createEmptySocialInsuranceDraft();
-        this.applySocialInsuranceDraft(empty);
-        this.socialInsuranceSnapshot = empty;
-    }
 }

@@ -8,7 +8,14 @@ export type SocialInsuranceStatus = {
     // 従業員紐づけ
     employeeId: string;                            // 従業員ID
 
-    // 会社状況
+    // 加入要件（判定の入力）
+    weeklyScheduledWorkHours: number | null;      // 週の所定労働時間
+    monthlyScheduledWorkDays: number | null;      // 月の所定労働日数
+    prescribedWage: number | null;                // 所定内賃金
+    isStudent: boolean;                           // 学生かどうか
+    expectedEmploymentOver2Months: boolean;     // 雇用見込み2か月超
+
+    // 加入状況
     healthInsuranceStatus: insuranceJoinStatus;   // 健康保険状況
     pensionInsuranceStatus: insuranceJoinStatus;  // 厚生年金状況
     careInsuranceStatus: insuranceJoinStatus;     // 介護保険状況

@@ -166,12 +166,14 @@
 
             <h2 class="section-title">社会保険（加入要件入力・参考判定）</h2>
             @if (isEditing() && isActiveEmployee()) {
-                <p class="section-note">
-                    ここで入力した情報は、現時点では保存しません（UIのみ）。判定は参考です。
+                <p class="insurance-judgment-note">
+                    <span class="required-mark" aria-hidden="true">*</span> は健康保険・厚生年金の判定に必要な項目です
                 </p>
 
                 <div class="form-field">
-                    <label for="employment-type">雇用区分</label>
+                    <label for="employment-type">
+                        雇用区分<span class="required-mark" aria-hidden="true">*</span>
+                    </label>
                     <select
                         id="employment-type"
                         name="employmentType"
@@ -210,17 +212,24 @@
                     </div>
 
                     <div class="form-field">
-                        <label for="weekly-hours">週の所定労働時間（本人）</label>
+                        <label for="weekly-hours">
+                            週の所定労働時間（本人）<span class="required-mark" aria-hidden="true">*</span>
+                        </label>
                         <input id="weekly-hours" type="number" name="weeklyScheduledWorkHours" [(ngModel)]="weeklyScheduledWorkHours" placeholder="例: 20" />
                     </div>
                     <div class="form-field">
-                        <label for="monthly-days">月の所定労働日数（本人）</label>
+                        <label for="monthly-days">
+                            月の所定労働日数（本人）<span class="required-mark" aria-hidden="true">*</span>
+                        </label>
                         <input id="monthly-days" type="number" name="monthlyScheduledWorkDays" [(ngModel)]="monthlyScheduledWorkDays" placeholder="例: 11" />
                     </div>
                     <div class="form-field">
-                        <label for="wage">所定内賃金（月額）</label>
+                        <label for="wage">
+                            所定内賃金（月額）<span class="required-mark" aria-hidden="true">*</span>
+                        </label>
                         <input id="wage" type="number" name="prescribedWage" [(ngModel)]="prescribedWage" placeholder="例: 88000" />
                     </div>
+                    <p class="judgment-sub-note">以下は4分の3基準を満たさない場合の短時間労働者判定でも参照します</p>
                     <div class="form-field checkbox-field">
                         <label>
                             <input type="checkbox" name="isStudent" [(ngModel)]="isStudent" />
@@ -235,9 +244,12 @@
                     </div>
                 }
             } @else {
+                <p class="insurance-judgment-note">
+                    <span class="required-mark" aria-hidden="true">*</span> は健康保険・厚生年金の判定に必要な項目です
+                </p>
                 <dl class="detail-list">
                     <div class="detail-row">
-                        <dt>雇用区分</dt>
+                        <dt>雇用区分<span class="required-mark" aria-hidden="true">*</span></dt>
                         <dd>{{ employmentTypeLabel(employmentType) }}</dd>
                     </div>
                 </dl>
@@ -270,17 +282,20 @@
 
                     <dl class="detail-list">
                         <div class="detail-row">
-                            <dt>週の所定労働時間（本人）</dt>
+                            <dt>週の所定労働時間（本人）<span class="required-mark" aria-hidden="true">*</span></dt>
                             <dd>{{ displayValue(weeklyScheduledWorkHours) }}</dd>
                         </div>
                         <div class="detail-row">
-                            <dt>月の所定労働日数（本人）</dt>
+                            <dt>月の所定労働日数（本人）<span class="required-mark" aria-hidden="true">*</span></dt>
                             <dd>{{ displayValue(monthlyScheduledWorkDays) }}</dd>
                         </div>
                         <div class="detail-row">
-                            <dt>所定内賃金（月額）</dt>
+                            <dt>所定内賃金（月額）<span class="required-mark" aria-hidden="true">*</span></dt>
                             <dd>{{ displayValue(prescribedWage) }}</dd>
                         </div>
+                    </dl>
+                    <p class="judgment-sub-note">以下は4分の3基準を満たさない場合の短時間労働者判定でも参照します</p>
+                    <dl class="detail-list">
                         <div class="detail-row">
                             <dt>学生</dt>
                             <dd>{{ yesNoLabel(isStudent) }}</dd>
@@ -430,6 +445,34 @@
         color: #6b7280;
         font-size: 13px;
         line-height: 1.5;
+    }
+
+    .insurance-judgment-note {
+        margin: 0 0 14px;
+        padding: 10px 12px;
+        background: #fffbeb;
+        border: 1px solid #fcd34d;
+        border-radius: 8px;
+        color: #92400e;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .judgment-sub-note {
+        margin: -4px 0 12px;
+        color: #6b7280;
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
+    .required-mark {
+        display: inline-block;
+        margin-left: 4px;
+        color: #dc2626;
+        font-size: 1.35em;
+        font-weight: 800;
+        line-height: 1;
+        vertical-align: -2px;
     }
 
     .subsection-title {
