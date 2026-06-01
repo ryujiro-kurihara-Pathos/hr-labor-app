@@ -94,6 +94,13 @@
             }
 
             @if (!isEditing()) {
+                <section class="insurance-link-section">
+                    <h2 class="section-title">報酬・標準報酬月額</h2>
+                    <a [routerLink]="['/premium', employee()!.id]" class="btn sub-btn insurance-link-btn">
+                        保険料計算へ
+                    </a>
+                </section>
+
                 <section class="retire-section">
                     <h2 class="section-title">在籍・退職</h2>
                     @if (isActiveEmployee()) {
@@ -427,6 +434,20 @@
     .status-badge.retired {
         background: #f3f4f6;
         color: #4b5563;
+    }
+
+    .insurance-link-section {
+        margin-bottom: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #f3f4f6;
+    }
+
+    .insurance-link-btn {
+        display: inline-block;
+        text-align: center;
+        text-decoration: none;
+        flex: none;
+        padding: 10px 16px;
     }
 
     .retire-section {

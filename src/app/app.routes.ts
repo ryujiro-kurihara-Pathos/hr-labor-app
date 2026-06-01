@@ -7,11 +7,13 @@ import { SignupPageComponent } from './features/auth/pages/signup-page.component
 import { LoginPageComponent } from './features/auth/pages/login-page.component';
 import { MainLayoutComponent } from './layouts/main-layout/main-layout.component';
 import { HomePageComponent } from './features/home/pages/home-page.component';
-import { CompanyPageComponent } from './features/company/pages/company-page.component'
+import { CompanyPageComponent } from './features/company/pages/company-page.component';
 import { EmployeePageComponent } from './features/employee/pages/employee-page.component';
 import { OfficePageComponent } from './features/company/pages/office-page.component';
 import { EmployeeCreatePageComponent } from './features/employee/pages/employee-create-page.component';
 import { EmployeeDetailPageComponent } from './features/employee/pages/employee-detail-page.component';
+import { InsurancePremiumPageComponent } from './features/insurance/pages/insurance-premium-page.component';
+import { InsurancePremiumDetailPageComponent } from './features/insurance/pages/insurance-premium-detail-page.component';
 
 export const routes: Routes = [
     {
@@ -62,6 +64,14 @@ export const routes: Routes = [
             {
                 path: 'employees/:employeeId',
                 component: EmployeeDetailPageComponent,
+            },
+            {
+                path: 'premium',
+                component: InsurancePremiumPageComponent,
+            },
+            {
+                path: 'premium/:employeeId',
+                component: InsurancePremiumDetailPageComponent,
             }
         ]
     },
