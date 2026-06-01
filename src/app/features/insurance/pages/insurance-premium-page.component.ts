@@ -9,12 +9,18 @@ import { AuthService } from '../../auth/services/auth.service';
 import { UserService } from '../../users/services/user.service';
 import { OfficeService } from '../../company/services/office.service';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
+import { EffectiveStandardRemuneration } from '../models/standard-remuneration-determination.model';
 import { StandardMonthlyRewardService } from '../services/standard-monthly-reward.service';
+import { StandardRemunerationDeterminationService } from '../services/standard-remuneration-determination.service';
+import { isRewardTargetMonth } from '../utils/reward-target-month.util';
+import { collectRewardMonthsToFetch } from '../utils/standard-remuneration-determination.util';
 
 export type InsurancePremiumListRow = {
     employee: Employee;
     reward: StandardMonthlyReward | null;
+    effective: EffectiveStandardRemuneration;
     isRegistered: boolean;
+    isTargetMonth: boolean;
 };
 
 @Component({
@@ -29,24 +35,29 @@ export class InsurancePremiumPageComponent {
     private readonly authService = inject(AuthService);
     private readonly userService = inject(UserService);
     private readonly rewardService = inject(StandardMonthlyRewardService);
+    private readonly determinationService = inject(StandardRemunerationDeterminationService);
 
     isLoading = signal(false);
     errorMessage = signal('');
 
     employees = signal<Employee[]>([]);
     officeNameById = signal<Record<string, string>>({});
-    rewardsByEmployeeId = signal<Record<string, StandardMonthlyReward>>({});
+    rewardsByEmployeeId = signal<Record<string, Record<string, StandardMonthlyReward>>>({});
 
     targetYearMonth = signal(this.currentYearMonth());
 
     targetYearMonthLabel = computed(() => this.formatYearMonth(this.targetYearMonth()));
 
     registeredRows = computed(() =>
-        this.buildRows().filter((row) => row.isRegistered),
+        this.buildRows().filter((row) => row.isTargetMonth && row.isRegistered),
     );
 
     unregisteredRows = computed(() =>
-        this.buildRows().filter((row) => !row.isRegistered),
+        this.buildRows().filter((row) => row.isTargetMonth && !row.isRegistered),
+    );
+
+    excludedRowCount = computed(() =>
+        this.buildRows().filter((row) => !row.isTargetMonth).length,
     );
 
     async ngOnInit() {
@@ -94,27 +105,41 @@ export class InsurancePremiumPageComponent {
 
     private async loadRewardsForMonth() {
         const ym = this.targetYearMonth();
-        if (!ym) return;
-
-        const rewards = await this.rewardService.listByTargetYearMonth(ym);
-        const employeeIds = new Set(this.employees().map((e) => e.id));
-        const byId: Record<string, StandardMonthlyReward> = {};
-        for (const reward of rewards) {
-            if (employeeIds.has(reward.employeeId)) {
-                byId[reward.employeeId] = reward;
-            }
+        const employees = this.employees();
+        if (!ym || employees.length === 0) {
+            this.rewardsByEmployeeId.set({});
+            return;
         }
-        this.rewardsByEmployeeId.set(byId);
+
+        const monthsToFetch = collectRewardMonthsToFetch(ym, employees);
+        const rewards = await this.rewardService.listByTargetYearMonths(monthsToFetch);
+        const employeeIds = new Set(employees.map((e) => e.id));
+
+        const byEmployee: Record<string, Record<string, StandardMonthlyReward>> = {};
+        for (const reward of rewards) {
+            if (!employeeIds.has(reward.employeeId)) continue;
+            if (!byEmployee[reward.employeeId]) {
+                byEmployee[reward.employeeId] = {};
+            }
+            byEmployee[reward.employeeId][reward.targetYearMonth] = reward;
+        }
+        this.rewardsByEmployeeId.set(byEmployee);
     }
 
     private buildRows(): InsurancePremiumListRow[] {
-        const byId = this.rewardsByEmployeeId();
+        const byEmployee = this.rewardsByEmployeeId();
+        const ym = this.targetYearMonth();
         return this.employees().map((employee) => {
-            const reward = byId[employee.id] ?? null;
+            const employeeRewards = byEmployee[employee.id] ?? {};
+            const reward = employeeRewards[ym] ?? null;
+            const isTargetMonth = isRewardTargetMonth(employee, ym);
+            const effective = this.determinationService.resolve(employee, employeeRewards, ym);
             return {
                 employee,
                 reward,
-                isRegistered: reward !== null,
+                effective,
+                isRegistered: effective.isComplete,
+                isTargetMonth,
             };
         });
     }

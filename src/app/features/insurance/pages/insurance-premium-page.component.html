@@ -2,7 +2,7 @@
     <header class="page-header">
         <div>
             <h1>保険料計算</h1>
-            <p class="page-note">対象年月ごとに、従業員の報酬入力状況と標準報酬月額を確認できます。</p>
+            <p class="page-note">対象年月ごとに、資格取得時決定・定時決定に基づく標準報酬月額を確認できます。</p>
         </div>
     </header>
 
@@ -37,6 +37,11 @@
             <p class="summary">
                 登録済み <strong>{{ registeredRows().length }}</strong> 名 /
                 未入力 <strong>{{ unregisteredRows().length }}</strong> 名
+                @if (excludedRowCount() > 0) {
+                    <span class="summary-excluded">
+                        · 対象外 <strong>{{ excludedRowCount() }}</strong> 名（入社前・退職後）
+                    </span>
+                }
             </p>
         </section>
 
@@ -51,7 +56,8 @@
                             <tr>
                                 <th>従業員</th>
                                 <th>事業所</th>
-                                <th>報酬月額</th>
+                                <th>決定方法</th>
+                                <th>報酬月額（基礎）</th>
                                 <th>健康保険（等級）</th>
                                 <th>健康保険（標準報酬月額）</th>
                                 <th>厚生年金（等級）</th>
@@ -70,11 +76,20 @@
                                         <span class="sub">{{ row.employee.employeeNumber || '—' }}</span>
                                     </td>
                                     <td>{{ officeNameById()[row.employee.officeId] || '—' }}</td>
-                                    <td class="num">{{ row.reward!.monthlyReward | number }} 円</td>
-                                    <td class="num">{{ row.reward!.healthInsuranceGrade }}</td>
-                                    <td class="num">{{ row.reward!.healthInsuranceStandardMonthlyAmount | number }} 円</td>
-                                    <td class="num">{{ row.reward!.pensionInsuranceGrade }}</td>
-                                    <td class="num">{{ row.reward!.pensionInsuranceStandardMonthlyAmount | number }} 円</td>
+                                    <td>
+                                        <span
+                                            class="determination-badge"
+                                            [class.initial]="row.effective.determinationType === 'initial'"
+                                            [class.regular]="row.effective.determinationType === 'regular'"
+                                        >
+                                            {{ row.effective.determinationLabel }}
+                                        </span>
+                                    </td>
+                                    <td class="num">{{ row.effective.averageMonthlyReward ?? 0 | number }} 円</td>
+                                    <td class="num">{{ row.effective.calculation!.health!.grade }}</td>
+                                    <td class="num">{{ row.effective.calculation!.health!.standardMonthlyAmount | number }} 円</td>
+                                    <td class="num">{{ row.effective.calculation!.pension!.grade }}</td>
+                                    <td class="num">{{ row.effective.calculation!.pension!.standardMonthlyAmount | number }} 円</td>
                                 </tr>
                             }
                         </tbody>
@@ -106,7 +121,7 @@
                                     {{ officeNameById()[row.employee.officeId] || '—' }}
                                     · 社員番号 {{ row.employee.employeeNumber || '—' }}
                                 </p>
-                                <p class="unregistered-note">報酬情報・標準報酬月額の入力が必要です</p>
+                                <p class="unregistered-note">{{ row.effective.description }}</p>
                             </a>
                         </li>
                     }
@@ -196,6 +211,9 @@
         font-size: 14px;
         color: #374151;
     }
+    .summary-excluded {
+        color: #6b7280;
+    }
     .list-section {
         margin-bottom: 28px;
     }
@@ -240,6 +258,22 @@
     }
     .num {
         text-align: right;
+    }
+    .determination-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .determination-badge.initial {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+    .determination-badge.regular {
+        background: #ede9fe;
+        color: #5b21b6;
     }
     .unregistered-list {
         list-style: none;

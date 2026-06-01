@@ -34,9 +34,10 @@
             <p class="employee-name">{{ employee.lastName }} {{ employee.firstName }}</p>
             <span
                 class="status-badge"
-                [class.retired]="employee.status === 'retired'"
+                [class.retired]="isRetiredBadge(employee)"
+                [class.retiring-soon]="isPendingRetirement(employee)"
             >
-                {{ statusLabel(employee.status) }}
+                {{ statusBadgeLabel(employee) }}
             </span>
         </div>
         <p>{{ officeNameById()[employee.officeId] ?? employee.officeId }}</p>
@@ -80,5 +81,10 @@
     .status-badge.retired {
         background: #f3f4f6;
         color: #4b5563;
+    }
+
+    .status-badge.retiring-soon {
+        background: #fef3c7;
+        color: #92400e;
     }
 </style>

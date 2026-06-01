@@ -45,13 +45,15 @@ export type StandardMonthlyRewardInput = Omit<
     | 'updatedAt'
 >;
 
+export type RewardFormFieldValue = number | '';
+
 export type RewardForm = {
     targetYearMonth: string;                         // 対象年月 例: '2026-04'
 
-    basicSalary: number;                             // 基本給
-    commutingAllowance: number;                      // 通勤手当
-    monthlyAllowance: number;                        // 毎月支給される手当
-    positionAllowance: number;                       // 役職手当
-    housingAllowance: number;                        // 住宅手当
-    fixedOvertimePay: number;                        // 見込み残業代
+    basicSalary: RewardFormFieldValue;                 // 基本給
+    commutingAllowance: RewardFormFieldValue;          // 通勤手当
+    monthlyAllowance: RewardFormFieldValue;            // 毎月支給される手当
+    positionAllowance: RewardFormFieldValue;           // 役職手当
+    housingAllowance: RewardFormFieldValue;            // 住宅手当
+    fixedOvertimePay: RewardFormFieldValue;            // 見込み残業代
 };

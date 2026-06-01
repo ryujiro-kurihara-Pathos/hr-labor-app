@@ -53,6 +53,24 @@ export class StandardMonthlyRewardService {
         return snap.docs.map((d) => ({ id: d.id, ...d.data() } as StandardMonthlyReward));
     }
 
+    /** 複数年月の標準報酬月額を一括取得（Firestore `in` は最大10件） */
+    async listByTargetYearMonths(targetYearMonths: string[]): Promise<StandardMonthlyReward[]> {
+        const unique = [...new Set(targetYearMonths.filter(Boolean))];
+        if (unique.length === 0) return [];
+
+        const results: StandardMonthlyReward[] = [];
+        const col = collection(db, 'standardMonthlyRewards');
+
+        for (let i = 0; i < unique.length; i += 10) {
+            const chunk = unique.slice(i, i + 10);
+            const q = query(col, where('targetYearMonth', 'in', chunk));
+            const snap = await getDocs(q);
+            results.push(...snap.docs.map((d) => ({ id: d.id, ...d.data() } as StandardMonthlyReward)));
+        }
+
+        return results;
+    }
+
     async upsert(input: StandardMonthlyRewardInput): Promise<StandardMonthlyReward> {
         const monthlyReward = this.sumRewardFields(input);
         const calc = this.calculator.calculate(monthlyReward);

@@ -1,4 +1,4 @@
-import { Component, signal, inject } from '@angular/core';
+import { Component, signal, inject, computed } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -6,6 +6,7 @@ import { FormsModule } from '@angular/forms';
 import {
     StandardMonthlyReward,
     RewardForm,
+    RewardFormFieldValue,
     StandardMonthlyRewardInput,
 } from '../models/standard-monthly-reward.model';
 import {
@@ -13,8 +14,14 @@ import {
     StandardMonthlyRewardCalculatorService,
 } from '../services/standard-monthly-reward-calculator.service';
 import { StandardMonthlyRewardService } from '../services/standard-monthly-reward.service';
+import { StandardRemunerationDeterminationService } from '../services/standard-remuneration-determination.service';
 import { Employee } from '../../employee/models/employee.models';
 import { EmployeeService } from '../../employee/services/employee.service';
+import { SocialInsuranceStatusService } from '../../social-insurance/services/social-insurance-status.service';
+import {
+    isRewardTargetMonth,
+    rewardTargetMonthReason,
+} from '../utils/reward-target-month.util';
 
 @Component({
     selector: 'app-insurance-premium-detail-page',
@@ -26,18 +33,22 @@ export class InsurancePremiumDetailPageComponent {
     private readonly route = inject(ActivatedRoute);
     private readonly calculator = inject(StandardMonthlyRewardCalculatorService);
     private readonly rewardService = inject(StandardMonthlyRewardService);
+    private readonly determinationService = inject(StandardRemunerationDeterminationService);
     private readonly employeeService = inject(EmployeeService);
+    private readonly socialInsuranceStatusService = inject(SocialInsuranceStatusService);
 
     standardReward = signal<StandardMonthlyReward | null>(null);
+    employeeRewards = signal<Record<string, StandardMonthlyReward>>({});
+    healthInsuranceStartDate = signal<string | null>(null);
 
     rewardForm: RewardForm = {
         targetYearMonth: '',
-        basicSalary: 0,
-        commutingAllowance: 0,
-        monthlyAllowance: 0,
-        positionAllowance: 0,
-        housingAllowance: 0,
-        fixedOvertimePay: 0,
+        basicSalary: '',
+        commutingAllowance: '',
+        monthlyAllowance: '',
+        positionAllowance: '',
+        housingAllowance: '',
+        fixedOvertimePay: '',
     };
 
     isLoading = signal(false);
@@ -47,6 +58,44 @@ export class InsurancePremiumDetailPageComponent {
 
     employeeId = signal<string>('');
     employee = signal<Employee | null>(null);
+
+    effectiveStandard = computed(() => {
+        const employee = this.employee();
+        const ym = this.rewardForm.targetYearMonth;
+        if (!employee || !ym) return null;
+        return this.determinationService.resolve(
+            employee,
+            this.employeeRewards(),
+            ym,
+            this.healthInsuranceStartDate(),
+        );
+    });
+
+    isTargetMonth(): boolean {
+        const employee = this.employee();
+        const ym = this.rewardForm.targetYearMonth;
+        if (!employee || !ym) return true;
+        return isRewardTargetMonth(employee, ym);
+    }
+
+    targetMonthReason(): string | null {
+        const employee = this.employee();
+        const ym = this.rewardForm.targetYearMonth;
+        if (!employee || !ym) return null;
+        return rewardTargetMonthReason(employee, ym);
+    }
+
+    isInputRequiredMonth(): boolean {
+        const effective = this.effectiveStandard();
+        const ym = this.rewardForm.targetYearMonth;
+        if (!effective || !ym) return true;
+        if (effective.missingMonths.includes(ym)) return true;
+        if (effective.determinationType === 'initial' && effective.qualificationYearMonth === ym) {
+            return true;
+        }
+        if (effective.calculationMonths.includes(ym)) return true;
+        return false;
+    }
 
     async ngOnInit() {
         this.isLoading.set(true);
@@ -60,6 +109,7 @@ export class InsurancePremiumDetailPageComponent {
         try {
             await this.loadEmployee();
             if (this.employee()) {
+                await Promise.all([this.loadEmployeeRewards(), this.loadSocialInsuranceStatus()]);
                 await this.loadStandardReward();
             }
         } finally {
@@ -77,6 +127,26 @@ export class InsurancePremiumDetailPageComponent {
             return;
         }
         this.employee.set(employee);
+    }
+
+    async loadSocialInsuranceStatus() {
+        const employeeId = this.employeeId();
+        if (!employeeId) return;
+
+        const status = await this.socialInsuranceStatusService.getByEmployeeId(employeeId);
+        this.healthInsuranceStartDate.set(status?.healthInsuranceStartDate ?? null);
+    }
+
+    async loadEmployeeRewards() {
+        const employeeId = this.employeeId();
+        if (!employeeId) return;
+
+        const rewards = await this.rewardService.listByEmployee(employeeId);
+        const map: Record<string, StandardMonthlyReward> = {};
+        for (const reward of rewards) {
+            map[reward.targetYearMonth] = reward;
+        }
+        this.employeeRewards.set(map);
     }
 
     async onTargetYearMonthChange() {
@@ -97,6 +167,10 @@ export class InsurancePremiumDetailPageComponent {
             this.standardReward.set(standardReward);
             if (standardReward) {
                 this.setFormFromStandardReward();
+                this.employeeRewards.update((current) => ({
+                    ...current,
+                    [targetYearMonth]: standardReward,
+                }));
             } else {
                 this.resetRewardFieldsKeepMonth();
             }
@@ -125,13 +199,31 @@ export class InsurancePremiumDetailPageComponent {
         const ym = this.rewardForm.targetYearMonth;
         this.rewardForm = {
             targetYearMonth: ym,
-            basicSalary: 0,
-            commutingAllowance: 0,
-            monthlyAllowance: 0,
-            positionAllowance: 0,
-            housingAllowance: 0,
-            fixedOvertimePay: 0,
+            basicSalary: '',
+            commutingAllowance: '',
+            monthlyAllowance: '',
+            positionAllowance: '',
+            housingAllowance: '',
+            fixedOvertimePay: '',
         };
+    }
+
+    hasRewardFormInput(): boolean {
+        return this.rewardFormFields().some(
+            (value) => value !== '' && value !== null && value !== undefined,
+        );
+    }
+
+    private rewardFormFields(): RewardFormFieldValue[] {
+        const form = this.rewardForm;
+        return [
+            form.basicSalary,
+            form.commutingAllowance,
+            form.monthlyAllowance,
+            form.positionAllowance,
+            form.housingAllowance,
+            form.fixedOvertimePay,
+        ];
     }
 
     getMonthlyReward(): number {
@@ -179,6 +271,10 @@ export class InsurancePremiumDetailPageComponent {
             this.errorMessage.set('対象年月を選択してください');
             return;
         }
+        if (!this.isTargetMonth()) {
+            this.errorMessage.set(this.targetMonthReason() ?? 'この月は報酬登録の対象外です。');
+            return;
+        }
 
         this.isSaving.set(true);
         this.errorMessage.set('');
@@ -188,6 +284,10 @@ export class InsurancePremiumDetailPageComponent {
             const saved = await this.rewardService.upsert(this.buildInput());
             this.standardReward.set(saved);
             this.setFormFromStandardReward();
+            this.employeeRewards.update((current) => ({
+                ...current,
+                [saved.targetYearMonth]: saved,
+            }));
             this.message.set(`${saved.targetYearMonth} の報酬情報を保存しました`);
         } catch (error) {
             console.error('保存に失敗しました', error);

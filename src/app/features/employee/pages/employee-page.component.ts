@@ -93,6 +93,28 @@ export class EmployeePageComponent {
         return status === 'active' ? '在籍' : '退職';
     }
 
+    isPendingRetirement(employee: Employee): boolean {
+        if (employee.status !== 'retired' || !employee.retiredDate) return false;
+
+        const retired = employee.retiredDate.toDate();
+        const today = new Date();
+        retired.setHours(0, 0, 0, 0);
+        today.setHours(0, 0, 0, 0);
+        return retired >= today;
+    }
+
+    statusBadgeLabel(employee: Employee): string {
+        if (this.isPendingRetirement(employee)) {
+            const d = employee.retiredDate!.toDate();
+            return `${d.getMonth() + 1}/${d.getDate()}退職予定`;
+        }
+        return this.statusLabel(employee.status);
+    }
+
+    isRetiredBadge(employee: Employee): boolean {
+        return employee.status === 'retired' && !this.isPendingRetirement(employee);
+    }
+
     // 従業員を検索（keyword / selectedOfficeId / employees が変わるたび呼ばれる）
     searchEmployees(): Employee[] {
         const keyword = this.keyword().trim().toLowerCase();

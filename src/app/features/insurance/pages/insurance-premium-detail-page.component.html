@@ -14,6 +14,28 @@
         @if (errorMessage()) {
             <p class="error-message">{{ errorMessage() }}</p>
         }
+        @if (!isTargetMonth()) {
+            <p class="out-of-scope-notice">{{ targetMonthReason() }}</p>
+        }
+
+        @if (effectiveStandard(); as effective) {
+            <div
+                class="determination-notice"
+                [class.complete]="effective.isComplete"
+                [class.incomplete]="!effective.isComplete"
+            >
+                <p class="determination-label">
+                    <span
+                        class="determination-badge"
+                        [class.initial]="effective.determinationType === 'initial'"
+                        [class.regular]="effective.determinationType === 'regular'"
+                    >
+                        {{ effective.determinationLabel }}
+                    </span>
+                </p>
+                <p class="determination-description">{{ effective.description }}</p>
+            </div>
+        }
 
         <div class="form-field">
             <label for="target-year-month">対象年月</label>
@@ -25,6 +47,13 @@
                 (ngModelChange)="onTargetYearMonthChange()"
             />
         </div>
+
+        @if (isInputRequiredMonth()) {
+            <p class="input-hint">この月の報酬情報の入力が必要です。</p>
+        } @else {
+            <p class="input-hint optional">この月の報酬入力は任意です（適用標準報酬月額は下記のとおり）。</p>
+        }
+
         <div class="form-field">
             <label for="basic-salary">基本給</label>
             <input type="number" placeholder="例: 88000" [(ngModel)]="rewardForm.basicSalary" />
@@ -49,7 +78,7 @@
             <label for="fixed-overtime-pay">見込み残業代</label>
             <input type="number" placeholder="例: 10000" [(ngModel)]="rewardForm.fixedOvertimePay" />
         </div>
-        <button type="button" (click)="saveStandardMonthlyReward()" [disabled]="isSaving()">
+        <button type="button" (click)="saveStandardMonthlyReward()" [disabled]="isSaving() || !isTargetMonth()">
             @if (isSaving()) {
                 保存中...
             } @else {
@@ -59,25 +88,52 @@
     </div>
 
     <section class="result-section">
-        <h2 class="result-title">算出結果</h2>
-        @let monthlyReward = getMonthlyReward();
-        <p class="result-row">
-            報酬月額:
-            <strong>{{ monthlyReward ?? '0' | number }}</strong> 円
-        </p>
+        <h2 class="result-title">この月に適用される標準報酬月額</h2>
 
-        @let calc = getStandardMonthlyRewardCalculation();
-        <div class="result-box">
-            <h3>健康保険（協会けんぽ）</h3>
-            <p>等級: {{ calc.health?.grade ?? ' -' }}</p>
-            <p>標準報酬月額: {{ calc.health?.standardMonthlyAmount ?? '0' | number }} 円</p>
-        </div>
-        <div class="result-box">
-            <h3>厚生年金</h3>
-            <p>等級: {{ calc.pension?.grade ?? ' -' }}</p>
-            <p>標準報酬月額: {{ calc.pension?.standardMonthlyAmount ?? '0' | number }} 円</p>
-        </div>
-        <p class="result-note">等級表: 令和6年3月分改定（協会けんぽ全国共通・厚生年金）</p>
+        @if (effectiveStandard(); as effective) {
+            @if (effective.isComplete && effective.calculation) {
+                <p class="result-row">
+                    報酬月額（基礎）:
+                    <strong>{{ effective.averageMonthlyReward ?? 0 | number }}</strong> 円
+                </p>
+                <div class="result-box">
+                    <h3>健康保険（協会けんぽ）</h3>
+                    <p>等級: {{ effective.calculation.health?.grade ?? '—' }}</p>
+                    <p>標準報酬月額: {{ effective.calculation.health?.standardMonthlyAmount ?? 0 | number }} 円</p>
+                </div>
+                <div class="result-box">
+                    <h3>厚生年金</h3>
+                    <p>等級: {{ effective.calculation.pension?.grade ?? '—' }}</p>
+                    <p>標準報酬月額: {{ effective.calculation.pension?.standardMonthlyAmount ?? 0 | number }} 円</p>
+                </div>
+            } @else {
+                <p class="result-incomplete">必要な報酬情報が揃っていません。上記の案内に従って入力してください。</p>
+            }
+        }
+
+        <section class="input-preview-section">
+            <h3 class="input-preview-title">入力中の月の報酬（参考）</h3>
+            @if (hasRewardFormInput()) {
+                @let monthlyReward = getMonthlyReward();
+                @let calc = getStandardMonthlyRewardCalculation();
+                <p class="result-row">
+                    報酬月額:
+                    <strong>{{ monthlyReward | number }}</strong> 円
+                </p>
+                <div class="result-box muted">
+                    @if (calc.health && calc.pension) {
+                        <p>等級（健康）: {{ calc.health.grade }} / 標準報酬月額: {{ calc.health.standardMonthlyAmount | number }} 円</p>
+                        <p>等級（年金）: {{ calc.pension.grade }} / 標準報酬月額: {{ calc.pension.standardMonthlyAmount | number }} 円</p>
+                    } @else {
+                        <p>報酬月額を入力すると等級をプレビューできます。</p>
+                    }
+                </div>
+            } @else {
+                <p class="result-empty">未入力</p>
+            }
+        </section>
+
+        <p class="result-note">等級表: 令和6年3月分改定。6/1以降の資格取得は翌年9月から定時決定。</p>
     </section>
 }
 
@@ -88,6 +144,7 @@
         gap: 10px;
         margin-top: 20px;
         width: 30%;
+        min-width: 280px;
     }
     .employee-name {
         margin: 0 0 4px;
@@ -103,6 +160,60 @@
         color: #b91c1c;
         font-size: 14px;
         font-weight: 600;
+    }
+    .out-of-scope-notice {
+        margin: 0;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: #f3f4f6;
+        color: #4b5563;
+        font-size: 14px;
+    }
+    .determination-notice {
+        padding: 12px;
+        border-radius: 8px;
+        font-size: 14px;
+    }
+    .determination-notice.complete {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+    }
+    .determination-notice.incomplete {
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+    }
+    .determination-label {
+        margin: 0 0 6px;
+    }
+    .determination-description {
+        margin: 0;
+        color: #374151;
+        line-height: 1.5;
+    }
+    .determination-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+    .determination-badge.initial {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+    .determination-badge.regular {
+        background: #ede9fe;
+        color: #5b21b6;
+    }
+    .input-hint {
+        margin: 0;
+        font-size: 13px;
+        color: #b45309;
+        font-weight: 600;
+    }
+    .input-hint.optional {
+        color: #6b7280;
+        font-weight: normal;
     }
     label {
         font-size: 14px;
@@ -122,7 +233,7 @@
         border: 1px solid #e5e7eb;
         border-radius: 12px;
         background: #f9fafb;
-        max-width: 480px;
+        max-width: 520px;
     }
     .result-title {
         margin: 0 0 12px;
@@ -131,11 +242,19 @@
     .result-row {
         margin: 0 0 12px;
     }
+    .result-incomplete {
+        margin: 0 0 12px;
+        color: #b45309;
+        font-size: 14px;
+    }
     .result-box {
         margin-bottom: 12px;
         padding: 12px;
         background: #fff;
         border-radius: 8px;
+    }
+    .result-box.muted {
+        background: #f3f4f6;
     }
     .result-box h3 {
         margin: 0 0 8px;
@@ -145,6 +264,21 @@
     .result-box p {
         margin: 4px 0;
         font-size: 14px;
+    }
+    .input-preview-section {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px dashed #d1d5db;
+    }
+    .input-preview-title {
+        margin: 0 0 8px;
+        font-size: 14px;
+        color: #6b7280;
+    }
+    .result-empty {
+        margin: 0;
+        font-size: 14px;
+        color: #9ca3af;
     }
     .result-note {
         margin: 8px 0 0;
