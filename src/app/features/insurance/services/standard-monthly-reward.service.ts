@@ -15,6 +15,8 @@ import {
 
 import { db } from '../../../core/firebase';
 import { StandardMonthlyReward, StandardMonthlyRewardInput } from '../models/standard-monthly-reward.model';
+import { detectFixedWageChanges } from '../utils/fixed-wage-change.util';
+import { addMonthsToYearMonth } from '../utils/reward-target-month.util';
 import { StandardMonthlyRewardCalculatorService } from './standard-monthly-reward-calculator.service';
 
 @Injectable({
@@ -71,6 +73,7 @@ export class StandardMonthlyRewardService {
         return results;
     }
 
+    // 標準報酬月額を登録・更新
     async upsert(input: StandardMonthlyRewardInput): Promise<StandardMonthlyReward> {
         const monthlyReward = this.sumRewardFields(input);
         const calc = this.calculator.calculate(monthlyReward);
@@ -86,7 +89,16 @@ export class StandardMonthlyRewardService {
         const docRef = doc(db, 'standardMonthlyRewards', id);
         const existing = await getDoc(docRef);
 
+        const previousYm = addMonthsToYearMonth(input.targetYearMonth, -1);
+        const previousRef = doc(db, 'standardMonthlyRewards', this.docId(input.employeeId, previousYm));
+        const previousSnap = await getDoc(previousRef);
+        const previous = previousSnap.exists()
+            ? ({ ...previousSnap.data() } as StandardMonthlyReward)
+            : null;
+        const wageChange = detectFixedWageChanges(input, previous);
+
         const payload = {
+            companyId: input.companyId,
             employeeId: input.employeeId,
             targetYearMonth: input.targetYearMonth,
             basicSalary: input.basicSalary,
@@ -100,6 +112,8 @@ export class StandardMonthlyRewardService {
             healthInsuranceStandardMonthlyAmount: calc.health.standardMonthlyAmount,
             pensionInsuranceGrade: calc.pension.grade,
             pensionInsuranceStandardMonthlyAmount: calc.pension.standardMonthlyAmount,
+            fixedWageChanged: wageChange.fixedWageChanged,
+            changedFixedWageFields: wageChange.changedFixedWageFields,
         };
 
         if (!existing.exists()) {
@@ -122,6 +136,7 @@ export class StandardMonthlyRewardService {
         return { id: after.id, ...after.data() } as StandardMonthlyReward;
     }
 
+    // 報酬月額を計算
     private sumRewardFields(input: StandardMonthlyRewardInput): number {
         return (
             input.basicSalary +

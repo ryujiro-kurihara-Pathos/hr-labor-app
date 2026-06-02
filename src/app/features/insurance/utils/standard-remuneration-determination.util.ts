@@ -4,6 +4,8 @@ import {
     yearMonthFromTimestamp,
 } from './reward-target-month.util';
 
+export type HealthInsuranceStartDateByEmployeeId = Record<string, string | null | undefined>;
+
 const YEAR_MONTH_PATTERN = /^\d{4}-\d{2}$/;
 
 /** 資格取得日（健康保険開始日があれば優先、なければ入社日） */
@@ -85,6 +87,7 @@ export function formatYearMonthList(labels: string[]): string {
 export function collectRewardMonthsToFetch(
     targetYearMonth: string,
     employees: Employee[],
+    healthInsuranceStartDateByEmployeeId: HealthInsuranceStartDateByEmployeeId = {},
 ): string[] {
     const months = new Set<string>([targetYearMonth]);
 
@@ -94,8 +97,14 @@ export function collectRewardMonthsToFetch(
     }
 
     for (const employee of employees) {
-        const joinYm = yearMonthFromDateString(employee.joinedDate);
-        if (joinYm) months.add(joinYm);
+        const qualificationDate = getQualificationDate(
+            employee,
+            healthInsuranceStartDateByEmployeeId[employee.id],
+        );
+        const qualificationYm = qualificationDate
+            ? yearMonthFromDateString(qualificationDate)
+            : yearMonthFromDateString(employee.joinedDate);
+        if (qualificationYm) months.add(qualificationYm);
     }
 
     return [...months].filter((ym) => YEAR_MONTH_PATTERN.test(ym)).sort();

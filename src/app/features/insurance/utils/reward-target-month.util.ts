@@ -54,3 +54,10 @@ function formatYearMonthLabel(ym: string): string {
     const [y, m] = ym.split('-');
     return `${y}年${Number(m)}月`;
 }
+
+/** YYYY-MM に月数を加算（日は1日固定） */
+export function addMonthsToYearMonth(ym: string, delta: number): string {
+    const [y, m] = ym.split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}

@@ -2,7 +2,9 @@
     <header class="page-header">
         <div>
             <h1>保険料計算</h1>
-            <p class="page-note">対象年月ごとに、資格取得時決定・定時決定に基づく標準報酬月額を確認できます。</p>
+            <p class="page-note">
+                対象年月の月次報酬の入力状況を確認できます。標準報酬月額は資格取得時決定・定時決定に基づき表示します。
+            </p>
         </div>
     </header>
 
@@ -81,15 +83,20 @@
                                             class="determination-badge"
                                             [class.initial]="row.effective.determinationType === 'initial'"
                                             [class.regular]="row.effective.determinationType === 'regular'"
+                                            [class.revision]="row.effective.determinationType === 'revision'"
                                         >
                                             {{ row.effective.determinationLabel }}
                                         </span>
                                     </td>
-                                    <td class="num">{{ row.effective.averageMonthlyReward ?? 0 | number }} 円</td>
-                                    <td class="num">{{ row.effective.calculation!.health!.grade }}</td>
-                                    <td class="num">{{ row.effective.calculation!.health!.standardMonthlyAmount | number }} 円</td>
-                                    <td class="num">{{ row.effective.calculation!.pension!.grade }}</td>
-                                    <td class="num">{{ row.effective.calculation!.pension!.standardMonthlyAmount | number }} 円</td>
+                                    @if (row.effective.isComplete && row.effective.calculation) {
+                                        <td class="num">{{ row.effective.averageMonthlyReward ?? 0 | number }} 円</td>
+                                        <td class="num">{{ row.effective.calculation.health!.grade }}</td>
+                                        <td class="num">{{ row.effective.calculation.health!.standardMonthlyAmount | number }} 円</td>
+                                        <td class="num">{{ row.effective.calculation.pension!.grade }}</td>
+                                        <td class="num">{{ row.effective.calculation.pension!.standardMonthlyAmount | number }} 円</td>
+                                    } @else {
+                                        <td colspan="5" class="incomplete-cell">{{ row.effective.description }}</td>
+                                    }
                                 </tr>
                             }
                         </tbody>
@@ -115,7 +122,7 @@
                                     <span class="employee-name">
                                         {{ row.employee.lastName }} {{ row.employee.firstName }}
                                     </span>
-                                    <span class="status-badge">未登録</span>
+                                    <span class="status-badge">未入力</span>
                                 </div>
                                 <p class="employee-meta">
                                     {{ officeNameById()[row.employee.officeId] || '—' }}
@@ -259,6 +266,12 @@
     .num {
         text-align: right;
     }
+    .incomplete-cell {
+        color: #6b7280;
+        font-size: 12px;
+        white-space: normal;
+        line-height: 1.4;
+    }
     .determination-badge {
         display: inline-block;
         padding: 2px 8px;
@@ -274,6 +287,10 @@
     .determination-badge.regular {
         background: #ede9fe;
         color: #5b21b6;
+    }
+    .determination-badge.revision {
+        background: #ffedd5;
+        color: #9a3412;
     }
     .unregistered-list {
         list-style: none;

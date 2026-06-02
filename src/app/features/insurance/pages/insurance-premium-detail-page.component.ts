@@ -18,10 +18,10 @@ import { StandardRemunerationDeterminationService } from '../services/standard-r
 import { Employee } from '../../employee/models/employee.models';
 import { EmployeeService } from '../../employee/services/employee.service';
 import { SocialInsuranceStatusService } from '../../social-insurance/services/social-insurance-status.service';
-import {
-    isRewardTargetMonth,
-    rewardTargetMonthReason,
-} from '../utils/reward-target-month.util';
+import { isRewardTargetMonth, rewardTargetMonthReason } from '../utils/reward-target-month.util';
+import { FIXED_WAGE_FIELD_LABELS, FixedWageFieldKey } from '../utils/fixed-wage-change.util';
+import { findLatestRegisteredRewardBefore } from '../utils/latest-reward.util';
+import { formatYearMonthLabel } from '../utils/standard-remuneration-determination.util';
 
 @Component({
     selector: 'app-insurance-premium-detail-page',
@@ -58,42 +58,45 @@ export class InsurancePremiumDetailPageComponent {
 
     employeeId = signal<string>('');
     employee = signal<Employee | null>(null);
+    targetYearMonth = signal<string>('');
+    /** 未入力月を開いたとき、初期表示に使った直近登録済み月（YYYY-MM） */
+    prefilledFromYearMonth = signal<string | null>(null);
 
     effectiveStandard = computed(() => {
         const employee = this.employee();
-        const ym = this.rewardForm.targetYearMonth;
-        if (!employee || !ym) return null;
+        const yearMonth = this.targetYearMonth();
+        if (!employee || !yearMonth) return null;
         return this.determinationService.resolve(
             employee,
             this.employeeRewards(),
-            ym,
+            yearMonth,
             this.healthInsuranceStartDate(),
         );
     });
 
     isTargetMonth(): boolean {
         const employee = this.employee();
-        const ym = this.rewardForm.targetYearMonth;
-        if (!employee || !ym) return true;
-        return isRewardTargetMonth(employee, ym);
+        const yearMonth = this.targetYearMonth();
+        if (!employee || !yearMonth) return true;
+        return isRewardTargetMonth(employee, yearMonth);
     }
 
     targetMonthReason(): string | null {
         const employee = this.employee();
-        const ym = this.rewardForm.targetYearMonth;
-        if (!employee || !ym) return null;
-        return rewardTargetMonthReason(employee, ym);
+        const yearMonth = this.targetYearMonth();
+        if (!employee || !yearMonth) return null;
+        return rewardTargetMonthReason(employee, yearMonth);
     }
 
     isInputRequiredMonth(): boolean {
         const effective = this.effectiveStandard();
-        const ym = this.rewardForm.targetYearMonth;
-        if (!effective || !ym) return true;
-        if (effective.missingMonths.includes(ym)) return true;
-        if (effective.determinationType === 'initial' && effective.qualificationYearMonth === ym) {
+        const yearMonth = this.targetYearMonth();
+        if (!effective || !yearMonth) return true;
+        if (effective.missingMonths.includes(yearMonth)) return true;
+        if (effective.determinationType === 'initial' && effective.qualificationYearMonth === yearMonth) {
             return true;
         }
-        if (effective.calculationMonths.includes(ym)) return true;
+        if (effective.calculationMonths.includes(yearMonth)) return true;
         return false;
     }
 
@@ -102,9 +105,10 @@ export class InsurancePremiumDetailPageComponent {
         this.errorMessage.set('');
         this.employeeId.set(this.route.snapshot.params['employeeId'] ?? '');
 
-        const ym = this.route.snapshot.queryParams['ym'] as string | undefined;
-        this.rewardForm.targetYearMonth =
-            ym && /^\d{4}-\d{2}$/.test(ym) ? ym : this.currentYearMonth();
+        const yearMonth = this.route.snapshot.queryParams['ym'] as string | undefined;
+        const initialYearMonth =
+            yearMonth && /^\d{4}-\d{2}$/.test(yearMonth) ? yearMonth : this.currentYearMonth();
+        this.setTargetYearMonth(initialYearMonth);
 
         try {
             await this.loadEmployee();
@@ -149,13 +153,61 @@ export class InsurancePremiumDetailPageComponent {
         this.employeeRewards.set(map);
     }
 
-    async onTargetYearMonthChange() {
+    async onTargetYearMonthChange(yearMonth: string) {
+        this.setTargetYearMonth(yearMonth);
+        this.message.set('');
         await this.loadStandardReward();
+    }
+
+    latestRegisteredReward(): StandardMonthlyReward | null {
+        const ym = this.targetYearMonth();
+        if (!ym) return null;
+        return findLatestRegisteredRewardBefore(ym, this.employeeRewards());
+    }
+
+    latestRegisteredYearMonthLabel(): string | null {
+        const latest = this.latestRegisteredReward();
+        return latest ? formatYearMonthLabel(latest.targetYearMonth) : null;
+    }
+
+    canCopyFromLatestRegistered(): boolean {
+        return Boolean(this.latestRegisteredReward()) && this.isTargetMonth();
+    }
+
+    copyFromLatestRegistered() {
+        const latest = this.latestRegisteredReward();
+        if (!latest) {
+            this.errorMessage.set('直近の登録済み報酬情報がありません');
+            return;
+        }
+        this.errorMessage.set('');
+        this.applyRewardToForm(latest);
+        this.message.set(
+            `${formatYearMonthLabel(latest.targetYearMonth)}の報酬をコピーしました。変更箇所を修正して保存してください。`,
+        );
+    }
+
+    prefilledFromYearMonthLabel(): string | null {
+        const ym = this.prefilledFromYearMonth();
+        return ym ? formatYearMonthLabel(ym) : null;
+    }
+
+    changedFixedWageFieldLabels(): string[] {
+        const reward = this.standardReward();
+        if (!reward?.changedFixedWageFields?.length) return [];
+        return reward.changedFixedWageFields.map(
+            (key) => FIXED_WAGE_FIELD_LABELS[key as FixedWageFieldKey] ?? key,
+        );
+    }
+
+    private setTargetYearMonth(yearMonth: string) {
+        this.targetYearMonth.set(yearMonth);
+        this.rewardForm.targetYearMonth = yearMonth;
     }
 
     async loadStandardReward() {
         const employeeId = this.employeeId();
-        const targetYearMonth = this.rewardForm.targetYearMonth;
+        const targetYearMonth = this.targetYearMonth();
         if (!employeeId || !targetYearMonth) return;
 
         this.errorMessage.set('');
@@ -166,13 +218,24 @@ export class InsurancePremiumDetailPageComponent {
             );
             this.standardReward.set(standardReward);
             if (standardReward) {
+                this.prefilledFromYearMonth.set(null);
                 this.setFormFromStandardReward();
                 this.employeeRewards.update((current) => ({
                     ...current,
                     [targetYearMonth]: standardReward,
                 }));
             } else {
-                this.resetRewardFieldsKeepMonth();
+                const latest = findLatestRegisteredRewardBefore(
+                    targetYearMonth,
+                    this.employeeRewards(),
+                );
+                if (latest) {
+                    this.prefilledFromYearMonth.set(latest.targetYearMonth);
+                    this.applyRewardToForm(latest);
+                } else {
+                    this.prefilledFromYearMonth.set(null);
+                    this.resetRewardFieldsKeepMonth();
+                }
             }
         } catch (error) {
             console.error('標準報酬月額の取得に失敗しました', error);
@@ -183,20 +246,23 @@ export class InsurancePremiumDetailPageComponent {
     setFormFromStandardReward() {
         const standardReward = this.standardReward();
         if (!standardReward) return;
+        this.applyRewardToForm(standardReward);
+    }
 
+    private applyRewardToForm(reward: StandardMonthlyReward) {
         this.rewardForm = {
-            targetYearMonth: standardReward.targetYearMonth,
-            basicSalary: standardReward.basicSalary,
-            commutingAllowance: standardReward.commutingAllowance,
-            monthlyAllowance: standardReward.monthlyAllowance,
-            positionAllowance: standardReward.positionAllowance,
-            housingAllowance: standardReward.housingAllowance,
-            fixedOvertimePay: standardReward.fixedOvertimePay,
+            targetYearMonth: this.targetYearMonth(),
+            basicSalary: reward.basicSalary,
+            commutingAllowance: reward.commutingAllowance,
+            monthlyAllowance: reward.monthlyAllowance,
+            positionAllowance: reward.positionAllowance,
+            housingAllowance: reward.housingAllowance,
+            fixedOvertimePay: reward.fixedOvertimePay,
         };
     }
 
     private resetRewardFieldsKeepMonth() {
-        const ym = this.rewardForm.targetYearMonth;
+        const ym = this.targetYearMonth();
         this.rewardForm = {
             targetYearMonth: ym,
             basicSalary: '',
@@ -252,22 +318,31 @@ export class InsurancePremiumDetailPageComponent {
     }
 
     private buildInput(): StandardMonthlyRewardInput {
+        const employee = this.employee();
+        if (!employee?.companyId) {
+            throw new Error('従業員の会社情報が取得できません');
+        }
         return {
+            companyId: employee.companyId,
             employeeId: this.employeeId(),
-            targetYearMonth: this.rewardForm.targetYearMonth,
+            targetYearMonth: this.targetYearMonth(),
             basicSalary: this.toNumber(this.rewardForm.basicSalary),
             commutingAllowance: this.toNumber(this.rewardForm.commutingAllowance),
             monthlyAllowance: this.toNumber(this.rewardForm.monthlyAllowance),
             positionAllowance: this.toNumber(this.rewardForm.positionAllowance),
             housingAllowance: this.toNumber(this.rewardForm.housingAllowance),
             fixedOvertimePay: this.toNumber(this.rewardForm.fixedOvertimePay),
+            healthInsuranceGrade: 0,
+            healthInsuranceStandardMonthlyAmount: 0,
+            pensionInsuranceGrade: 0,
+            pensionInsuranceStandardMonthlyAmount: 0,
         };
     }
 
     async saveStandardMonthlyReward() {
         const employeeId = this.employeeId();
         if (!employeeId) return;
-        if (!this.rewardForm.targetYearMonth) {
+        if (!this.targetYearMonth()) {
             this.errorMessage.set('対象年月を選択してください');
             return;
         }
@@ -276,13 +351,17 @@ export class InsurancePremiumDetailPageComponent {
             return;
         }
 
+        // ローディング
         this.isSaving.set(true);
+
+        // エラーメッセージ
         this.errorMessage.set('');
         this.message.set('');
 
         try {
             const saved = await this.rewardService.upsert(this.buildInput());
             this.standardReward.set(saved);
+            this.prefilledFromYearMonth.set(null);
             this.setFormFromStandardReward();
             this.employeeRewards.update((current) => ({
                 ...current,

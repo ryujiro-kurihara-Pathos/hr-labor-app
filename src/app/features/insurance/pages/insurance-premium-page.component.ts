@@ -12,13 +12,14 @@ import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 import { EffectiveStandardRemuneration } from '../models/standard-remuneration-determination.model';
 import { StandardMonthlyRewardService } from '../services/standard-monthly-reward.service';
 import { StandardRemunerationDeterminationService } from '../services/standard-remuneration-determination.service';
-import { isRewardTargetMonth } from '../utils/reward-target-month.util';
-import { collectRewardMonthsToFetch } from '../utils/standard-remuneration-determination.util';
+import { SocialInsuranceStatusService } from '../../social-insurance/services/social-insurance-status.service';
+import { addMonthsToYearMonth, isRewardTargetMonth } from '../utils/reward-target-month.util';
 
 export type InsurancePremiumListRow = {
     employee: Employee;
     reward: StandardMonthlyReward | null;
     effective: EffectiveStandardRemuneration;
+    /** 対象年月の月次報酬が入力済みか */
     isRegistered: boolean;
     isTargetMonth: boolean;
 };
@@ -36,6 +37,7 @@ export class InsurancePremiumPageComponent {
     private readonly userService = inject(UserService);
     private readonly rewardService = inject(StandardMonthlyRewardService);
     private readonly determinationService = inject(StandardRemunerationDeterminationService);
+    private readonly socialInsuranceStatusService = inject(SocialInsuranceStatusService);
 
     isLoading = signal(false);
     errorMessage = signal('');
@@ -43,6 +45,7 @@ export class InsurancePremiumPageComponent {
     employees = signal<Employee[]>([]);
     officeNameById = signal<Record<string, string>>({});
     rewardsByEmployeeId = signal<Record<string, Record<string, StandardMonthlyReward>>>({});
+    healthInsuranceStartDateByEmployeeId = signal<Record<string, string | null>>({});
 
     targetYearMonth = signal(this.currentYearMonth());
 
@@ -69,7 +72,7 @@ export class InsurancePremiumPageComponent {
     }
 
     async shiftMonth(delta: number) {
-        this.targetYearMonth.set(this.addMonths(this.targetYearMonth(), delta));
+        this.targetYearMonth.set(addMonthsToYearMonth(this.targetYearMonth(), delta));
         await this.loadRewardsForMonth();
     }
 
@@ -94,6 +97,7 @@ export class InsurancePremiumPageComponent {
             }
             this.officeNameById.set(map);
 
+            await this.loadHealthInsuranceStartDates(employees);
             await this.loadRewardsForMonth();
         } catch (e) {
             console.error('保険料計算画面の取得に失敗しました', e);
@@ -104,41 +108,56 @@ export class InsurancePremiumPageComponent {
     }
 
     private async loadRewardsForMonth() {
-        const ym = this.targetYearMonth();
         const employees = this.employees();
-        if (!ym || employees.length === 0) {
+        if (employees.length === 0) {
             this.rewardsByEmployeeId.set({});
             return;
         }
 
-        const monthsToFetch = collectRewardMonthsToFetch(ym, employees);
-        const rewards = await this.rewardService.listByTargetYearMonths(monthsToFetch);
-        const employeeIds = new Set(employees.map((e) => e.id));
+        const rewardLists = await Promise.all(
+            employees.map((employee) => this.rewardService.listByEmployee(employee.id)),
+        );
 
         const byEmployee: Record<string, Record<string, StandardMonthlyReward>> = {};
-        for (const reward of rewards) {
-            if (!employeeIds.has(reward.employeeId)) continue;
-            if (!byEmployee[reward.employeeId]) {
-                byEmployee[reward.employeeId] = {};
+        for (let i = 0; i < employees.length; i++) {
+            const map: Record<string, StandardMonthlyReward> = {};
+            for (const reward of rewardLists[i]) {
+                map[reward.targetYearMonth] = reward;
             }
-            byEmployee[reward.employeeId][reward.targetYearMonth] = reward;
+            byEmployee[employees[i].id] = map;
         }
         this.rewardsByEmployeeId.set(byEmployee);
+    }
+
+    private async loadHealthInsuranceStartDates(employees: Employee[]) {
+        const entries = await Promise.all(
+            employees.map(async (employee) => {
+                const status = await this.socialInsuranceStatusService.getByEmployeeId(employee.id);
+                return [employee.id, status?.healthInsuranceStartDate ?? null] as const;
+            }),
+        );
+        this.healthInsuranceStartDateByEmployeeId.set(Object.fromEntries(entries));
     }
 
     private buildRows(): InsurancePremiumListRow[] {
         const byEmployee = this.rewardsByEmployeeId();
         const ym = this.targetYearMonth();
+        const healthDates = this.healthInsuranceStartDateByEmployeeId();
         return this.employees().map((employee) => {
             const employeeRewards = byEmployee[employee.id] ?? {};
             const reward = employeeRewards[ym] ?? null;
             const isTargetMonth = isRewardTargetMonth(employee, ym);
-            const effective = this.determinationService.resolve(employee, employeeRewards, ym);
+            const effective = this.determinationService.resolve(
+                employee,
+                employeeRewards,
+                ym,
+                healthDates[employee.id],
+            );
             return {
                 employee,
                 reward,
                 effective,
-                isRegistered: effective.isComplete,
+                isRegistered: reward !== null,
                 isTargetMonth,
             };
         });
@@ -154,12 +173,6 @@ export class InsurancePremiumPageComponent {
 
     private currentYearMonth(): string {
         const d = new Date();
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    }
-
-    private addMonths(ym: string, delta: number): string {
-        const [y, m] = ym.split('-').map(Number);
-        const d = new Date(y, m - 1 + delta, 1);
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     }
 

@@ -1,6 +1,6 @@
 import { StandardMonthlyRewardCalculation } from '../services/standard-monthly-reward-calculator.service';
 
-export type DeterminationType = 'initial' | 'regular';
+export type DeterminationType = 'initial' | 'regular' | 'revision';
 
 export type EffectiveStandardRemuneration = {
     determinationType: DeterminationType;
