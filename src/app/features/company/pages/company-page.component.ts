@@ -105,6 +105,7 @@ export class CompanyPageComponent {
             const office = {
                 companyId: company.id,
                 name: form.name,
+                prefecture: '',
                 address: form.address,
                 healthInsuranceType: form.healthInsuranceType,
                 regularWeeklyScheduledWorkHours: null,

@@ -14,46 +14,43 @@
         @if (errorMessage()) {
             <p class="error-message">{{ errorMessage() }}</p>
         }
-        @if (!isTargetMonth()) {
-            <p class="out-of-scope-notice">{{ targetMonthReason() }}</p>
-        }
 
-        @if (effectiveStandard(); as effective) {
-            <div
-                class="determination-notice"
-                [class.complete]="effective.isComplete"
-                [class.incomplete]="!effective.isComplete"
-            >
-                <p class="determination-label">
-                    <span
-                        class="determination-badge"
-                        [class.initial]="effective.determinationType === 'initial'"
-                        [class.regular]="effective.determinationType === 'regular'"
-                        [class.revision]="effective.determinationType === 'revision'"
-                    >
-                        {{ effective.determinationLabel }}
-                    </span>
-                </p>
-                <p class="determination-description">{{ effective.description }}</p>
-            </div>
-        }
-
-        <div class="form-field">
+        <div class="form-field month-field">
             <label for="target-year-month">対象年月</label>
-            <input
-                id="target-year-month"
-                type="month"
-                name="targetYearMonth"
-                [ngModel]="targetYearMonth()"
-                (ngModelChange)="onTargetYearMonthChange($event)"
-            />
+            <div class="month-picker">
+                <button
+                    type="button"
+                    class="month-nav-btn"
+                    (click)="shiftMonth(-1)"
+                    [disabled]="isLoadingMonth()"
+                    aria-label="前月"
+                >
+                    ←
+                </button>
+                <button
+                    type="button"
+                    class="month-nav-btn"
+                    (click)="shiftMonth(1)"
+                    [disabled]="isLoadingMonth()"
+                    aria-label="翌月"
+                >
+                    →
+                </button>
+                <input
+                    id="target-year-month"
+                    type="month"
+                    name="targetYearMonth"
+                    [ngModel]="targetYearMonth()"
+                    (ngModelChange)="onTargetYearMonthChange($event)"
+                    (change)="onTargetYearMonthChange($any($event.target).value)"
+                    [disabled]="isLoadingMonth()"
+                />
+                <span class="month-display">{{ targetYearMonthLabel() }}</span>
+            </div>
+            @if (isLoadingMonth()) {
+                <p class="month-loading">報酬情報を読み込み中...</p>
+            }
         </div>
-
-        @if (prefilledFromYearMonthLabel() && !standardReward()) {
-            <p class="prefill-notice">
-                直近の登録済み報酬（{{ prefilledFromYearMonthLabel() }}）を初期値として表示しています。内容を確認して保存してください。
-            </p>
-        }
 
         @if (canCopyFromLatestRegistered()) {
             <button
@@ -72,93 +69,122 @@
             </p>
         }
 
-        @if (isInputRequiredMonth()) {
-            <p class="input-hint">この月の報酬情報の入力が必要です。</p>
-        } @else {
-            <p class="input-hint optional">この月の報酬入力は任意です（適用標準報酬月額は下記のとおり）。</p>
-        }
+        <div class="form-section">
+            <h3 class="form-section-title">報酬入力</h3>
 
-        <div class="form-field">
-            <label for="basic-salary">基本給</label>
-            <input type="number" placeholder="例: 88000" [(ngModel)]="rewardForm.basicSalary" />
+            <div class="form-field">
+                <label for="basic-salary">基本給</label>
+                <input type="number" placeholder="例: 88000" [(ngModel)]="rewardForm.basicSalary" />
+            </div>
+            <div class="form-field">
+                <label for="commuting-allowance">通勤手当</label>
+                <input type="number" placeholder="例: 10000" [(ngModel)]="rewardForm.commutingAllowance" />
+            </div>
+            <div class="form-field">
+                <label for="monthly-allowance">毎月支給される手当</label>
+                <input type="number" placeholder="例: 10000" [(ngModel)]="rewardForm.monthlyAllowance" />
+            </div>
+            <div class="form-field">
+                <label for="position-allowance">役職手当</label>
+                <input type="number" placeholder="例: 10000" [(ngModel)]="rewardForm.positionAllowance" />
+            </div>
+            <div class="form-field">
+                <label for="housing-allowance">住宅手当</label>
+                <input type="number" placeholder="例: 10000" [(ngModel)]="rewardForm.housingAllowance" />
+            </div>
+            <div class="form-field">
+                <label for="fixed-overtime-pay">見込み残業代</label>
+                <input type="number" placeholder="例: 10000" [(ngModel)]="rewardForm.fixedOvertimePay" />
+            </div>
+            <button
+                type="button"
+                (click)="saveStandardMonthlyReward()"
+                [disabled]="isSaving() || isLoadingMonth() || !isTargetMonth()"
+            >
+                @if (isSaving()) {
+                    保存中...
+                } @else if (monthRewardStatus() === 'registered') {
+                    更新する
+                } @else {
+                    保存する
+                }
+            </button>
         </div>
-        <div class="form-field">
-            <label for="commuting-allowance">通勤手当</label>
-            <input type="number" placeholder="例: 10000" [(ngModel)]="rewardForm.commutingAllowance" />
-        </div>
-        <div class="form-field">
-            <label for="monthly-allowance">毎月支給される手当</label>
-            <input type="number" placeholder="例: 10000" [(ngModel)]="rewardForm.monthlyAllowance" />
-        </div>
-        <div class="form-field">
-            <label for="position-allowance">役職手当</label>
-            <input type="number" placeholder="例: 10000" [(ngModel)]="rewardForm.positionAllowance" />
-        </div>
-        <div class="form-field">
-            <label for="housing-allowance">住宅手当</label>
-            <input type="number" placeholder="例: 10000" [(ngModel)]="rewardForm.housingAllowance" />
-        </div>
-        <div class="form-field">
-            <label for="fixed-overtime-pay">見込み残業代</label>
-            <input type="number" placeholder="例: 10000" [(ngModel)]="rewardForm.fixedOvertimePay" />
-        </div>
-        <button type="button" (click)="saveStandardMonthlyReward()" [disabled]="isSaving() || !isTargetMonth()">
-            @if (isSaving()) {
-                保存中...
-            } @else {
-                保存する
+
+        <section
+            class="month-status-panel"
+            [class.loading]="monthRewardStatus() === 'loading'"
+            [class.registered]="monthRewardStatus() === 'registered'"
+            [class.unregistered]="monthRewardStatus() === 'unregistered'"
+            [class.excluded]="monthRewardStatus() === 'excluded'"
+        >
+            <div class="month-status-header">
+                <h2 class="month-status-title">{{ targetYearMonthLabel() }}の報酬</h2>
+                <span
+                    class="registration-badge"
+                    [class.loading]="monthRewardStatus() === 'loading'"
+                    [class.registered]="monthRewardStatus() === 'registered'"
+                    [class.unregistered]="monthRewardStatus() === 'unregistered'"
+                    [class.excluded]="monthRewardStatus() === 'excluded'"
+                >
+                    {{ monthRewardStatusLabel() }}
+                </span>
+            </div>
+            @if (monthRewardStatusDescription()) {
+                <p class="month-status-description">{{ monthRewardStatusDescription() }}</p>
             }
-        </button>
-    </div>
 
-    <section class="result-section">
-        <h2 class="result-title">この月に適用される標準報酬月額</h2>
-
-        @if (effectiveStandard(); as effective) {
-            @if (effective.isComplete && effective.calculation) {
-                <p class="result-row">
-                    報酬月額（基礎）:
-                    <strong>{{ effective.averageMonthlyReward ?? 0 | number }}</strong> 円
-                </p>
-                <div class="result-box">
-                    <h3>健康保険（協会けんぽ）</h3>
-                    <p>等級: {{ effective.calculation.health?.grade ?? '—' }}</p>
-                    <p>標準報酬月額: {{ effective.calculation.health?.standardMonthlyAmount ?? 0 | number }} 円</p>
+            @if (monthRewardStatus() === 'registered' && registeredMonthlyReward() !== null) {
+                <div class="status-block">
+                    <h3 class="status-block-title">【登録済みの月額報酬】</h3>
+                    <p class="status-line">報酬月額：{{ registeredMonthlyReward() | number }}円</p>
                 </div>
-                <div class="result-box">
-                    <h3>厚生年金</h3>
-                    <p>等級: {{ effective.calculation.pension?.grade ?? '—' }}</p>
-                    <p>標準報酬月額: {{ effective.calculation.pension?.standardMonthlyAmount ?? 0 | number }} 円</p>
-                </div>
-            } @else {
-                <p class="result-incomplete">必要な報酬情報が揃っていません。上記の案内に従って入力してください。</p>
             }
-        }
 
-        <section class="input-preview-section">
-            <h3 class="input-preview-title">入力中の月の報酬（参考）</h3>
-            @if (hasRewardFormInput()) {
-                @let monthlyReward = getMonthlyReward();
-                @let calc = getStandardMonthlyRewardCalculation();
-                <p class="result-row">
-                    報酬月額:
-                    <strong>{{ monthlyReward | number }}</strong> 円
-                </p>
-                <div class="result-box muted">
-                    @if (calc.health && calc.pension) {
-                        <p>等級（健康）: {{ calc.health.grade }} / 標準報酬月額: {{ calc.health.standardMonthlyAmount | number }} 円</p>
-                        <p>等級（年金）: {{ calc.pension.grade }} / 標準報酬月額: {{ calc.pension.standardMonthlyAmount | number }} 円</p>
+            @if (effectiveStandard(); as effective) {
+                <div class="status-block">
+                    <h3 class="status-block-title">【この月に適用される標準報酬月額】</h3>
+                    <p class="status-line">決定区分：{{ effective.determinationLabel }}</p>
+                    @if (effective.calculationMonths.length > 0) {
+                        <p class="status-line">算定対象月：{{ effectiveCalculationMonthsLabel() }}</p>
+                    }
+                    @if (effective.isComplete && effective.averageMonthlyReward !== null && effective.calculation) {
+                        <p class="status-line">算定報酬月額：{{ effective.averageMonthlyReward | number }}円</p>
+                        <p class="status-line">
+                            健康保険：等級{{ effective.calculation.health?.grade ?? '—' }} /
+                            標準報酬月額 {{ (effective.calculation.health?.standardMonthlyAmount ?? 0) | number }}円
+                        </p>
+                        <p class="status-line">
+                            厚生年金：等級{{ effective.calculation.pension?.grade ?? '—' }} /
+                            標準報酬月額 {{ (effective.calculation.pension?.standardMonthlyAmount ?? 0) | number }}円
+                        </p>
                     } @else {
-                        <p>報酬月額を入力すると等級をプレビューできます。</p>
+                        <p class="status-line muted">{{ effective.description }}</p>
                     }
                 </div>
-            } @else {
-                <p class="result-empty">未入力</p>
+            }
+
+            @if (revisionPreview(); as preview) {
+                <div class="status-block">
+                    <h3 class="status-block-title">【随時改定（月額変更）判定】</h3>
+                    <p class="status-line">{{ preview.description }}</p>
+                    @if (revisionPreviewResult(); as result) {
+                        <p class="status-line revision-result">{{ result }}</p>
+                    }
+                </div>
+            }
+
+            @if (monthRewardStatus() === 'unregistered' && isInputRequiredMonth()) {
+                <p class="month-status-action">入力が必要な月です。下記フォームに報酬を入力して保存してください。</p>
             }
         </section>
 
-        <p class="result-note">等級表: 令和6年3月分改定。6/1以降の資格取得は翌年9月から定時決定。</p>
-    </section>
+        <section>
+            <h3 class="form-section-title">健康保険料</h3>
+            <p>事業所：{{ office()?.prefecture ?? '-' }}</p>
+            <p>健康保険料：{{ displayHealthInsuranceRates() ?? '-' }}</p>
+        </section>
+    </div>
 }
 
 <style>
@@ -167,8 +193,9 @@
         flex-direction: column;
         gap: 10px;
         margin-top: 20px;
-        width: 30%;
-        min-width: 280px;
+        width: 42%;
+        min-width: 360px;
+        max-width: 560px;
     }
     .employee-name {
         margin: 0 0 4px;
@@ -216,68 +243,155 @@
         color: #4b5563;
         font-size: 14px;
     }
-    .determination-notice {
-        padding: 12px;
-        border-radius: 8px;
-        font-size: 14px;
+    .month-status-panel {
+        padding: 14px 16px;
+        border-radius: 10px;
+        border: 1px solid #e5e7eb;
+        background: #f9fafb;
     }
-    .determination-notice.complete {
+    .month-status-panel.registered {
         background: #f0fdf4;
-        border: 1px solid #bbf7d0;
+        border-color: #bbf7d0;
     }
-    .determination-notice.incomplete {
+    .month-status-panel.unregistered {
         background: #fffbeb;
-        border: 1px solid #fde68a;
+        border-color: #fde68a;
     }
-    .determination-label {
-        margin: 0 0 6px;
+    .month-status-panel.excluded {
+        background: #f3f4f6;
+        border-color: #d1d5db;
     }
-    .determination-description {
+    .month-status-panel.loading {
+        background: #f9fafb;
+        border-color: #e5e7eb;
+    }
+    .month-status-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 8px;
+    }
+    .month-status-title {
         margin: 0;
-        color: #374151;
-        line-height: 1.5;
+        font-size: 15px;
+        font-weight: 600;
+        color: #111827;
     }
-    .determination-badge {
-        display: inline-block;
-        padding: 2px 8px;
+    .registration-badge {
+        flex-shrink: 0;
+        padding: 3px 10px;
         border-radius: 999px;
-        font-size: 11px;
+        font-size: 12px;
         font-weight: 700;
     }
-    .determination-badge.initial {
-        background: #dbeafe;
-        color: #1e40af;
+    .registration-badge.registered {
+        background: #dcfce7;
+        color: #166534;
     }
-    .determination-badge.regular {
-        background: #ede9fe;
-        color: #5b21b6;
+    .registration-badge.unregistered {
+        background: #fef3c7;
+        color: #92400e;
     }
-    .determination-badge.revision {
-        background: #ffedd5;
-        color: #9a3412;
+    .registration-badge.excluded {
+        background: #e5e7eb;
+        color: #4b5563;
     }
-    .prefill-notice {
-        margin: 0;
+    .registration-badge.loading {
+        background: #e5e7eb;
+        color: #6b7280;
+    }
+    .month-status-description {
+        margin: 0 0 8px;
+        font-size: 13px;
+        line-height: 1.6;
+        color: #374151;
+    }
+    .status-block {
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px dashed #d1d5db;
+    }
+    .status-block-title {
+        margin: 0 0 8px;
+        font-size: 13px;
+        font-weight: 700;
+        color: #111827;
+    }
+    .status-line {
+        margin: 0 0 4px;
+        font-size: 13px;
+        line-height: 1.6;
+        color: #374151;
+    }
+    .status-line:last-child {
+        margin-bottom: 0;
+    }
+    .status-line.muted {
+        color: #6b7280;
+    }
+    .status-line.revision-result {
+        margin-top: 6px;
         padding: 8px 10px;
         border-radius: 6px;
-        background: #eff6ff;
-        border: 1px solid #bfdbfe;
-        color: #1e40af;
-        font-size: 13px;
-        line-height: 1.5;
+        background: rgba(255, 255, 255, 0.8);
+        border: 1px solid #e5e7eb;
+        color: #1f2937;
     }
-    .input-hint {
-        margin: 0;
+    .month-status-action {
+        margin: 10px 0 0;
+        padding: 8px 10px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.8);
+        border: 1px solid #fde68a;
+        color: #92400e;
         font-size: 13px;
-        color: #b45309;
         font-weight: 600;
     }
-    .input-hint.optional {
-        color: #6b7280;
-        font-weight: normal;
+    .form-section {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding-top: 4px;
+        border-top: 1px dashed #e5e7eb;
+    }
+    .form-section-title {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+        color: #374151;
     }
     label {
         font-size: 14px;
+    }
+    .month-field .month-picker {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 16px;
+    }
+    .month-nav-btn {
+        flex-shrink: 0;
+        width: auto;
+        padding: 8px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: #fff;
+        cursor: pointer;
+    }
+    .month-nav-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .month-display {
+        font-size: 16px;
+        font-weight: 600;
+        color: #111827;
+    }
+    .month-loading {
+        margin: 4px 0 0;
+        font-size: 13px;
+        color: #6b7280;
     }
     input {
         width: 100%;
@@ -287,63 +401,5 @@
     }
     button {
         width: 100%;
-    }
-    .result-section {
-        margin-top: 24px;
-        padding: 16px;
-        border: 1px solid #e5e7eb;
-        border-radius: 12px;
-        background: #f9fafb;
-        max-width: 520px;
-    }
-    .result-title {
-        margin: 0 0 12px;
-        font-size: 16px;
-    }
-    .result-row {
-        margin: 0 0 12px;
-    }
-    .result-incomplete {
-        margin: 0 0 12px;
-        color: #b45309;
-        font-size: 14px;
-    }
-    .result-box {
-        margin-bottom: 12px;
-        padding: 12px;
-        background: #fff;
-        border-radius: 8px;
-    }
-    .result-box.muted {
-        background: #f3f4f6;
-    }
-    .result-box h3 {
-        margin: 0 0 8px;
-        font-size: 14px;
-        color: #374151;
-    }
-    .result-box p {
-        margin: 4px 0;
-        font-size: 14px;
-    }
-    .input-preview-section {
-        margin-top: 16px;
-        padding-top: 16px;
-        border-top: 1px dashed #d1d5db;
-    }
-    .input-preview-title {
-        margin: 0 0 8px;
-        font-size: 14px;
-        color: #6b7280;
-    }
-    .result-empty {
-        margin: 0;
-        font-size: 14px;
-        color: #9ca3af;
-    }
-    .result-note {
-        margin: 8px 0 0;
-        font-size: 12px;
-        color: #6b7280;
     }
 </style>

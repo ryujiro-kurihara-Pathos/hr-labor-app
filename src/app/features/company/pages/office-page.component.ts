@@ -117,6 +117,7 @@ export class OfficePageComponent {
             await this.officeService.updateOffice(office.id, {
                 companyId: office.companyId,
                 name: this.name,
+                prefecture: office.prefecture,
                 address: this.address,
                 healthInsuranceType: this.healthInsuranceType,
                 regularWeeklyScheduledWorkHours,

@@ -4,7 +4,7 @@ import { Employee } from '../../employee/models/employee.models';
 import { EffectiveStandardRemuneration } from '../models/standard-remuneration-determination.model';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 import { pickWinningDeterminationCandidate } from '../utils/determination-precedence.util';
-import { yearMonthFromDateString } from '../utils/reward-target-month.util';
+import { addMonthsToYearMonth, yearMonthFromDateString } from '../utils/reward-target-month.util';
 import {
     formatYearMonthLabel,
     formatYearMonthList,
@@ -59,6 +59,7 @@ export class StandardRemunerationDeterminationService {
             employee,
             qualificationDate,
             rewardsByYearMonth,
+            (monthlyReward) => this.calculator.calculate(monthlyReward),
         );
 
         if (!winner) {
@@ -139,46 +140,57 @@ export class StandardRemunerationDeterminationService {
 
     // 随時決定（月額変更）
     private resolveRevision(
-        revisionOriginMonth: string, // 変更月
-        qualificationYearMonth: string, // 資格取得月
-        rewardsByYearMonth: Record<string, StandardMonthlyReward>, // 報酬月額
+        revisionOriginMonth: string,
+        qualificationYearMonth: string,
+        rewardsByYearMonth: Record<string, StandardMonthlyReward>,
     ): EffectiveStandardRemuneration {
-        // 変更月の報酬を取得
-        const revisionReward = rewardsByYearMonth[revisionOriginMonth];
-        // 変更月の報酬が未登録の場合
-        if (!revisionReward) {
+        const calculationMonths = [
+            revisionOriginMonth,
+            this.addMonths(revisionOriginMonth, 1),
+            this.addMonths(revisionOriginMonth, 2),
+        ];
+
+        const missingMonths = calculationMonths.filter((ym) => !rewardsByYearMonth[ym]);
+
+        if (missingMonths.length > 0) {
             return this.incomplete(
                 'revision',
                 '随時決定（月額変更）',
-                `${formatYearMonthLabel(revisionOriginMonth)}の報酬情報（固定的賃金の変更月）を登録してください。`,
+                `${formatYearMonthList(calculationMonths)}の報酬情報が必要です（未登録: ${formatYearMonthList(missingMonths)}）。`,
                 qualificationYearMonth,
-                [revisionOriginMonth],
-                [revisionOriginMonth],
+                calculationMonths,
+                missingMonths,
             );
         }
 
-        // 変更月の報酬から標準報酬月額の計算
-        const calculation = this.calculator.calculate(this.monthlyReward(revisionReward));
-        // 変更月の報酬から等級を判定できない場合
+        const total = calculationMonths.reduce(
+            (sum, ym) => sum + this.monthlyReward(rewardsByYearMonth[ym]),
+            0,
+        );
+
+        const averageMonthlyReward = Math.round(total / calculationMonths.length);
+        const calculation = this.calculator.calculate(averageMonthlyReward);
+
         if (!calculation.health || !calculation.pension) {
             return this.incomplete(
                 'revision',
                 '随時決定（月額変更）',
-                `${formatYearMonthLabel(revisionOriginMonth)}の報酬月額から等級を判定できませんでした。`,
+                '随時改定の平均報酬月額から等級を判定できませんでした。',
                 qualificationYearMonth,
-                [revisionOriginMonth],
+                calculationMonths,
                 [],
             );
         }
 
-        // 随時決定（月額変更）の結果を返す
+        const applyFrom = this.addMonths(revisionOriginMonth, 3);
+
         return {
             determinationType: 'revision',
             determinationLabel: '随時決定（月額変更）',
-            description: `${formatYearMonthLabel(revisionOriginMonth)}に固定的賃金の変更があり、その報酬に基づく標準報酬月額を適用しています。`,
+            description: `${formatYearMonthList(calculationMonths)}の平均報酬月額 ${averageMonthlyReward.toLocaleString()} 円を適用（${formatYearMonthLabel(applyFrom)}から）。`,
             qualificationYearMonth,
-            calculationMonths: [revisionOriginMonth],
-            averageMonthlyReward: this.monthlyReward(revisionReward),
+            calculationMonths,
+            averageMonthlyReward,
             calculation,
             isComplete: true,
             missingMonths: [],

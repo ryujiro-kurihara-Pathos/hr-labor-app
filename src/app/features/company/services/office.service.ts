@@ -105,6 +105,7 @@ export class OfficeService {
             id,
             companyId: String(data['companyId'] ?? ''),
             name: String(data['name'] ?? ''),
+            prefecture: String(data['prefecture'] ?? ''),
             address: String(data['address'] ?? ''),
             healthInsuranceType: (data['healthInsuranceType'] as Office['healthInsuranceType']) ?? 'kyokai',
             regularWeeklyScheduledWorkHours: this.toNullableNumber(data['regularWeeklyScheduledWorkHours']),

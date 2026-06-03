@@ -8,6 +8,7 @@ export type Office = {
     companyId: string; // 会社ID
 
     name: string; // 事業所名
+    prefecture: string; // 都道府県
     address: string; // 所在地
     healthInsuranceType: HealthInsuranceType; // 健康保険の種類
 
