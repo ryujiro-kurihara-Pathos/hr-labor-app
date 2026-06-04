@@ -3,6 +3,7 @@ import {
     InsuranceRateRow,
 } from '../models/insurance-rate.model';
 
+// 健康保険料率を検索
 export function findHealthInsuranceRate(input: {
     rates: InsuranceRateRow[];
     targetYearMonth: string;
@@ -34,4 +35,11 @@ export function findHealthInsuranceRate(input: {
 
         return true;
     }) ?? null;
+}
+
+// 介護保険料率を検索
+export function findCareInsuranceRate(input: {
+    rates: InsuranceRateRow[];
+}): InsuranceRateRow | null {
+    return null;
 }

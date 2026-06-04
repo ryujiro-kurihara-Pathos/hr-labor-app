@@ -2,7 +2,7 @@ import { Component, signal, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
-import { EmployeeInput } from '../models/employee.models';
+import { EmployeeInput, EmploymentType } from '../models/employee.models';
 import { EmployeeService } from '../services/employee.service';
 import { AuthService } from '../../auth/services/auth.service';
 import { UserService } from '../../users/services/user.service';
@@ -125,10 +125,11 @@ export class EmployeeCreatePageComponent {
         try {
             // 従業員を作成
             const employee = await this.employeeService.createEmployee(this.employee);
+            if(!employee) return;
 
             // 介護保険の対象かの判定
             const birthDate = this.employee.birthDate;
-            const careInsuranceStatus = this.judgeCareInsurance(birthDate);
+            const careInsuranceStatus = this.judgeCareInsurance(birthDate, employee.employmentType);
 
             // 社会保険情報を作成
             const socialInsuranceStatusInput: SocialInsuranceStatusInput = {
@@ -166,11 +167,23 @@ export class EmployeeCreatePageComponent {
         return value.trim() === '';
     }
 
+    // 健康保険の対象かの判定
+    judgeHealthInsurance(birthDate: string, employmentType: EmploymentType): insuranceJoinStatus {
+        // パート・アルバイトは対象外
+        return 'active';
+    }
+
     // 厚生年金の対象かの判定
-    judgeCareInsurance(birthDate: string): insuranceJoinStatus {
+    judgeCareInsurance(birthDate: string, employmentType: EmploymentType): insuranceJoinStatus {
+        // パート・アルバイトは対象外
+        if (employmentType === 'part-time') {
+            return 'inactive';
+        }
+        // 年齢を計算
         const age = this.ageToday(birthDate);
         if (age === null) return 'unknown';
-        // 参考ルール（簡易）：40歳以上65歳未満を対象
+
+        // 40歳以上65歳未満は対象
         return age >= 40 && age < 65 ? 'active' : 'inactive';
     }
 

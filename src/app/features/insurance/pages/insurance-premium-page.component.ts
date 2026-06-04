@@ -132,7 +132,7 @@ export class InsurancePremiumPageComponent {
     private async loadHealthInsuranceStartDates(employees: Employee[]) {
         const entries = await Promise.all(
             employees.map(async (employee) => {
-                const status = await this.socialInsuranceStatusService.getByEmployeeId(employee.id);
+                const status = await this.socialInsuranceStatusService.getInsuranceStatusByEmployeeId(employee.id);
                 return [employee.id, status?.healthInsuranceStartDate ?? null] as const;
             }),
         );

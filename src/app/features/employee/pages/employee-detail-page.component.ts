@@ -102,7 +102,7 @@ export class EmployeeDetailPageComponent {
             this.syncFormFromEmployee(employee);
 
             // 社会保険情報を取得
-            const socialInsuranceStatus = await this.socialInsuranceStatusService.getByEmployeeId(employeeId);
+            const socialInsuranceStatus = await this.socialInsuranceStatusService.getInsuranceStatusByEmployeeId(employeeId);
             this.socialInsuranceStatus.set(socialInsuranceStatus);
             this.syncFormFromSocialInsuranceStatus(socialInsuranceStatus);
         } catch (error) {

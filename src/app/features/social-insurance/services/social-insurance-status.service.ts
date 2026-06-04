@@ -37,7 +37,7 @@ export class SocialInsuranceStatusService {
     }
 
     // employeeIdから社会保険情報を取得
-    async getByEmployeeId(employeeId: string): Promise<SocialInsuranceStatus | null> {
+    async getInsuranceStatusByEmployeeId(employeeId: string): Promise<SocialInsuranceStatus | null> {
         const docRef = collection(db, 'socialInsuranceStatuses');
         const q = query(docRef, where('employeeId', '==', employeeId));
         const docSnap = await getDocs(q);

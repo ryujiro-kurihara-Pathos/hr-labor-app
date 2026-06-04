@@ -59,7 +59,7 @@ export class InsurancePremiumDetailPageComponent {
     employeeRewards = signal<Record<string, StandardMonthlyReward>>({}); // 従業員の報酬月額
     healthInsuranceStartDate = signal<string | null>(null); // 健康保険の資格取得日
     healthInsuranceStatus = signal<insuranceJoinStatus | null>(null); // 健康保険の加入判定
-
+    careInsuranceStatus = signal<insuranceJoinStatus | null>(null); // 介護保険の加入判定
 
     // 報酬フォーム
     rewardForm: RewardForm = {
@@ -146,7 +146,7 @@ export class InsurancePremiumDetailPageComponent {
 
     // 介護保険加入判定(active: 対象, inactive: 対象外, unknown: 判定不可)
     careInsuranceJoinStatus = computed((): insuranceJoinStatus => {
-        return 'unknown';
+        return this.careInsuranceStatus() ?? 'unknown';
     })
 
     revisionPreview = computed(() => {
@@ -330,13 +330,20 @@ export class InsurancePremiumDetailPageComponent {
         this.office.set(office);
     }
 
+    // 社会保険情報を読み込む
     async loadSocialInsuranceStatus() {
         const employeeId = this.employeeId();
         if (!employeeId) return;
 
-        const status = await this.socialInsuranceStatusService.getByEmployeeId(employeeId);
+        // 社会保険情報を取得
+        const status = await this.socialInsuranceStatusService.getInsuranceStatusByEmployeeId(employeeId);
+
+        // 健康保険の資格取得日を設定
         this.healthInsuranceStartDate.set(status?.healthInsuranceStartDate ?? null);
+        // 健康保険の加入状況を設定
         this.healthInsuranceStatus.set(status?.healthInsuranceStatus ?? null);
+        // 介護保険の加入状況を設定
+        this.careInsuranceStatus.set(status?.careInsuranceStatus ?? null);
     }
 
     async loadEmployeeRewards() {
