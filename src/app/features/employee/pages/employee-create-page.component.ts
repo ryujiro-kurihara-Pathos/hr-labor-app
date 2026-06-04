@@ -9,7 +9,7 @@ import { UserService } from '../../users/services/user.service';
 import { SocialInsuranceStatusService } from '../../social-insurance/services/social-insurance-status.service';
 import { OfficeService } from '../../company/services/office.service';
 import { Office } from '../../company/models/office.model';
-import { SocialInsuranceStatusInput } from '../../social-insurance/models/social-insurance-status.model';
+import { insuranceJoinStatus, SocialInsuranceStatusInput } from '../../social-insurance/models/social-insurance-status.model';
 
 @Component({
     selector: 'app-employee-create-page',
@@ -126,6 +126,10 @@ export class EmployeeCreatePageComponent {
             // 従業員を作成
             const employee = await this.employeeService.createEmployee(this.employee);
 
+            // 介護保険の対象かの判定
+            const birthDate = this.employee.birthDate;
+            const careInsuranceStatus = this.judgeCareInsurance(birthDate);
+
             // 社会保険情報を作成
             const socialInsuranceStatusInput: SocialInsuranceStatusInput = {
                 employeeId: employee.id,
@@ -136,7 +140,7 @@ export class EmployeeCreatePageComponent {
                 expectedEmploymentOver2Months: false,
                 healthInsuranceStatus: 'unknown',   // 健康保険
                 pensionInsuranceStatus: 'unknown',  // 厚生年金
-                careInsuranceStatus: 'unknown',     // 介護保険
+                careInsuranceStatus: careInsuranceStatus,     // 介護保険
                 healthInsuranceStartDate: null,     // 健康保険の資格取得日
                 healthInsuranceEndDate: null,       // 健康保険の資格喪失日
                 pensionInsuranceStartDate: null,    // 厚生年金の資格取得日
@@ -160,5 +164,25 @@ export class EmployeeCreatePageComponent {
     // フォームが空白かどうか
     isFormEmpty(value: string): boolean {
         return value.trim() === '';
+    }
+
+    // 厚生年金の対象かの判定
+    judgeCareInsurance(birthDate: string): insuranceJoinStatus {
+        const age = this.ageToday(birthDate);
+        if (age === null) return 'unknown';
+        // 参考ルール（簡易）：40歳以上65歳未満を対象
+        return age >= 40 && age < 65 ? 'active' : 'inactive';
+    }
+
+    // 生年月日から年齢を計算する
+    private ageToday(birthDate: string): number | null {
+        if (!birthDate) return null;
+        const d = new Date(birthDate);
+        if (Number.isNaN(d.getTime())) return null;
+        const today = new Date();
+        let age = today.getFullYear() - d.getFullYear();
+        const m = today.getMonth() - d.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+        return age;
     }
 }

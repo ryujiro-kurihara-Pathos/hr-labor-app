@@ -55,4 +55,14 @@ export class SocialInsuranceStatusService {
             updatedAt: serverTimestamp(),
         });
     }
+
+    // 社会保険情報を取得
+    async getHealthInsuranceStatus(employeeId: string): Promise<SocialInsuranceStatus | null> {
+        const docRef = collection(db, 'socialInsuranceStatuses');
+        const q = query(docRef, where('employeeId', '==', employeeId));
+        const docSnap = await getDocs(q);
+        if (docSnap.empty) return null;
+        const snapshot = docSnap.docs[0];
+        return { id: snapshot.id, ...snapshot.data() } as SocialInsuranceStatus;
+    }
 }

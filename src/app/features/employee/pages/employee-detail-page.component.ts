@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Timestamp } from 'firebase/firestore';
@@ -41,6 +41,7 @@ export class EmployeeDetailPageComponent {
     isEditing = signal<boolean>(false);
     isRetireFormOpen = signal<boolean>(false);
     errorMessage = signal<string>('');
+    age = computed(() => this.ageToday(this.birthDate));
 
     retiredDateInput = '';
 
@@ -167,7 +168,7 @@ export class EmployeeDetailPageComponent {
             expectedEmploymentOver2Months: this.expectedEmploymentOver2Months,
             healthInsuranceStatus: this.judgeHealthInsurance(),
             pensionInsuranceStatus: this.judgePensionInsurance(),
-            careInsuranceStatus: this.judgeCareInsurance(),
+            careInsuranceStatus: this.careInsuranceJudge(),
             healthInsuranceStartDate: currentSocialInsuranceStatus?.healthInsuranceStartDate ?? null,
             healthInsuranceEndDate: currentSocialInsuranceStatus?.healthInsuranceEndDate ?? null,
             pensionInsuranceStartDate: currentSocialInsuranceStatus?.pensionInsuranceStartDate ?? null,
@@ -382,7 +383,6 @@ export class EmployeeDetailPageComponent {
         if (this.meetsThreeQuartersRule(weeklyHours, monthlyDays)) return 'active';
         // 短時間労働者の条件をチェック
         if (this.meetsShortTimeWorkerConditions(weeklyHours, monthlyDays, wage)) return 'active';
-
         return 'inactive';
     }
 
@@ -429,13 +429,11 @@ export class EmployeeDetailPageComponent {
         return this.judgeHealthInsurance();
     }
 
-    judgeCareInsurance(): insuranceJoinStatus {
-        const birth = this.birthDate;
-        const age = this.ageToday(birth);
-        if (age === null) return 'unknown';
-        // 参考ルール（簡易）：40歳以上65歳未満を対象
+    careInsuranceJudge = computed(() => {
+        const age = this.age();
+        if(age === null) return 'unknown';
         return age >= 40 && age < 65 ? 'active' : 'inactive';
-    }
+    })
 
     // 文字列・数値入力を数値に変換する（type="number" の ngModel は number になる）
     private toNumberOrNull(value: string | number | null | undefined): number | null {

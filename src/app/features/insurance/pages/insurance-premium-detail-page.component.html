@@ -42,7 +42,6 @@
                     name="targetYearMonth"
                     [ngModel]="targetYearMonth()"
                     (ngModelChange)="onTargetYearMonthChange($event)"
-                    (change)="onTargetYearMonthChange($any($event.target).value)"
                     [disabled]="isLoadingMonth()"
                 />
                 <span class="month-display">{{ targetYearMonthLabel() }}</span>
@@ -175,14 +174,96 @@
             }
 
             @if (monthRewardStatus() === 'unregistered' && isInputRequiredMonth()) {
-                <p class="month-status-action">入力が必要な月です。下記フォームに報酬を入力して保存してください。</p>
+                <p class="month-status-action">入力が必要な月です。上記フォームに報酬を入力して保存してください。</p>
             }
         </section>
 
         <section>
-            <h3 class="form-section-title">健康保険料</h3>
+            @if (targetMonthMonthlyReward(); as monthlyReward) {
+                <p>報酬月額：{{ monthlyReward | number }}円</p>
+            } @else {
+                <p>報酬月額：—</p>
+            }
             <p>事業所：{{ office()?.prefecture ?? '-' }}</p>
-            <p>健康保険料：{{ displayHealthInsuranceRates() ?? '-' }}</p>
+        </section>
+
+        <section>
+            <h3 class="form-section-title">健康保険料（{{ targetYearMonthLabel() }}）</h3>
+            <p class="insurance-join-status">
+                健康保険の加入判定：
+                @if (isLoading()) {
+                    <span class="join-status-badge loading">読み込み中</span>
+                } @else {
+                    <span
+                        class="join-status-badge"
+                        [class.ok]="healthInsuranceJoinStatus() === 'active'"
+                        [class.ng]="healthInsuranceJoinStatus() === 'inactive'"
+                        [class.unknown]="healthInsuranceJoinStatus() === 'unknown'"
+                    >
+                        {{ displayInsuranceStatus(healthInsuranceJoinStatus()) }}
+                    </span>
+                }
+            </p>
+            <p>健康保険料率（本人）：{{ healthInsuranceRatePercentLabel() ?? '-' }}%</p>
+            <p>健康保険料率（会社）：{{ healthInsuranceRatePercentLabel() ?? '-' }}%</p>
+            @if (healthInsurancePremium(); as premium) {
+                <p>健康保険料（本人）：{{ premium | number }}円</p>
+            } @else {
+                <p>健康保険料（本人）：—</p>
+            }
+            @if (healthInsurancePremium(); as premium) {
+                <p>健康保険料（会社）：{{ premium | number }}円</p>
+            } @else {
+                <p>健康保険料（会社）：—</p>
+            }
+        </section>
+        <section>
+            <h3 class="form-section-title">厚生年金料（{{ targetYearMonthLabel() }}）</h3>
+            <p class="insurance-join-status">
+                厚生年金の加入判定：
+                @if (isLoading()) {
+                    <span class="join-status-badge loading">読み込み中</span>
+                } @else {
+                    <span
+                        class="join-status-badge"
+                        [class.ok]="healthInsuranceJoinStatus() === 'active'"
+                        [class.ng]="healthInsuranceJoinStatus() === 'inactive'"
+                        [class.unknown]="healthInsuranceJoinStatus() === 'unknown'"
+                    >
+                        {{ displayInsuranceStatus(healthInsuranceJoinStatus()) }}
+                    </span>
+                }
+            </p>
+            <p>厚生年金保険料率（本人）：{{ pensionInsuranceRate }}％</p>
+            <p>厚生年金保険料率（会社）：{{ pensionInsuranceRate }}％</p>
+            @if (pensionInsurancePremium(); as premium) {
+                <p>厚生年金料（本人）：{{ premium | number }}円</p>
+            } @else {
+                <p>厚生年金料（本人）：—</p>
+            }
+            @if (pensionInsurancePremium(); as premium) {
+                <p>厚生年金料（会社）：{{ premium | number }}円</p>
+            } @else {
+                <p>厚生年金料（会社）：—</p>
+            }
+        </section>
+
+        <section>
+            <h3 class="form-section-title">介護保険料（{{ targetYearMonthLabel() }}）</h3>
+            <p class="insurance-join-status">
+                介護保険の加入判定：
+                @if (isLoading()) {
+                    <span class="join-status-badge loading">読み込み中</span>
+                } @else {
+                    <span 
+                        class="join-status-badge"
+                        [class.ok]="careInsuranceJoinStatus() === 'active'"
+                        [class.ng]="careInsuranceJoinStatus() === 'inactive'"
+                        [class.unknown]="careInsuranceJoinStatus() === 'unknown'">
+                        {{ displayInsuranceStatus(careInsuranceJoinStatus()) }}
+                    </span>
+                }
+            </p>
         </section>
     </div>
 }
@@ -401,5 +482,31 @@
     }
     button {
         width: 100%;
+    }
+    .insurance-join-status {
+        margin: 0 0 8px;
+        font-size: 14px;
+        color: #374151;
+    }
+    .join-status-badge {
+        display: inline-block;
+        margin-left: 4px;
+        padding: 2px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+    .join-status-badge.ok {
+        background: #dcfce7;
+        color: #166534;
+    }
+    .join-status-badge.ng {
+        background: #f3f4f6;
+        color: #4b5563;
+    }
+    .join-status-badge.unknown,
+    .join-status-badge.loading {
+        background: #fffbeb;
+        color: #92400e;
     }
 </style>

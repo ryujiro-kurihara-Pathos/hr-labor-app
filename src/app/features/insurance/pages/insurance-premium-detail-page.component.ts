@@ -34,7 +34,8 @@ import { yearMonthFromDateString } from '../utils/reward-target-month.util';
 import { Office } from '../../company/models/office.model';
 import { OfficeService } from '../../company/services/office.service';
 import { findHealthInsuranceRate } from '../../insurance-rate/utils/insurance-rate-lookup.util';
-import { INSURANCE_RATES } from '../../insurance-rate/data/insurance-rates';
+import { KYOKAI_HEALTH_INSURANCE_RATE_FILES } from '../../insurance-rate/data/insurance-rates';
+import { insuranceJoinStatus } from '../../social-insurance/models/social-insurance-status.model';
 
 type MonthRewardStatus = 'loading' | 'registered' | 'unregistered' | 'excluded';
 
@@ -54,10 +55,13 @@ export class InsurancePremiumDetailPageComponent {
     private readonly socialInsuranceStatusService = inject(SocialInsuranceStatusService);
     private readonly officeService = inject(OfficeService);
 
-    standardReward = signal<StandardMonthlyReward | null>(null);
-    employeeRewards = signal<Record<string, StandardMonthlyReward>>({});
-    healthInsuranceStartDate = signal<string | null>(null);
+    standardReward = signal<StandardMonthlyReward | null>(null); // 標準報酬月額
+    employeeRewards = signal<Record<string, StandardMonthlyReward>>({}); // 従業員の報酬月額
+    healthInsuranceStartDate = signal<string | null>(null); // 健康保険の資格取得日
+    healthInsuranceStatus = signal<insuranceJoinStatus | null>(null); // 健康保険の加入判定
 
+
+    // 報酬フォーム
     rewardForm: RewardForm = {
         targetYearMonth: '',
         basicSalary: '',
@@ -68,19 +72,26 @@ export class InsurancePremiumDetailPageComponent {
         fixedOvertimePay: '',
     };
 
+    // ローディング
     isLoading = signal(false);
     isLoadingMonth = signal(false);
     isSaving = signal(false);
+    // メッセージ
     errorMessage = signal<string>('');
     message = signal<string>('');
 
+    // 従業員
     employeeId = signal<string>('');
     employee = signal<Employee | null>(null);
+    // 事業所
     office = signal<Office | null>(null);
+    // 対象年月
     targetYearMonth = signal<string>('');
     targetYearMonthLabel = computed(() => formatYearMonthLabel(this.targetYearMonth()));
     /** 未入力月を開いたとき、初期表示に使った直近登録済み月（YYYY-MM） */
     prefilledFromYearMonth = signal<string | null>(null);
+    /** 未保存のフォーム合計を computed に反映するためのトリガ */
+    private formRewardRevision = signal(0);
 
     effectiveStandard = computed(() => {
         const employee = this.employee();
@@ -109,6 +120,34 @@ export class InsurancePremiumDetailPageComponent {
         if (!reward) return null;
         return this.sumRewardFields(reward);
     });
+
+    /** 対象月の報酬月額（手当合計。保存済みは DB、未保存はフォーム） */
+    targetMonthMonthlyReward = computed((): number | null => {
+        this.formRewardRevision();
+        const targetYearMonth = this.targetYearMonth();
+        if (this.isLoadingMonth() || !targetYearMonth) return null;
+
+        const saved = this.standardReward();
+        if (saved) return this.sumRewardFields(saved);
+
+        const fromForm = this.getMonthlyReward();
+        return fromForm > 0 ? fromForm : null;
+    });
+
+    // 社会保険加入判定の日本語表示（対象, 対象外, 判定不可）
+    displayInsuranceStatus(insuranceStatus: insuranceJoinStatus): string {
+        return insuranceStatus === 'active' ? '対象' : insuranceStatus === 'inactive' ? '対象外' : '判定不可';
+    }
+
+    // 健康保険(厚生年金)加入判定(active: 対象, inactive: 対象外, unknown: 判定不可)
+    healthInsuranceJoinStatus = computed((): insuranceJoinStatus => {
+        return this.healthInsuranceStatus() ?? 'unknown';
+    });
+
+    // 介護保険加入判定(active: 対象, inactive: 対象外, unknown: 判定不可)
+    careInsuranceJoinStatus = computed((): insuranceJoinStatus => {
+        return 'unknown';
+    })
 
     revisionPreview = computed(() => {
         const ym = this.targetYearMonth();
@@ -297,6 +336,7 @@ export class InsurancePremiumDetailPageComponent {
 
         const status = await this.socialInsuranceStatusService.getByEmployeeId(employeeId);
         this.healthInsuranceStartDate.set(status?.healthInsuranceStartDate ?? null);
+        this.healthInsuranceStatus.set(status?.healthInsuranceStatus ?? null);
     }
 
     async loadEmployeeRewards() {
@@ -426,6 +466,8 @@ export class InsurancePremiumDetailPageComponent {
         } catch (error) {
             console.error('標準報酬月額の取得に失敗しました', error);
             this.errorMessage.set('標準報酬月額の取得に失敗しました');
+        } finally {
+            this.bumpFormRewardRevision();
         }
     }
 
@@ -589,16 +631,79 @@ export class InsurancePremiumDetailPageComponent {
         return `${y}-${m}`;
     }
 
-    displayHealthInsuranceRates(): number | null {
-        const healthInsuranceRate = findHealthInsuranceRate({
-            rates: INSURANCE_RATES,
-            targetYearMonth: '2026-04',
-            providerType: 'kyokai',
-            prefecture: '東京都',
+    // 対象年月に対応する協会けんぽ料率行
+    healthInsuranceRateRow = computed(() => {
+        const targetYearMonth = this.targetYearMonth();
+        if (!targetYearMonth) return null;
+
+        const fiscalYear = this.healthInsuranceFiscalYear(targetYearMonth);
+        const fileName = `kyokai-health-insurance-rates-${fiscalYear}-03.ts`;
+        const rates =
+            KYOKAI_HEALTH_INSURANCE_RATE_FILES.find((file) => file.fileName === fileName)?.rates ?? [];
+
+        return findHealthInsuranceRate({
+            rates,
+            targetYearMonth,
+            providerType: this.office()?.healthInsuranceType ?? 'kyokai',
+            prefecture: this.office()?.prefecture ?? null,
         });
+    });
 
-        if(!healthInsuranceRate) return null;
+    // 健康保険料率（本人負担・小数
+    healthInsuranceRate = computed((): number | null => {
+        return this.healthInsuranceRateRow()?.employeeRate ?? null;
+    });
 
-        return healthInsuranceRate.totalRate;
+    /** この月に適用される健康保険の標準報酬月額 */
+    applicableHealthStandardAmount = computed((): number | null => {
+        const targetYearMonth = this.targetYearMonth();
+        this.standardReward();
+        this.employeeRewards();
+        if (this.isLoadingMonth() || !targetYearMonth) return null;
+
+        const effective = this.effectiveStandard();
+        if (!effective?.isComplete || !effective.calculation?.health) return null;
+
+        return effective.calculation.health.standardMonthlyAmount;
+    });
+
+    // 健康保険料（本人負担）
+    healthInsurancePremium = computed((): number | null => {
+        const targetYearMonth = this.targetYearMonth();
+        this.standardReward();
+        this.employeeRewards();
+        if (this.isLoadingMonth() || !targetYearMonth) return null;
+
+        const amount = this.applicableHealthStandardAmount();
+        const rateRow = this.healthInsuranceRateRow();
+        if (amount === null || !rateRow) return null;
+
+        return Math.round(amount * rateRow.employeeRate);
+    });
+
+    // 厚生年金料率
+    pensionInsuranceRate = 9.15;
+
+    // 厚生年金料（本人負担）
+    pensionInsurancePremium = computed((): number | null => {
+        const amount = this.applicableHealthStandardAmount();
+        if (!amount) return null;
+        const insuranceRate = this.pensionInsuranceRate;
+        return Math.round(amount * insuranceRate / 100);
+    })
+
+    healthInsuranceRatePercentLabel(): string | null {
+        const rate = this.healthInsuranceRate();
+        if (rate === null) return null;
+        return (rate * 100).toFixed(2);
+    }
+
+    private healthInsuranceFiscalYear(targetYearMonth: string): string {
+        const [y, m] = targetYearMonth.split('-').map(Number);
+        return m < 3 ? String(y - 1) : String(y);
+    }
+
+    private bumpFormRewardRevision(): void {
+        this.formRewardRevision.update((v) => v + 1);
     }
 }

@@ -67,6 +67,7 @@
                     <div class="detail-row">
                         <dt>生年月日</dt>
                         <dd>{{ employee()!.birthDate }}</dd>
+                        <dd>(満{{ age() }}歳)</dd>
                     </div>
                     <div class="detail-row">
                         <dt>入社日</dt>
@@ -338,9 +339,9 @@
                 </div>
                 <div class="result-row">
                     <span class="result-label">介護保険（年齢）</span>
-                    <span class="result-badge" [class.ok]="judgeCareInsurance() === 'active'" [class.ng]="judgeCareInsurance() === 'inactive'">
+                    <span class="result-badge" [class.ok]="careInsuranceJudge() === 'active'" [class.ng]="careInsuranceJudge() === 'inactive'">
                         @if(isEditing()) {
-                            {{ displayInsuranceStatus(judgeCareInsurance()) }}
+                            {{ displayInsuranceStatus(careInsuranceJudge()) }}
                         } @else {
                             {{ displayInsuranceStatus(socialInsuranceStatus()?.careInsuranceStatus ?? 'unknown') }}
                         }
