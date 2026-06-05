@@ -319,10 +319,15 @@ export class StandardRemunerationDeterminationService {
         return (
             reward.basicSalary +
             reward.commutingAllowance +
-            reward.monthlyAllowance +
             reward.positionAllowance +
             reward.housingAllowance +
-            reward.fixedOvertimePay
+            reward.fixedOvertimePay +
+            reward.otherFixedAllowance +
+            reward.overtimePay +
+            reward.holidayPay +
+            reward.nightPay +
+            reward.commissionPay +
+            reward.otherVariablePay
         );
     }
 

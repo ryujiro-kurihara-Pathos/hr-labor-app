@@ -27,13 +27,20 @@ export type StandardMonthlyReward = {
     // 対象年月
     targetYearMonth: string;                         // 対象年月（YYYY-MM）例: '2026-04'
 
-    // 報酬情報
+    // 固定的賃金
     basicSalary: number;                             // 基本給
     commutingAllowance: number;                      // 通勤手当
-    monthlyAllowance: number;                        // 毎月支給される手当
     positionAllowance: number;                       // 役職手当
     housingAllowance: number;                        // 住宅手当
     fixedOvertimePay: number;                        // 見込み残業代
+    otherFixedAllowance: number;                     // その他固定手当
+
+    // 変動的賃金
+    overtimePay: number;                             // 残業代
+    holidayPay: number;                              // 休日手当
+    nightPay: number;                                // 深夜手当
+    commissionPay: number;                           // インセンティブ
+    otherVariablePay: number;                        // その他変動手当
 
   /** 前月と比較して固定的賃金に変更があったか（月額変更改定の判定材料） */
     fixedWageChanged?: boolean;
@@ -59,10 +66,15 @@ export type RewardForm = {
 
     basicSalary: RewardFormFieldValue;                 // 基本給
     commutingAllowance: RewardFormFieldValue;          // 通勤手当
-    monthlyAllowance: RewardFormFieldValue;            // 毎月支給される手当
     positionAllowance: RewardFormFieldValue;           // 役職手当
     housingAllowance: RewardFormFieldValue;            // 住宅手当
     fixedOvertimePay: RewardFormFieldValue;            // 見込み残業代
+    otherFixedAllowance: RewardFormFieldValue;         // その他固定手当
+    overtimePay: RewardFormFieldValue;                 // 残業代
+    holidayPay: RewardFormFieldValue;                  // 休日手当
+    nightPay: RewardFormFieldValue;                    // 深夜手当
+    commissionPay: RewardFormFieldValue;               // インセンティブ
+    otherVariablePay: RewardFormFieldValue;            // その他変動手当
 };
 
 export type StandardMonthlyRewardDecisionType =

@@ -1,6 +1,6 @@
 import { Component, signal, inject, computed } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
 import {
@@ -19,7 +19,11 @@ import { Employee } from '../../employee/models/employee.models';
 import { EmployeeService } from '../../employee/services/employee.service';
 import { SocialInsuranceStatusService } from '../../social-insurance/services/social-insurance-status.service';
 import { addMonthsToYearMonth, isRewardTargetMonth, rewardTargetMonthReason } from '../utils/reward-target-month.util';
-import { FIXED_WAGE_FIELD_LABELS, FixedWageFieldKey } from '../utils/fixed-wage-change.util';
+import {
+    FIXED_WAGE_FIELD_KEYS,
+    FIXED_WAGE_FIELD_LABELS,
+    FixedWageFieldKey,
+} from '../utils/fixed-wage-change.util';
 import { findLatestRegisteredRewardBefore } from '../utils/latest-reward.util';
 import {
     formatYearMonthLabel,
@@ -33,7 +37,7 @@ import {
 import { yearMonthFromDateString } from '../utils/reward-target-month.util';
 import { Office } from '../../company/models/office.model';
 import { OfficeService } from '../../company/services/office.service';
-import { findHealthInsuranceRate } from '../../insurance-rate/utils/insurance-rate-lookup.util';
+import { findCareInsuranceRate, findHealthInsuranceRate } from '../../insurance-rate/utils/insurance-rate-lookup.util';
 import { KYOKAI_HEALTH_INSURANCE_RATE_FILES } from '../../insurance-rate/data/insurance-rates';
 import { insuranceJoinStatus } from '../../social-insurance/models/social-insurance-status.model';
 
@@ -42,7 +46,7 @@ type MonthRewardStatus = 'loading' | 'registered' | 'unregistered' | 'excluded';
 @Component({
     selector: 'app-insurance-premium-detail-page',
     standalone: true,
-    imports: [FormsModule, DecimalPipe],
+    imports: [FormsModule, DecimalPipe, RouterLink],
     templateUrl: './insurance-premium-detail-page.component.html',
 })
 export class InsurancePremiumDetailPageComponent {
@@ -59,6 +63,7 @@ export class InsurancePremiumDetailPageComponent {
     employeeRewards = signal<Record<string, StandardMonthlyReward>>({}); // 従業員の報酬月額
     healthInsuranceStartDate = signal<string | null>(null); // 健康保険の資格取得日
     healthInsuranceStatus = signal<insuranceJoinStatus | null>(null); // 健康保険の加入判定
+    pensionInsuranceStatus = signal<insuranceJoinStatus | null>(null); // 厚生年金の加入判定
     careInsuranceStatus = signal<insuranceJoinStatus | null>(null); // 介護保険の加入判定
 
     // 報酬フォーム
@@ -66,10 +71,15 @@ export class InsurancePremiumDetailPageComponent {
         targetYearMonth: '',
         basicSalary: '',
         commutingAllowance: '',
-        monthlyAllowance: '',
         positionAllowance: '',
         housingAllowance: '',
         fixedOvertimePay: '',
+        otherFixedAllowance: '',
+        overtimePay: '',
+        holidayPay: '',
+        nightPay: '',
+        commissionPay: '',
+        otherVariablePay: '',
     };
 
     // ローディング
@@ -144,10 +154,15 @@ export class InsurancePremiumDetailPageComponent {
         return this.healthInsuranceStatus() ?? 'unknown';
     });
 
+    // 厚生年金加入判定(active: 対象, inactive: 対象外, unknown: 判定不可)
+    pensionInsuranceJoinStatus = computed((): insuranceJoinStatus => {
+        return this.pensionInsuranceStatus() ?? 'unknown';
+    });
+
     // 介護保険加入判定(active: 対象, inactive: 対象外, unknown: 判定不可)
     careInsuranceJoinStatus = computed((): insuranceJoinStatus => {
         return this.careInsuranceStatus() ?? 'unknown';
-    })
+    });
 
     revisionPreview = computed(() => {
         const ym = this.targetYearMonth();
@@ -342,6 +357,8 @@ export class InsurancePremiumDetailPageComponent {
         this.healthInsuranceStartDate.set(status?.healthInsuranceStartDate ?? null);
         // 健康保険の加入状況を設定
         this.healthInsuranceStatus.set(status?.healthInsuranceStatus ?? null);
+        // 厚生年金の加入状況を設定
+        this.pensionInsuranceStatus.set(status?.pensionInsuranceStatus ?? null);
         // 介護保険の加入状況を設定
         this.careInsuranceStatus.set(status?.careInsuranceStatus ?? null);
     }
@@ -433,6 +450,32 @@ export class InsurancePremiumDetailPageComponent {
         );
     }
 
+    previousMonthReward(): StandardMonthlyReward | null {
+        const yearMonth = this.targetYearMonth();
+        if (!yearMonth) return null;
+        return this.employeeRewards()[addMonthsToYearMonth(yearMonth, -1)] ?? null;
+    }
+
+    isFixedWageFieldChanged(key: FixedWageFieldKey): boolean {
+        const previous = this.previousMonthReward();
+        if (!previous) return false;
+        return this.toNumber(this.rewardForm[key]) !== previous[key];
+    }
+
+    hasFixedWageChangesInForm(): boolean {
+        return FIXED_WAGE_FIELD_KEYS.some((key) => this.isFixedWageFieldChanged(key));
+    }
+
+    previousFixedWageValue(key: FixedWageFieldKey): number | null {
+        const previous = this.previousMonthReward();
+        if (!previous || !this.isFixedWageFieldChanged(key)) return null;
+        return previous[key];
+    }
+
+    onRewardFormFieldChange(): void {
+        this.bumpFormRewardRevision();
+    }
+
     private setTargetYearMonth(yearMonth: string) {
         this.targetYearMonth.set(yearMonth);
         this.rewardForm.targetYearMonth = yearMonth;
@@ -489,10 +532,15 @@ export class InsurancePremiumDetailPageComponent {
             targetYearMonth: this.targetYearMonth(),
             basicSalary: reward.basicSalary,
             commutingAllowance: reward.commutingAllowance,
-            monthlyAllowance: reward.monthlyAllowance,
             positionAllowance: reward.positionAllowance,
             housingAllowance: reward.housingAllowance,
             fixedOvertimePay: reward.fixedOvertimePay,
+            otherFixedAllowance: reward.otherFixedAllowance,
+            overtimePay: reward.overtimePay,
+            holidayPay: reward.holidayPay,
+            nightPay: reward.nightPay,
+            commissionPay: reward.commissionPay,
+            otherVariablePay: reward.otherVariablePay,
         };
     }
 
@@ -502,10 +550,15 @@ export class InsurancePremiumDetailPageComponent {
             targetYearMonth: ym,
             basicSalary: '',
             commutingAllowance: '',
-            monthlyAllowance: '',
             positionAllowance: '',
             housingAllowance: '',
             fixedOvertimePay: '',
+            otherFixedAllowance: '',
+            overtimePay: '',
+            holidayPay: '',
+            nightPay: '',
+            commissionPay: '',
+            otherVariablePay: '',
         };
     }
 
@@ -520,10 +573,15 @@ export class InsurancePremiumDetailPageComponent {
         return [
             form.basicSalary,
             form.commutingAllowance,
-            form.monthlyAllowance,
             form.positionAllowance,
             form.housingAllowance,
             form.fixedOvertimePay,
+            form.otherFixedAllowance,
+            form.overtimePay,
+            form.holidayPay,
+            form.nightPay,
+            form.commissionPay,
+            form.otherVariablePay,
         ];
     }
 
@@ -532,10 +590,15 @@ export class InsurancePremiumDetailPageComponent {
         return (
             this.toNumber(form.basicSalary) +
             this.toNumber(form.commutingAllowance) +
-            this.toNumber(form.monthlyAllowance) +
             this.toNumber(form.positionAllowance) +
             this.toNumber(form.housingAllowance) +
-            this.toNumber(form.fixedOvertimePay)
+            this.toNumber(form.fixedOvertimePay) +
+            this.toNumber(form.otherFixedAllowance) +
+            this.toNumber(form.overtimePay) +
+            this.toNumber(form.holidayPay) +
+            this.toNumber(form.nightPay) +
+            this.toNumber(form.commissionPay) +
+            this.toNumber(form.otherVariablePay)
         );
     }
 
@@ -556,18 +619,28 @@ export class InsurancePremiumDetailPageComponent {
         StandardMonthlyReward,
         | 'basicSalary'
         | 'commutingAllowance'
-        | 'monthlyAllowance'
         | 'positionAllowance'
         | 'housingAllowance'
         | 'fixedOvertimePay'
+        | 'otherFixedAllowance'
+        | 'overtimePay'
+        | 'holidayPay'
+        | 'nightPay'
+        | 'commissionPay'
+        | 'otherVariablePay'
     >): number {
         return (
             reward.basicSalary +
             reward.commutingAllowance +
-            reward.monthlyAllowance +
             reward.positionAllowance +
             reward.housingAllowance +
-            reward.fixedOvertimePay
+            reward.fixedOvertimePay +
+            reward.otherFixedAllowance +
+            reward.overtimePay +
+            reward.holidayPay +
+            reward.nightPay +
+            reward.commissionPay +
+            reward.otherVariablePay
         );
     }
 
@@ -582,10 +655,15 @@ export class InsurancePremiumDetailPageComponent {
             targetYearMonth: this.targetYearMonth(),
             basicSalary: this.toNumber(this.rewardForm.basicSalary),
             commutingAllowance: this.toNumber(this.rewardForm.commutingAllowance),
-            monthlyAllowance: this.toNumber(this.rewardForm.monthlyAllowance),
             positionAllowance: this.toNumber(this.rewardForm.positionAllowance),
             housingAllowance: this.toNumber(this.rewardForm.housingAllowance),
             fixedOvertimePay: this.toNumber(this.rewardForm.fixedOvertimePay),
+            otherFixedAllowance: this.toNumber(this.rewardForm.otherFixedAllowance),
+            overtimePay: this.toNumber(this.rewardForm.overtimePay),
+            holidayPay: this.toNumber(this.rewardForm.holidayPay),
+            nightPay: this.toNumber(this.rewardForm.nightPay),
+            commissionPay: this.toNumber(this.rewardForm.commissionPay),
+            otherVariablePay: this.toNumber(this.rewardForm.otherVariablePay),
             healthInsuranceGrade: 0,
             healthInsuranceStandardMonthlyAmount: 0,
             pensionInsuranceGrade: 0,
@@ -638,27 +716,24 @@ export class InsurancePremiumDetailPageComponent {
         return `${y}-${m}`;
     }
 
-    // 対象年月に対応する協会けんぽ料率行
-    healthInsuranceRateRow = computed(() => {
-        const targetYearMonth = this.targetYearMonth();
-        if (!targetYearMonth) return null;
-
-        const fiscalYear = this.healthInsuranceFiscalYear(targetYearMonth);
-        const fileName = `kyokai-health-insurance-rates-${fiscalYear}-03.ts`;
-        const rates =
-            KYOKAI_HEALTH_INSURANCE_RATE_FILES.find((file) => file.fileName === fileName)?.rates ?? [];
-
-        return findHealthInsuranceRate({
-            rates,
-            targetYearMonth,
-            providerType: this.office()?.healthInsuranceType ?? 'kyokai',
-            prefecture: this.office()?.prefecture ?? null,
-        });
-    });
-
-    // 健康保険料率（本人負担・小数
+    // 健康保険料率（本人負担）
     healthInsuranceRate = computed((): number | null => {
         return this.healthInsuranceRateRow()?.employeeRate ?? null;
+    });
+
+    // 健康保険料率（会社負担）
+    healthInsuranceEmployerRate = computed((): number | null => {
+        return this.healthInsuranceRateRow()?.employerRate ?? null;
+    });
+
+    // 介護保険料率（本人負担）
+    careInsuranceRate = computed((): number | null => {
+        return this.careInsuranceRateRow()?.employeeRate ?? null;
+    });
+
+    // 介護保険料率（会社負担）
+    careInsuranceEmployerRate = computed((): number | null => {
+        return this.careInsuranceRateRow()?.employerRate ?? null;
     });
 
     /** この月に適用される健康保険の標準報酬月額 */
@@ -676,38 +751,101 @@ export class InsurancePremiumDetailPageComponent {
 
     // 健康保険料（本人負担）
     healthInsurancePremium = computed((): number | null => {
-        const targetYearMonth = this.targetYearMonth();
-        this.standardReward();
-        this.employeeRewards();
-        if (this.isLoadingMonth() || !targetYearMonth) return null;
+        return this.calculatePremium(this.applicableHealthStandardAmount(), this.healthInsuranceRate());
+    });
 
-        const amount = this.applicableHealthStandardAmount();
-        const rateRow = this.healthInsuranceRateRow();
-        if (amount === null || !rateRow) return null;
-
-        return Math.round(amount * rateRow.employeeRate);
+    // 健康保険料（会社負担）
+    healthInsuranceEmployerPremium = computed((): number | null => {
+        return this.calculatePremium(
+            this.applicableHealthStandardAmount(),
+            this.healthInsuranceEmployerRate(),
+        );
     });
 
     // 厚生年金料率
-    pensionInsuranceRate = 9.15;
+    pensionInsuranceRate = 0.0915;
 
     // 厚生年金料（本人負担）
     pensionInsurancePremium = computed((): number | null => {
-        const amount = this.applicableHealthStandardAmount();
-        if (!amount) return null;
-        const insuranceRate = this.pensionInsuranceRate;
-        return Math.round(amount * insuranceRate / 100);
-    })
+        return this.calculatePremium(this.applicableHealthStandardAmount(), this.pensionInsuranceRate);
+    });
 
-    healthInsuranceRatePercentLabel(): string | null {
-        const rate = this.healthInsuranceRate();
+    // 厚生年金料（会社負担）
+    pensionInsuranceEmployerPremium = computed((): number | null => {
+        return this.calculatePremium(this.applicableHealthStandardAmount(), this.pensionInsuranceRate);
+    });
+
+    // 介護保険料（本人負担）
+    careInsurancePremium = computed((): number | null => {
+        return this.calculatePremium(this.applicableHealthStandardAmount(), this.careInsuranceRate());
+    });
+
+    // 介護保険料（会社負担）
+    careInsuranceEmployerPremium = computed((): number | null => {
+        return this.calculatePremium(
+            this.applicableHealthStandardAmount(),
+            this.careInsuranceEmployerRate(),
+        );
+    });
+
+    // 社会保険料の合計（本人負担）
+    socialInsurancePremium = computed((): number | null => {
+        const healthPremium = this.healthInsurancePremium() ?? 0;
+        const pensionPremium = this.pensionInsurancePremium() ?? 0;
+        const carePremium = this.careInsurancePremium() ?? 0;
+        return healthPremium + pensionPremium + carePremium;
+    });
+
+    // 社会保険料の合計（会社負担）
+    socialInsuranceEmployerPremium = computed((): number | null => {
+        const healthPremium = this.healthInsuranceEmployerPremium() ?? 0;
+        const pensionPremium = this.pensionInsuranceEmployerPremium() ?? 0;
+        const carePremium = this.careInsuranceEmployerPremium() ?? 0;
+        return healthPremium + pensionPremium + carePremium;
+    });
+
+    insuranceRatePercentLabel(rate: number | null): string | null {
         if (rate === null) return null;
-        return (rate * 100).toFixed(2);
+        return Number((rate * 100).toFixed(3)).toString();
     }
 
     private healthInsuranceFiscalYear(targetYearMonth: string): string {
         const [y, m] = targetYearMonth.split('-').map(Number);
         return m < 3 ? String(y - 1) : String(y);
+    }
+
+    private healthInsuranceRateRow() {
+        const targetYearMonth = this.targetYearMonth();
+        if (!targetYearMonth) return null;
+
+        const fiscalYear = this.healthInsuranceFiscalYear(targetYearMonth);
+        const fileName = `kyokai-health-insurance-rates-${fiscalYear}-03.ts`;
+        const rates =
+            KYOKAI_HEALTH_INSURANCE_RATE_FILES.find((file) => file.fileName === fileName)?.rates ?? [];
+
+        return findHealthInsuranceRate({
+            rates,
+            targetYearMonth,
+            providerType: this.office()?.healthInsuranceType ?? 'kyokai',
+            prefecture: this.office()?.prefecture ?? null,
+        });
+    }
+
+    private careInsuranceRateRow() {
+        const targetYearMonth = this.targetYearMonth();
+        if (!targetYearMonth) return null;
+
+        return findCareInsuranceRate(targetYearMonth);
+    }
+
+    private calculatePremium(amount: number | null, rate: number | null): number | null {
+        const targetYearMonth = this.targetYearMonth();
+        this.standardReward();
+        this.employeeRewards();
+        if (this.isLoadingMonth() || !targetYearMonth) return null;
+        if (amount === null || rate === null) return null;
+
+        return Math.round(amount * rate);
     }
 
     private bumpFormRewardRevision(): void {

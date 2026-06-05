@@ -1,41 +1,40 @@
-<h1>保険料計算（報酬入力）</h1>
-
-@if (isLoading()) {
-    <p>読み込み中...</p>
-} @else if (!employee()) {
-    <p>{{ errorMessage() }}</p>
-} @else {
-    <div class="insurance-premium-form">
-        <p class="employee-name">{{ employee()!.lastName }} {{ employee()!.firstName }}</p>
+<div class="insurance-premium-detail-page">
+    @if (isLoading()) {
+        <p class="loading">読み込み中...</p>
+    } @else if (!employee()) {
+        <p class="error-message">{{ errorMessage() }}</p>
+    } @else {
+        <header class="page-header">
+            <a routerLink="/premium" class="back-link">← 一覧に戻る</a>
+            <h1>保険料計算</h1>
+            <p class="employee-meta">
+                {{ employee()!.lastName }} {{ employee()!.firstName }}
+                @if (office()?.prefecture) {
+                    <span class="meta-separator">·</span>
+                    事業所：{{ office()!.prefecture }}
+                }
+            </p>
+        </header>
 
         @if (message()) {
-            <p class="message">{{ message() }}</p>
+            <p class="alert alert-success">{{ message() }}</p>
         }
         @if (errorMessage()) {
-            <p class="error-message">{{ errorMessage() }}</p>
+            <p class="alert alert-error">{{ errorMessage() }}</p>
         }
 
-        <div class="form-field month-field">
-            <label for="target-year-month">対象年月</label>
+        <div class="month-toolbar">
+            <button
+                type="button"
+                class="month-nav-btn"
+                (click)="shiftMonth(-1)"
+                [disabled]="isLoadingMonth()"
+                aria-label="前月"
+            >
+                ←
+            </button>
             <div class="month-picker">
-                <button
-                    type="button"
-                    class="month-nav-btn"
-                    (click)="shiftMonth(-1)"
-                    [disabled]="isLoadingMonth()"
-                    aria-label="前月"
-                >
-                    ←
-                </button>
-                <button
-                    type="button"
-                    class="month-nav-btn"
-                    (click)="shiftMonth(1)"
-                    [disabled]="isLoadingMonth()"
-                    aria-label="翌月"
-                >
-                    →
-                </button>
+                <label for="target-year-month" class="month-label">対象年月</label>
                 <input
                     id="target-year-month"
                     type="month"
@@ -46,15 +45,24 @@
                 />
                 <span class="month-display">{{ targetYearMonthLabel() }}</span>
             </div>
-            @if (isLoadingMonth()) {
-                <p class="month-loading">報酬情報を読み込み中...</p>
-            }
+            <button
+                type="button"
+                class="month-nav-btn"
+                (click)="shiftMonth(1)"
+                [disabled]="isLoadingMonth()"
+                aria-label="翌月"
+            >
+                →
+            </button>
         </div>
+        @if (isLoadingMonth()) {
+            <p class="month-loading">報酬情報を読み込み中...</p>
+        }
 
         @if (canCopyFromLatestRegistered()) {
             <button
                 type="button"
-                class="copy-prev-btn"
+                class="btn sub-btn copy-prev-btn"
                 (click)="copyFromLatestRegistered()"
                 [disabled]="isSaving() || !isTargetMonth()"
             >
@@ -63,289 +71,729 @@
         }
 
         @if (standardReward()?.fixedWageChanged && changedFixedWageFieldLabels().length > 0) {
-            <p class="wage-change-notice">
+            <p class="alert alert-warning">
                 前月から固定的賃金に変更があります（{{ changedFixedWageFieldLabels().join('・') }}）。月額変更の届出が必要な場合があります。
             </p>
         }
 
-        <div class="form-section">
-            <h3 class="form-section-title">報酬入力</h3>
+        <div class="main-grid">
+            <section class="card form-card">
+                <h2 class="section-title">報酬入力</h2>
 
-            <div class="form-field">
-                <label for="basic-salary">基本給</label>
-                <input type="number" placeholder="例: 88000" [(ngModel)]="rewardForm.basicSalary" />
-            </div>
-            <div class="form-field">
-                <label for="commuting-allowance">通勤手当</label>
-                <input type="number" placeholder="例: 10000" [(ngModel)]="rewardForm.commutingAllowance" />
-            </div>
-            <div class="form-field">
-                <label for="monthly-allowance">毎月支給される手当</label>
-                <input type="number" placeholder="例: 10000" [(ngModel)]="rewardForm.monthlyAllowance" />
-            </div>
-            <div class="form-field">
-                <label for="position-allowance">役職手当</label>
-                <input type="number" placeholder="例: 10000" [(ngModel)]="rewardForm.positionAllowance" />
-            </div>
-            <div class="form-field">
-                <label for="housing-allowance">住宅手当</label>
-                <input type="number" placeholder="例: 10000" [(ngModel)]="rewardForm.housingAllowance" />
-            </div>
-            <div class="form-field">
-                <label for="fixed-overtime-pay">見込み残業代</label>
-                <input type="number" placeholder="例: 10000" [(ngModel)]="rewardForm.fixedOvertimePay" />
-            </div>
-            <button
-                type="button"
-                (click)="saveStandardMonthlyReward()"
-                [disabled]="isSaving() || isLoadingMonth() || !isTargetMonth()"
+                <div class="wage-section fixed-wage-section">
+                    <div class="wage-section-header">
+                        <h3 class="wage-section-title">固定的賃金</h3>
+                        @if (hasFixedWageChangesInForm()) {
+                            <span class="wage-change-hint">前月から変更あり</span>
+                        }
+                    </div>
+                    <p class="wage-section-note">毎月一定額が支給される項目。前月と異なる値は黄色で表示されます。</p>
+
+                    <div class="reward-fields">
+                        <div class="form-field" [class.field-changed]="isFixedWageFieldChanged('basicSalary')">
+                            <label for="basic-salary">
+                                基本給
+                                @if (isFixedWageFieldChanged('basicSalary')) {
+                                    <span class="field-change-badge">変更</span>
+                                }
+                            </label>
+                            <input
+                                id="basic-salary"
+                                type="number"
+                                placeholder="例: 88000"
+                                [(ngModel)]="rewardForm.basicSalary"
+                                (ngModelChange)="onRewardFormFieldChange()"
+                            />
+                            @if (previousFixedWageValue('basicSalary'); as prev) {
+                                <span class="previous-value-hint">前月: {{ prev | number }}円</span>
+                            }
+                        </div>
+                        <div class="form-field" [class.field-changed]="isFixedWageFieldChanged('commutingAllowance')">
+                            <label for="commuting-allowance">
+                                通勤手当
+                                @if (isFixedWageFieldChanged('commutingAllowance')) {
+                                    <span class="field-change-badge">変更</span>
+                                }
+                            </label>
+                            <input
+                                id="commuting-allowance"
+                                type="number"
+                                placeholder="例: 10000"
+                                [(ngModel)]="rewardForm.commutingAllowance"
+                                (ngModelChange)="onRewardFormFieldChange()"
+                            />
+                            @if (previousFixedWageValue('commutingAllowance'); as prev) {
+                                <span class="previous-value-hint">前月: {{ prev | number }}円</span>
+                            }
+                        </div>
+                        <div class="form-field" [class.field-changed]="isFixedWageFieldChanged('positionAllowance')">
+                            <label for="position-allowance">
+                                役職手当
+                                @if (isFixedWageFieldChanged('positionAllowance')) {
+                                    <span class="field-change-badge">変更</span>
+                                }
+                            </label>
+                            <input
+                                id="position-allowance"
+                                type="number"
+                                placeholder="例: 10000"
+                                [(ngModel)]="rewardForm.positionAllowance"
+                                (ngModelChange)="onRewardFormFieldChange()"
+                            />
+                            @if (previousFixedWageValue('positionAllowance'); as prev) {
+                                <span class="previous-value-hint">前月: {{ prev | number }}円</span>
+                            }
+                        </div>
+                        <div class="form-field" [class.field-changed]="isFixedWageFieldChanged('housingAllowance')">
+                            <label for="housing-allowance">
+                                住宅手当
+                                @if (isFixedWageFieldChanged('housingAllowance')) {
+                                    <span class="field-change-badge">変更</span>
+                                }
+                            </label>
+                            <input
+                                id="housing-allowance"
+                                type="number"
+                                placeholder="例: 10000"
+                                [(ngModel)]="rewardForm.housingAllowance"
+                                (ngModelChange)="onRewardFormFieldChange()"
+                            />
+                            @if (previousFixedWageValue('housingAllowance'); as prev) {
+                                <span class="previous-value-hint">前月: {{ prev | number }}円</span>
+                            }
+                        </div>
+                        <div class="form-field" [class.field-changed]="isFixedWageFieldChanged('fixedOvertimePay')">
+                            <label for="fixed-overtime-pay">
+                                見込み残業代
+                                @if (isFixedWageFieldChanged('fixedOvertimePay')) {
+                                    <span class="field-change-badge">変更</span>
+                                }
+                            </label>
+                            <input
+                                id="fixed-overtime-pay"
+                                type="number"
+                                placeholder="例: 10000"
+                                [(ngModel)]="rewardForm.fixedOvertimePay"
+                                (ngModelChange)="onRewardFormFieldChange()"
+                            />
+                            @if (previousFixedWageValue('fixedOvertimePay'); as prev) {
+                                <span class="previous-value-hint">前月: {{ prev | number }}円</span>
+                            }
+                        </div>
+                        <div class="form-field" [class.field-changed]="isFixedWageFieldChanged('otherFixedAllowance')">
+                            <label for="other-fixed-allowance">
+                                その他固定手当
+                                @if (isFixedWageFieldChanged('otherFixedAllowance')) {
+                                    <span class="field-change-badge">変更</span>
+                                }
+                            </label>
+                            <input
+                                id="other-fixed-allowance"
+                                type="number"
+                                placeholder="例: 10000"
+                                [(ngModel)]="rewardForm.otherFixedAllowance"
+                                (ngModelChange)="onRewardFormFieldChange()"
+                            />
+                            @if (previousFixedWageValue('otherFixedAllowance'); as prev) {
+                                <span class="previous-value-hint">前月: {{ prev | number }}円</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="wage-section variable-wage-section">
+                    <h3 class="wage-section-title">変動的賃金</h3>
+                    <p class="wage-section-note">月ごとに変動する項目（残業代・インセンティブなど）。</p>
+
+                    <div class="reward-fields">
+                        <div class="form-field">
+                            <label for="overtime-pay">残業代</label>
+                            <input
+                                id="overtime-pay"
+                                type="number"
+                                placeholder="例: 15000"
+                                [(ngModel)]="rewardForm.overtimePay"
+                                (ngModelChange)="onRewardFormFieldChange()"
+                            />
+                        </div>
+                        <div class="form-field">
+                            <label for="holiday-pay">休日手当</label>
+                            <input
+                                id="holiday-pay"
+                                type="number"
+                                placeholder="例: 5000"
+                                [(ngModel)]="rewardForm.holidayPay"
+                                (ngModelChange)="onRewardFormFieldChange()"
+                            />
+                        </div>
+                        <div class="form-field">
+                            <label for="night-pay">深夜手当</label>
+                            <input
+                                id="night-pay"
+                                type="number"
+                                placeholder="例: 3000"
+                                [(ngModel)]="rewardForm.nightPay"
+                                (ngModelChange)="onRewardFormFieldChange()"
+                            />
+                        </div>
+                        <div class="form-field">
+                            <label for="commission-pay">インセンティブ</label>
+                            <input
+                                id="commission-pay"
+                                type="number"
+                                placeholder="例: 20000"
+                                [(ngModel)]="rewardForm.commissionPay"
+                                (ngModelChange)="onRewardFormFieldChange()"
+                            />
+                        </div>
+                        <div class="form-field">
+                            <label for="other-variable-pay">その他変動手当</label>
+                            <input
+                                id="other-variable-pay"
+                                type="number"
+                                placeholder="例: 5000"
+                                [(ngModel)]="rewardForm.otherVariablePay"
+                                (ngModelChange)="onRewardFormFieldChange()"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <button
+                    type="button"
+                    class="btn primary-btn save-btn"
+                    (click)="saveStandardMonthlyReward()"
+                    [disabled]="isSaving() || isLoadingMonth() || !isTargetMonth()"
+                >
+                    @if (isSaving()) {
+                        保存中...
+                    } @else if (monthRewardStatus() === 'registered') {
+                        更新する
+                    } @else {
+                        保存する
+                    }
+                </button>
+            </section>
+
+            <section
+                class="card month-status-panel"
+                [class.loading]="monthRewardStatus() === 'loading'"
+                [class.registered]="monthRewardStatus() === 'registered'"
+                [class.unregistered]="monthRewardStatus() === 'unregistered'"
+                [class.excluded]="monthRewardStatus() === 'excluded'"
             >
-                @if (isSaving()) {
-                    保存中...
-                } @else if (monthRewardStatus() === 'registered') {
-                    更新する
-                } @else {
-                    保存する
+                <div class="month-status-header">
+                    <h2 class="section-title">{{ targetYearMonthLabel() }}の報酬</h2>
+                    <span
+                        class="registration-badge"
+                        [class.loading]="monthRewardStatus() === 'loading'"
+                        [class.registered]="monthRewardStatus() === 'registered'"
+                        [class.unregistered]="monthRewardStatus() === 'unregistered'"
+                        [class.excluded]="monthRewardStatus() === 'excluded'"
+                    >
+                        {{ monthRewardStatusLabel() }}
+                    </span>
+                </div>
+                @if (monthRewardStatusDescription()) {
+                    <p class="month-status-description">{{ monthRewardStatusDescription() }}</p>
                 }
-            </button>
+
+                <dl class="status-dl">
+                    <div class="status-row">
+                        <dt>報酬月額</dt>
+                        <dd>
+                            @if (targetMonthMonthlyReward(); as monthlyReward) {
+                                {{ monthlyReward | number }}円
+                            } @else {
+                                —
+                            }
+                        </dd>
+                    </div>
+                </dl>
+
+                @if (effectiveStandard(); as effective) {
+                    <div class="status-block">
+                        <h3 class="status-block-title">適用される標準報酬月額</h3>
+                        <p class="status-line">決定区分：{{ effective.determinationLabel }}</p>
+                        @if (effective.calculationMonths.length > 0) {
+                            <p class="status-line">算定対象月：{{ effectiveCalculationMonthsLabel() }}</p>
+                        }
+                        @if (effective.isComplete && effective.averageMonthlyReward !== null && effective.calculation) {
+                            <p class="status-line">算定報酬月額：{{ effective.averageMonthlyReward | number }}円</p>
+                            <p class="status-line">
+                                健康保険：等級{{ effective.calculation.health?.grade ?? '—' }} /
+                                標準報酬月額 {{ (effective.calculation.health?.standardMonthlyAmount ?? 0) | number }}円
+                            </p>
+                            <p class="status-line">
+                                厚生年金：等級{{ effective.calculation.pension?.grade ?? '—' }} /
+                                標準報酬月額 {{ (effective.calculation.pension?.standardMonthlyAmount ?? 0) | number }}円
+                            </p>
+                        } @else {
+                            <p class="status-line muted">{{ effective.description }}</p>
+                        }
+                    </div>
+                }
+
+                @if (revisionPreview(); as preview) {
+                    <div class="status-block">
+                        <h3 class="status-block-title">随時改定（月額変更）判定</h3>
+                        <p class="status-line">{{ preview.description }}</p>
+                        @if (revisionPreviewResult(); as result) {
+                            <p class="status-line revision-result">{{ result }}</p>
+                        }
+                    </div>
+                }
+
+                @if (monthRewardStatus() === 'unregistered' && isInputRequiredMonth()) {
+                    <p class="month-status-action">入力が必要な月です。左のフォームに報酬を入力して保存してください。</p>
+                }
+            </section>
         </div>
 
-        <section
-            class="month-status-panel"
-            [class.loading]="monthRewardStatus() === 'loading'"
-            [class.registered]="monthRewardStatus() === 'registered'"
-            [class.unregistered]="monthRewardStatus() === 'unregistered'"
-            [class.excluded]="monthRewardStatus() === 'excluded'"
-        >
-            <div class="month-status-header">
-                <h2 class="month-status-title">{{ targetYearMonthLabel() }}の報酬</h2>
-                <span
-                    class="registration-badge"
-                    [class.loading]="monthRewardStatus() === 'loading'"
-                    [class.registered]="monthRewardStatus() === 'registered'"
-                    [class.unregistered]="monthRewardStatus() === 'unregistered'"
-                    [class.excluded]="monthRewardStatus() === 'excluded'"
-                >
-                    {{ monthRewardStatusLabel() }}
-                </span>
+        <section class="card premium-card">
+            <h2 class="section-title">社会保険料（{{ targetYearMonthLabel() }}）</h2>
+            @if (applicableHealthStandardAmount(); as standardAmount) {
+                <p class="premium-note">標準報酬月額 {{ standardAmount | number }}円をもとに計算</p>
+            } @else {
+                <p class="premium-note muted">標準報酬月額が確定していないため、保険料を計算できません。</p>
+            }
+
+            <div class="table-wrap">
+                <table class="premium-table">
+                    <thead>
+                        <tr>
+                            <th>種別</th>
+                            <th>加入判定</th>
+                            <th class="num">料率（本人）</th>
+                            <th class="num">料率（会社）</th>
+                            <th class="num">保険料（本人）</th>
+                            <th class="num">保険料（会社）</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>健康保険</td>
+                            <td>
+                                <span
+                                    class="join-status-badge"
+                                    [class.ok]="healthInsuranceJoinStatus() === 'active'"
+                                    [class.ng]="healthInsuranceJoinStatus() === 'inactive'"
+                                    [class.unknown]="healthInsuranceJoinStatus() === 'unknown'"
+                                >
+                                    {{ displayInsuranceStatus(healthInsuranceJoinStatus()) }}
+                                </span>
+                            </td>
+                            <td class="num">{{ insuranceRatePercentLabel(healthInsuranceRate()) ?? '—' }}%</td>
+                            <td class="num">{{ insuranceRatePercentLabel(healthInsuranceEmployerRate()) ?? '—' }}%</td>
+                            <td class="num">
+                                @if (healthInsurancePremium(); as premium) {
+                                    {{ premium | number }}円
+                                } @else {
+                                    —
+                                }
+                            </td>
+                            <td class="num">
+                                @if (healthInsuranceEmployerPremium(); as premium) {
+                                    {{ premium | number }}円
+                                } @else {
+                                    —
+                                }
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>厚生年金</td>
+                            <td>
+                                <span
+                                    class="join-status-badge"
+                                    [class.ok]="pensionInsuranceJoinStatus() === 'active'"
+                                    [class.ng]="pensionInsuranceJoinStatus() === 'inactive'"
+                                    [class.unknown]="pensionInsuranceJoinStatus() === 'unknown'"
+                                >
+                                    {{ displayInsuranceStatus(pensionInsuranceJoinStatus()) }}
+                                </span>
+                            </td>
+                            <td class="num">{{ insuranceRatePercentLabel(pensionInsuranceRate) }}%</td>
+                            <td class="num">{{ insuranceRatePercentLabel(pensionInsuranceRate) }}%</td>
+                            <td class="num">
+                                @if (pensionInsurancePremium(); as premium) {
+                                    {{ premium | number }}円
+                                } @else {
+                                    —
+                                }
+                            </td>
+                            <td class="num">
+                                @if (pensionInsuranceEmployerPremium(); as premium) {
+                                    {{ premium | number }}円
+                                } @else {
+                                    —
+                                }
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>介護保険</td>
+                            <td>
+                                <span
+                                    class="join-status-badge"
+                                    [class.ok]="careInsuranceJoinStatus() === 'active'"
+                                    [class.ng]="careInsuranceJoinStatus() === 'inactive'"
+                                    [class.unknown]="careInsuranceJoinStatus() === 'unknown'"
+                                >
+                                    {{ displayInsuranceStatus(careInsuranceJoinStatus()) }}
+                                </span>
+                            </td>
+                            <td class="num">{{ insuranceRatePercentLabel(careInsuranceRate()) ?? '—' }}%</td>
+                            <td class="num">{{ insuranceRatePercentLabel(careInsuranceEmployerRate()) ?? '—' }}%</td>
+                            <td class="num">
+                                @if (careInsurancePremium(); as premium) {
+                                    {{ premium | number }}円
+                                } @else {
+                                    —
+                                }
+                            </td>
+                            <td class="num">
+                                @if (careInsuranceEmployerPremium(); as premium) {
+                                    {{ premium | number }}円
+                                } @else {
+                                    —
+                                }
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th colspan="4">合計</th>
+                            <th class="num">{{ socialInsurancePremium() | number }}円</th>
+                            <th class="num">{{ socialInsuranceEmployerPremium() | number }}円</th>
+                        </tr>
+                    </tfoot>
+                </table>
             </div>
-            @if (monthRewardStatusDescription()) {
-                <p class="month-status-description">{{ monthRewardStatusDescription() }}</p>
-            }
-
-            @if (monthRewardStatus() === 'registered' && registeredMonthlyReward() !== null) {
-                <div class="status-block">
-                    <h3 class="status-block-title">【登録済みの月額報酬】</h3>
-                    <p class="status-line">報酬月額：{{ registeredMonthlyReward() | number }}円</p>
-                </div>
-            }
-
-            @if (effectiveStandard(); as effective) {
-                <div class="status-block">
-                    <h3 class="status-block-title">【この月に適用される標準報酬月額】</h3>
-                    <p class="status-line">決定区分：{{ effective.determinationLabel }}</p>
-                    @if (effective.calculationMonths.length > 0) {
-                        <p class="status-line">算定対象月：{{ effectiveCalculationMonthsLabel() }}</p>
-                    }
-                    @if (effective.isComplete && effective.averageMonthlyReward !== null && effective.calculation) {
-                        <p class="status-line">算定報酬月額：{{ effective.averageMonthlyReward | number }}円</p>
-                        <p class="status-line">
-                            健康保険：等級{{ effective.calculation.health?.grade ?? '—' }} /
-                            標準報酬月額 {{ (effective.calculation.health?.standardMonthlyAmount ?? 0) | number }}円
-                        </p>
-                        <p class="status-line">
-                            厚生年金：等級{{ effective.calculation.pension?.grade ?? '—' }} /
-                            標準報酬月額 {{ (effective.calculation.pension?.standardMonthlyAmount ?? 0) | number }}円
-                        </p>
-                    } @else {
-                        <p class="status-line muted">{{ effective.description }}</p>
-                    }
-                </div>
-            }
-
-            @if (revisionPreview(); as preview) {
-                <div class="status-block">
-                    <h3 class="status-block-title">【随時改定（月額変更）判定】</h3>
-                    <p class="status-line">{{ preview.description }}</p>
-                    @if (revisionPreviewResult(); as result) {
-                        <p class="status-line revision-result">{{ result }}</p>
-                    }
-                </div>
-            }
-
-            @if (monthRewardStatus() === 'unregistered' && isInputRequiredMonth()) {
-                <p class="month-status-action">入力が必要な月です。上記フォームに報酬を入力して保存してください。</p>
-            }
         </section>
-
-        <section>
-            @if (targetMonthMonthlyReward(); as monthlyReward) {
-                <p>報酬月額：{{ monthlyReward | number }}円</p>
-            } @else {
-                <p>報酬月額：—</p>
-            }
-            <p>事業所：{{ office()?.prefecture ?? '-' }}</p>
-        </section>
-
-        <section>
-            <h3 class="form-section-title">健康保険料（{{ targetYearMonthLabel() }}）</h3>
-            <p class="insurance-join-status">
-                健康保険の加入判定：
-                @if (isLoading()) {
-                    <span class="join-status-badge loading">読み込み中</span>
-                } @else {
-                    <span
-                        class="join-status-badge"
-                        [class.ok]="healthInsuranceJoinStatus() === 'active'"
-                        [class.ng]="healthInsuranceJoinStatus() === 'inactive'"
-                        [class.unknown]="healthInsuranceJoinStatus() === 'unknown'"
-                    >
-                        {{ displayInsuranceStatus(healthInsuranceJoinStatus()) }}
-                    </span>
-                }
-            </p>
-            <p>健康保険料率（本人）：{{ healthInsuranceRatePercentLabel() ?? '-' }}%</p>
-            <p>健康保険料率（会社）：{{ healthInsuranceRatePercentLabel() ?? '-' }}%</p>
-            @if (healthInsurancePremium(); as premium) {
-                <p>健康保険料（本人）：{{ premium | number }}円</p>
-            } @else {
-                <p>健康保険料（本人）：—</p>
-            }
-            @if (healthInsurancePremium(); as premium) {
-                <p>健康保険料（会社）：{{ premium | number }}円</p>
-            } @else {
-                <p>健康保険料（会社）：—</p>
-            }
-        </section>
-        <section>
-            <h3 class="form-section-title">厚生年金料（{{ targetYearMonthLabel() }}）</h3>
-            <p class="insurance-join-status">
-                厚生年金の加入判定：
-                @if (isLoading()) {
-                    <span class="join-status-badge loading">読み込み中</span>
-                } @else {
-                    <span
-                        class="join-status-badge"
-                        [class.ok]="healthInsuranceJoinStatus() === 'active'"
-                        [class.ng]="healthInsuranceJoinStatus() === 'inactive'"
-                        [class.unknown]="healthInsuranceJoinStatus() === 'unknown'"
-                    >
-                        {{ displayInsuranceStatus(healthInsuranceJoinStatus()) }}
-                    </span>
-                }
-            </p>
-            <p>厚生年金保険料率（本人）：{{ pensionInsuranceRate }}％</p>
-            <p>厚生年金保険料率（会社）：{{ pensionInsuranceRate }}％</p>
-            @if (pensionInsurancePremium(); as premium) {
-                <p>厚生年金料（本人）：{{ premium | number }}円</p>
-            } @else {
-                <p>厚生年金料（本人）：—</p>
-            }
-            @if (pensionInsurancePremium(); as premium) {
-                <p>厚生年金料（会社）：{{ premium | number }}円</p>
-            } @else {
-                <p>厚生年金料（会社）：—</p>
-            }
-        </section>
-
-        <section>
-            <h3 class="form-section-title">介護保険料（{{ targetYearMonthLabel() }}）</h3>
-            <p class="insurance-join-status">
-                介護保険の加入判定：
-                @if (isLoading()) {
-                    <span class="join-status-badge loading">読み込み中</span>
-                } @else {
-                    <span 
-                        class="join-status-badge"
-                        [class.ok]="careInsuranceJoinStatus() === 'active'"
-                        [class.ng]="careInsuranceJoinStatus() === 'inactive'"
-                        [class.unknown]="careInsuranceJoinStatus() === 'unknown'">
-                        {{ displayInsuranceStatus(careInsuranceJoinStatus()) }}
-                    </span>
-                }
-            </p>
-        </section>
-    </div>
-}
+    }
+</div>
 
 <style>
-    .insurance-premium-form {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        margin-top: 20px;
-        width: 42%;
-        min-width: 360px;
-        max-width: 560px;
+    .insurance-premium-detail-page {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 24px 16px 40px;
     }
-    .employee-name {
-        margin: 0 0 4px;
-        font-weight: 600;
-    }
-    .copy-prev-btn {
-        align-self: flex-start;
-        padding: 6px 12px;
-        font-size: 13px;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        background: #fff;
-        cursor: pointer;
-    }
-    .copy-prev-btn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-    .wage-change-notice {
+
+    .loading {
         margin: 0;
-        padding: 8px 10px;
-        border-radius: 6px;
-        background: #fffbeb;
-        border: 1px solid #fde68a;
-        color: #92400e;
+        color: #6b7280;
+        font-size: 14px;
+    }
+
+    .page-header {
+        margin-bottom: 20px;
+    }
+
+    .back-link {
+        display: inline-block;
+        margin-bottom: 10px;
+        font-size: 13px;
+        color: #2f6fed;
+        text-decoration: none;
+    }
+
+    .back-link:hover {
+        text-decoration: underline;
+    }
+
+    h1 {
+        margin: 0 0 6px;
+        font-size: 22px;
+    }
+
+    .employee-meta {
+        margin: 0;
+        font-size: 14px;
+        color: #6b7280;
+    }
+
+    .meta-separator {
+        margin: 0 6px;
+    }
+
+    .alert {
+        margin: 0 0 12px;
+        padding: 10px 12px;
+        border-radius: 8px;
         font-size: 13px;
         line-height: 1.5;
     }
-    .message {
-        margin: 0;
+
+    .alert-success {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
         color: #166534;
-        font-size: 14px;
     }
-    .error-message {
-        margin: 0;
+
+    .alert-error {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
         color: #b91c1c;
+        font-weight: 600;
+    }
+
+    .alert-warning {
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        color: #92400e;
+    }
+
+    .month-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 8px;
+        padding: 16px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+    }
+
+    .month-nav-btn {
+        flex-shrink: 0;
+        width: 40px;
+        height: 40px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: #fff;
+        font-size: 18px;
+        cursor: pointer;
+    }
+
+    .month-nav-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .month-picker {
+        flex: 1;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 16px;
+    }
+
+    .month-label {
         font-size: 14px;
         font-weight: 600;
     }
-    .out-of-scope-notice {
-        margin: 0;
-        padding: 10px 12px;
+
+    .month-picker input[type='month'] {
+        padding: 8px 10px;
+        border: 1px solid #d1d5db;
         border-radius: 8px;
-        background: #f3f4f6;
-        color: #4b5563;
         font-size: 14px;
     }
-    .month-status-panel {
-        padding: 14px 16px;
-        border-radius: 10px;
-        border: 1px solid #e5e7eb;
-        background: #f9fafb;
+
+    .month-display {
+        font-size: 16px;
+        font-weight: 600;
+        color: #111827;
     }
+
+    .month-loading {
+        margin: 0 0 16px;
+        font-size: 13px;
+        color: #6b7280;
+    }
+
+    .copy-prev-btn {
+        margin-bottom: 16px;
+        width: auto;
+    }
+
+    .main-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+
+    @media (max-width: 768px) {
+        .main-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .card {
+        padding: 20px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+    }
+
+    .section-title {
+        margin: 0 0 14px;
+        font-size: 17px;
+    }
+
+    .wage-section {
+        margin-bottom: 16px;
+    }
+
+    .wage-section:last-of-type {
+        margin-bottom: 0;
+    }
+
+    .fixed-wage-section {
+        padding: 14px;
+        background: #f8fafc;
+        border: 1px solid #dbeafe;
+        border-radius: 10px;
+    }
+
+    .variable-wage-section {
+        padding: 14px;
+        background: #fafafa;
+        border: 1px dashed #d1d5db;
+        border-radius: 10px;
+    }
+
+    .wage-section-header {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 4px;
+    }
+
+    .wage-section-title {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 700;
+    }
+
+    .fixed-wage-section .wage-section-title {
+        color: #1e40af;
+    }
+
+    .variable-wage-section .wage-section-title {
+        color: #4b5563;
+    }
+
+    .wage-section-note {
+        margin: 0 0 12px;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #6b7280;
+    }
+
+    .wage-change-hint {
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .reward-fields {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px 16px;
+    }
+
+    @media (max-width: 520px) {
+        .reward-fields {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .form-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .form-field label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .form-field input {
+        height: 40px;
+        padding: 0 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 14px;
+    }
+
+    .form-field.field-changed label {
+        color: #92400e;
+    }
+
+    .form-field.field-changed input {
+        border-color: #f59e0b;
+        background: #fffbeb;
+    }
+
+    .field-change-badge {
+        margin-left: 6px;
+        padding: 1px 6px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 700;
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .previous-value-hint {
+        font-size: 11px;
+        color: #b45309;
+    }
+
+    .btn {
+        height: 42px;
+        padding: 0 16px;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .btn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    .primary-btn {
+        width: 100%;
+        background: #2f6fed;
+        color: #fff;
+    }
+
+    .save-btn {
+        margin-top: 16px;
+    }
+
+    .sub-btn {
+        background: #fff;
+        color: #374151;
+        border: 1px solid #d1d5db;
+    }
+
     .month-status-panel.registered {
         background: #f0fdf4;
         border-color: #bbf7d0;
     }
+
     .month-status-panel.unregistered {
         background: #fffbeb;
         border-color: #fde68a;
     }
+
     .month-status-panel.excluded {
         background: #f3f4f6;
         border-color: #d1d5db;
     }
-    .month-status-panel.loading {
-        background: #f9fafb;
-        border-color: #e5e7eb;
-    }
+
     .month-status-header {
         display: flex;
         align-items: center;
@@ -353,12 +801,12 @@
         gap: 12px;
         margin-bottom: 8px;
     }
-    .month-status-title {
+
+    .month-status-header .section-title {
         margin: 0;
-        font-size: 15px;
-        font-weight: 600;
-        color: #111827;
+        font-size: 16px;
     }
+
     .registration-badge {
         flex-shrink: 0;
         padding: 3px 10px;
@@ -366,51 +814,90 @@
         font-size: 12px;
         font-weight: 700;
     }
+
     .registration-badge.registered {
         background: #dcfce7;
         color: #166534;
     }
+
     .registration-badge.unregistered {
         background: #fef3c7;
         color: #92400e;
     }
+
     .registration-badge.excluded {
         background: #e5e7eb;
         color: #4b5563;
     }
+
     .registration-badge.loading {
         background: #e5e7eb;
         color: #6b7280;
     }
+
     .month-status-description {
-        margin: 0 0 8px;
+        margin: 0 0 12px;
         font-size: 13px;
         line-height: 1.6;
         color: #374151;
     }
+
+    .status-dl {
+        margin: 0;
+    }
+
+    .status-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 12px;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    .status-row dt {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 600;
+        color: #6b7280;
+    }
+
+    .status-row dd {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 600;
+        color: #111827;
+    }
+
     .status-block {
         margin-top: 14px;
         padding-top: 14px;
         border-top: 1px dashed #d1d5db;
     }
+
     .status-block-title {
         margin: 0 0 8px;
         font-size: 13px;
         font-weight: 700;
         color: #111827;
     }
+
     .status-line {
         margin: 0 0 4px;
         font-size: 13px;
         line-height: 1.6;
         color: #374151;
     }
+
     .status-line:last-child {
         margin-bottom: 0;
     }
-    .status-line.muted {
+
+    .status-line.muted,
+    .premium-note.muted {
         color: #6b7280;
     }
+
     .status-line.revision-result {
         margin-top: 6px;
         padding: 8px 10px;
@@ -419,8 +906,9 @@
         border: 1px solid #e5e7eb;
         color: #1f2937;
     }
+
     .month-status-action {
-        margin: 10px 0 0;
+        margin: 12px 0 0;
         padding: 8px 10px;
         border-radius: 6px;
         background: rgba(255, 255, 255, 0.8);
@@ -429,83 +917,73 @@
         font-size: 13px;
         font-weight: 600;
     }
-    .form-section {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        padding-top: 4px;
-        border-top: 1px dashed #e5e7eb;
+
+    .premium-card {
+        margin-top: 0;
     }
-    .form-section-title {
-        margin: 0;
-        font-size: 14px;
-        font-weight: 600;
-        color: #374151;
-    }
-    label {
-        font-size: 14px;
-    }
-    .month-field .month-picker {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 10px 16px;
-    }
-    .month-nav-btn {
-        flex-shrink: 0;
-        width: auto;
-        padding: 8px 12px;
-        border: 1px solid #d1d5db;
-        border-radius: 8px;
-        background: #fff;
-        cursor: pointer;
-    }
-    .month-nav-btn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-    .month-display {
-        font-size: 16px;
-        font-weight: 600;
-        color: #111827;
-    }
-    .month-loading {
-        margin: 4px 0 0;
+
+    .premium-note {
+        margin: 0 0 14px;
         font-size: 13px;
-        color: #6b7280;
-    }
-    input {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-    }
-    button {
-        width: 100%;
-    }
-    .insurance-join-status {
-        margin: 0 0 8px;
-        font-size: 14px;
         color: #374151;
     }
+
+    .table-wrap {
+        overflow-x: auto;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+    }
+
+    .premium-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+
+    .premium-table th,
+    .premium-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #f3f4f6;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    .premium-table thead th {
+        background: #f9fafb;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .premium-table tfoot th {
+        background: #f9fafb;
+        font-weight: 700;
+        color: #111827;
+        border-bottom: none;
+    }
+
+    .premium-table .num {
+        text-align: right;
+    }
+
     .join-status-badge {
         display: inline-block;
-        margin-left: 4px;
         padding: 2px 10px;
         border-radius: 999px;
         font-size: 12px;
         font-weight: 700;
     }
+
     .join-status-badge.ok {
         background: #dcfce7;
         color: #166534;
     }
+
     .join-status-badge.ng {
         background: #f3f4f6;
         color: #4b5563;
     }
-    .join-status-badge.unknown,
-    .join-status-badge.loading {
+
+    .join-status-badge.unknown {
         background: #fffbeb;
         color: #92400e;
     }

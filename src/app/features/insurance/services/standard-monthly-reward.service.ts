@@ -103,10 +103,15 @@ export class StandardMonthlyRewardService {
             targetYearMonth: input.targetYearMonth,
             basicSalary: input.basicSalary,
             commutingAllowance: input.commutingAllowance,
-            monthlyAllowance: input.monthlyAllowance,
             positionAllowance: input.positionAllowance,
             housingAllowance: input.housingAllowance,
             fixedOvertimePay: input.fixedOvertimePay,
+            otherFixedAllowance: input.otherFixedAllowance,
+            overtimePay: input.overtimePay,
+            holidayPay: input.holidayPay,
+            nightPay: input.nightPay,
+            commissionPay: input.commissionPay,
+            otherVariablePay: input.otherVariablePay,
             monthlyReward,
             healthInsuranceGrade: calc.health.grade,
             healthInsuranceStandardMonthlyAmount: calc.health.standardMonthlyAmount,
@@ -141,10 +146,15 @@ export class StandardMonthlyRewardService {
         return (
             input.basicSalary +
             input.commutingAllowance +
-            input.monthlyAllowance +
             input.positionAllowance +
             input.housingAllowance +
-            input.fixedOvertimePay
+            input.fixedOvertimePay +
+            input.otherFixedAllowance +
+            input.overtimePay +
+            input.holidayPay +
+            input.nightPay +
+            input.commissionPay +
+            input.otherVariablePay
         );
     }
 }
