@@ -77,7 +77,8 @@
         }
 
         <div class="main-grid">
-            <section class="card form-card">
+            <section class="card form-card monthly-reward-card">
+                <span class="card-type-badge monthly">月次報酬</span>
                 <h2 class="section-title">報酬入力</h2>
 
                 <div class="wage-section fixed-wage-section">
@@ -350,125 +351,413 @@
             </section>
         </div>
 
-        <section class="card premium-card">
-            <h2 class="section-title">社会保険料（{{ targetYearMonthLabel() }}）</h2>
-            @if (applicableHealthStandardAmount(); as standardAmount) {
-                <p class="premium-note">標準報酬月額 {{ standardAmount | number }}円をもとに計算</p>
-            } @else {
-                <p class="premium-note muted">標準報酬月額が確定していないため、保険料を計算できません。</p>
+        <section class="card bonus-card">
+            <span class="card-type-badge bonus">賞与</span>
+            <h2 class="section-title">賞与入力（{{ targetYearMonthLabel() }}）</h2>
+            <p class="bonus-section-note">
+                月次報酬とは別に、賞与支給時の金額を登録します。標準賞与額は1,000円未満を切り捨てて計算されます。
+            </p>
+
+            @if (bonusMessage()) {
+                <p class="alert alert-success">{{ bonusMessage() }}</p>
+            }
+            @if (bonusErrorMessage()) {
+                <p class="alert alert-error">{{ bonusErrorMessage() }}</p>
             }
 
-            <div class="table-wrap">
-                <table class="premium-table">
-                    <thead>
-                        <tr>
-                            <th>種別</th>
-                            <th>加入判定</th>
-                            <th class="num">料率（本人）</th>
-                            <th class="num">料率（会社）</th>
-                            <th class="num">保険料（本人）</th>
-                            <th class="num">保険料（会社）</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>健康保険</td>
-                            <td>
-                                <span
-                                    class="join-status-badge"
-                                    [class.ok]="healthInsuranceJoinStatus() === 'active'"
-                                    [class.ng]="healthInsuranceJoinStatus() === 'inactive'"
-                                    [class.unknown]="healthInsuranceJoinStatus() === 'unknown'"
+            @if (isLoadingBonus()) {
+                <p class="bonus-loading">賞与情報を読み込み中...</p>
+            } @else if (monthBonuses().length > 0) {
+                <div class="bonus-list">
+                    <div class="bonus-list-header">
+                        <h3 class="bonus-list-title">登録済みの賞与</h3>
+                        @if (!isBonusFormVisible()) {
+                            <button
+                                type="button"bonus-add-btn
+                                class="btn sub-btn bonus-add-btn"
+                                (click)="openNewBonusForm()"
+                            >
+                                賞与を修正
+                            </button>
+                        }
+                    </div>
+                    <ul>
+                        @for (bonus of monthBonuses(); track bonus.id) {
+                            <li>
+                                <button
+                                    type="button"
+                                    class="bonus-list-item"
+                                    [class.active]="isBonusFormVisible() && bonusForm.paymentDate === bonus.paymentDate"
+                                    (click)="selectBonusForEdit(bonus)"
                                 >
-                                    {{ displayInsuranceStatus(healthInsuranceJoinStatus()) }}
-                                </span>
-                            </td>
-                            <td class="num">{{ insuranceRatePercentLabel(healthInsuranceRate()) ?? '—' }}%</td>
-                            <td class="num">{{ insuranceRatePercentLabel(healthInsuranceEmployerRate()) ?? '—' }}%</td>
-                            <td class="num">
-                                @if (healthInsurancePremium(); as premium) {
-                                    {{ premium | number }}円
-                                } @else {
-                                    —
-                                }
-                            </td>
-                            <td class="num">
-                                @if (healthInsuranceEmployerPremium(); as premium) {
-                                    {{ premium | number }}円
-                                } @else {
-                                    —
-                                }
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>厚生年金</td>
-                            <td>
-                                <span
-                                    class="join-status-badge"
-                                    [class.ok]="pensionInsuranceJoinStatus() === 'active'"
-                                    [class.ng]="pensionInsuranceJoinStatus() === 'inactive'"
-                                    [class.unknown]="pensionInsuranceJoinStatus() === 'unknown'"
-                                >
-                                    {{ displayInsuranceStatus(pensionInsuranceJoinStatus()) }}
-                                </span>
-                            </td>
-                            <td class="num">{{ insuranceRatePercentLabel(pensionInsuranceRate) }}%</td>
-                            <td class="num">{{ insuranceRatePercentLabel(pensionInsuranceRate) }}%</td>
-                            <td class="num">
-                                @if (pensionInsurancePremium(); as premium) {
-                                    {{ premium | number }}円
-                                } @else {
-                                    —
-                                }
-                            </td>
-                            <td class="num">
-                                @if (pensionInsuranceEmployerPremium(); as premium) {
-                                    {{ premium | number }}円
-                                } @else {
-                                    —
-                                }
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>介護保険</td>
-                            <td>
-                                <span
-                                    class="join-status-badge"
-                                    [class.ok]="careInsuranceJoinStatus() === 'active'"
-                                    [class.ng]="careInsuranceJoinStatus() === 'inactive'"
-                                    [class.unknown]="careInsuranceJoinStatus() === 'unknown'"
-                                >
-                                    {{ displayInsuranceStatus(careInsuranceJoinStatus()) }}
-                                </span>
-                            </td>
-                            <td class="num">{{ insuranceRatePercentLabel(careInsuranceRate()) ?? '—' }}%</td>
-                            <td class="num">{{ insuranceRatePercentLabel(careInsuranceEmployerRate()) ?? '—' }}%</td>
-                            <td class="num">
-                                @if (careInsurancePremium(); as premium) {
-                                    {{ premium | number }}円
-                                } @else {
-                                    —
-                                }
-                            </td>
-                            <td class="num">
-                                @if (careInsuranceEmployerPremium(); as premium) {
-                                    {{ premium | number }}円
-                                } @else {
-                                    —
-                                }
-                            </td>
-                        </tr>
-                    </tbody>
-                    <tfoot>
-                        <tr>
-                            <th colspan="4">合計</th>
-                            <th class="num">{{ socialInsurancePremium() | number }}円</th>
-                            <th class="num">{{ socialInsuranceEmployerPremium() | number }}円</th>
-                        </tr>
-                    </tfoot>
-                </table>
+                                    <span class="bonus-list-date">{{ bonus.paymentDate }}</span>
+                                    <span class="bonus-list-amount">{{ bonus.bonusAmount | number }}円</span>
+                                    <span class="bonus-list-standard">
+                                        標準 {{ bonus.standardBonusAmount | number }}円
+                                    </span>
+                                </button>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            } @else {
+                <p class="bonus-empty">この月の賞与は未登録です。</p>
+            }
+
+            @if (isBonusFormVisible()) {
+                <div class="bonus-form">
+                    <div class="bonus-form-header">
+                        <h3 class="bonus-form-title">
+                            @if (isEditingBonus()) {
+                                賞与を編集
+                            } @else {
+                                賞与を入力
+                            }
+                        </h3>
+                        @if (monthBonuses().length > 0) {
+                            <button
+                                type="button"
+                                class="btn sub-btn bonus-close-btn"
+                                (click)="hideBonusForm()"
+                                [disabled]="isSavingBonus()"
+                            >
+                                閉じる
+                            </button>
+                        }
+                    </div>
+                    <div class="bonus-form-fields">
+                        <div class="form-field">
+                            <label for="bonus-payment-date">支給日</label>
+                            <input
+                                id="bonus-payment-date"
+                                type="date"
+                                [(ngModel)]="bonusForm.paymentDate"
+                            />
+                        </div>
+                        <div class="form-field">
+                            <label for="bonus-amount">賞与額</label>
+                            <input
+                                id="bonus-amount"
+                                type="number"
+                                placeholder="例: 500000"
+                                [(ngModel)]="bonusForm.bonusAmount"
+                            />
+                        </div>
+                    </div>
+    
+                    @if (getPreviewStandardBonusAmount(); as standardAmount) {
+                        <p class="bonus-preview">標準賞与額（見込み）：{{ standardAmount | number }}円</p>
+                    }
+    
+                    <div class="bonus-form-actions">
+                        <button
+                            type="button"
+                            class="btn sub-btn"
+                            (click)="resetBonusForm()"
+                            [disabled]="isSavingBonus()"
+                        >
+                            クリア
+                        </button>
+                        <button
+                            type="button"
+                            class="btn bonus-save-btn"
+                            (click)="saveBonusReward()"
+                            [disabled]="isSavingBonus() || isLoadingBonus()"
+                        >
+                            @if (isSavingBonus()) {
+                                保存中...
+                            } @else if (isEditingBonus()) {
+                                賞与を更新
+                            } @else {
+                                賞与を保存
+                            }
+                        </button>
+                    </div>
+                </div>
+            }
+        </section>
+
+        <section class="card premium-card">
+            <h2 class="section-title">社会保険料（{{ targetYearMonthLabel() }}）</h2>
+
+            <div class="premium-subsection monthly-premium-subsection">
+                <div class="premium-subsection-header">
+                    <span class="card-type-badge monthly">月次報酬</span>
+                    <h3 class="premium-subsection-title">月次報酬に対する保険料</h3>
+                </div>
+                @if (applicableHealthStandardAmount(); as standardAmount) {
+                    <p class="premium-note">標準報酬月額 {{ standardAmount | number }}円をもとに計算</p>
+                } @else {
+                    <p class="premium-note muted">標準報酬月額が確定していないため、保険料を計算できません。</p>
+                }
+
+                <div class="table-wrap">
+                    <table class="premium-table">
+                        <thead>
+                            <tr>
+                                <th>種別</th>
+                                <th>加入判定</th>
+                                <th class="num">料率（本人）</th>
+                                <th class="num">料率（会社）</th>
+                                <th class="num">保険料（本人）</th>
+                                <th class="num">保険料（会社）</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>健康保険</td>
+                                <td>
+                                    <span
+                                        class="join-status-badge"
+                                        [class.ok]="healthInsuranceJoinStatus() === 'active'"
+                                        [class.ng]="healthInsuranceJoinStatus() === 'inactive'"
+                                        [class.unknown]="healthInsuranceJoinStatus() === 'unknown'"
+                                    >
+                                        {{ displayInsuranceStatus(healthInsuranceJoinStatus()) }}
+                                    </span>
+                                </td>
+                                <td class="num">{{ insuranceRatePercentLabel(healthInsuranceRate()) ?? '—' }}%</td>
+                                <td class="num">{{ insuranceRatePercentLabel(healthInsuranceEmployerRate()) ?? '—' }}%</td>
+                                <td class="num">
+                                    @if (healthInsurancePremium(); as premium) {
+                                        {{ premium | number }}円
+                                    } @else {
+                                        —
+                                    }
+                                </td>
+                                <td class="num">
+                                    @if (healthInsuranceEmployerPremium(); as premium) {
+                                        {{ premium | number }}円
+                                    } @else {
+                                        —
+                                    }
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>厚生年金</td>
+                                <td>
+                                    <span
+                                        class="join-status-badge"
+                                        [class.ok]="pensionInsuranceJoinStatus() === 'active'"
+                                        [class.ng]="pensionInsuranceJoinStatus() === 'inactive'"
+                                        [class.unknown]="pensionInsuranceJoinStatus() === 'unknown'"
+                                    >
+                                        {{ displayInsuranceStatus(pensionInsuranceJoinStatus()) }}
+                                    </span>
+                                </td>
+                                <td class="num">{{ insuranceRatePercentLabel(pensionInsuranceRate) }}%</td>
+                                <td class="num">{{ insuranceRatePercentLabel(pensionInsuranceRate) }}%</td>
+                                <td class="num">
+                                    @if (pensionInsurancePremium(); as premium) {
+                                        {{ premium | number }}円
+                                    } @else {
+                                        —
+                                    }
+                                </td>
+                                <td class="num">
+                                    @if (pensionInsuranceEmployerPremium(); as premium) {
+                                        {{ premium | number }}円
+                                    } @else {
+                                        —
+                                    }
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>介護保険</td>
+                                <td>
+                                    <span
+                                        class="join-status-badge"
+                                        [class.ok]="careInsuranceJoinStatus() === 'active'"
+                                        [class.ng]="careInsuranceJoinStatus() === 'inactive'"
+                                        [class.unknown]="careInsuranceJoinStatus() === 'unknown'"
+                                    >
+                                        {{ displayInsuranceStatus(careInsuranceJoinStatus()) }}
+                                    </span>
+                                </td>
+                                <td class="num">{{ insuranceRatePercentLabel(careInsuranceRate()) ?? '—' }}%</td>
+                                <td class="num">{{ insuranceRatePercentLabel(careInsuranceEmployerRate()) ?? '—' }}%</td>
+                                <td class="num">
+                                    @if (careInsurancePremium(); as premium) {
+                                        {{ premium | number }}円
+                                    } @else {
+                                        —
+                                    }
+                                </td>
+                                <td class="num">
+                                    @if (careInsuranceEmployerPremium(); as premium) {
+                                        {{ premium | number }}円
+                                    } @else {
+                                        —
+                                    }
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <th colspan="4">合計</th>
+                                <th class="num">{{ socialInsurancePremium() | number }}円</th>
+                                <th class="num">{{ socialInsuranceEmployerPremium() | number }}円</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <div class="premium-subsection bonus-premium-subsection">
+                <div class="premium-subsection-header">
+                    <span class="card-type-badge bonus">賞与</span>
+                    <h3 class="premium-subsection-title">賞与に対する保険料</h3>
+                </div>
+
+                @if (monthBonuses().length > 0) {
+                    @for (bonus of monthBonuses(); track bonus.id) {
+                        <div class="bonus-premium-block">
+                            <p class="premium-note">
+                                支給日 {{ bonus.paymentDate }}
+                                · 賞与額 {{ bonus.bonusAmount | number }}円
+                                · 標準賞与額 {{ bonus.standardBonusAmount | number }}円をもとに計算
+                            </p>
+
+                            <div class="table-wrap">
+                                <table class="premium-table bonus-premium-table">
+                                    <thead>
+                                        <tr>
+                                            <th>種別</th>
+                                            <th>加入判定</th>
+                                            <th class="num">料率（本人）</th>
+                                            <th class="num">料率（会社）</th>
+                                            <th class="num">保険料（本人）</th>
+                                            <th class="num">保険料（会社）</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>健康保険</td>
+                                            <td>
+                                                <span
+                                                    class="join-status-badge"
+                                                    [class.ok]="healthInsuranceJoinStatus() === 'active'"
+                                                    [class.ng]="healthInsuranceJoinStatus() === 'inactive'"
+                                                    [class.unknown]="healthInsuranceJoinStatus() === 'unknown'"
+                                                >
+                                                    {{ displayInsuranceStatus(healthInsuranceJoinStatus()) }}
+                                                </span>
+                                            </td>
+                                            <td class="num">{{ insuranceRatePercentLabel(healthInsuranceRate()) ?? '—' }}%</td>
+                                            <td class="num">{{ insuranceRatePercentLabel(healthInsuranceEmployerRate()) ?? '—' }}%</td>
+                                            <td class="num">
+                                                @if (healthInsuranceBonusPremium(); as premium) {
+                                                    {{ premium | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </td>
+                                            <td class="num">
+                                                @if (healthInsuranceBonusPremium(); as premium) {
+                                                    {{ premium | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>厚生年金</td>
+                                            <td>
+                                                <span
+                                                    class="join-status-badge"
+                                                    [class.ok]="pensionInsuranceJoinStatus() === 'active'"
+                                                    [class.ng]="pensionInsuranceJoinStatus() === 'inactive'"
+                                                    [class.unknown]="pensionInsuranceJoinStatus() === 'unknown'"
+                                                >
+                                                    {{ displayInsuranceStatus(pensionInsuranceJoinStatus()) }}
+                                                </span>
+                                            </td>
+                                            <td class="num">{{ insuranceRatePercentLabel(pensionInsuranceRate) }}%</td>
+                                            <td class="num">{{ insuranceRatePercentLabel(pensionInsuranceRate) }}%</td>
+                                            <td class="num">
+                                                @if (pensionInsuranceBonusPremium(); as premium) {
+                                                    {{ premium | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </td>
+                                            <td class="num">
+                                                @if (pensionInsuranceBonusPremium(); as premium) {
+                                                    {{ premium | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>介護保険</td>
+                                            <td>
+                                                <span
+                                                    class="join-status-badge"
+                                                    [class.ok]="careInsuranceJoinStatus() === 'active'"
+                                                    [class.ng]="careInsuranceJoinStatus() === 'inactive'"
+                                                    [class.unknown]="careInsuranceJoinStatus() === 'unknown'"
+                                                >
+                                                    {{ displayInsuranceStatus(careInsuranceJoinStatus()) }}
+                                                </span>
+                                            </td>
+                                            <td class="num">{{ insuranceRatePercentLabel(careInsuranceRate()) ?? '—' }}%</td>
+                                            <td class="num">{{ insuranceRatePercentLabel(careInsuranceEmployerRate()) ?? '—' }}%</td>
+                                            <td class="num">
+                                                @if (careInsuranceBonusPremium(); as premium) {
+                                                    {{ premium | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </td>
+                                            <td class="num">
+                                                @if (careInsuranceBonusPremium(); as premium) {
+                                                    {{ premium | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <th colspan="4">合計</th>
+                                            <th class="num">
+                                                @if (socialInsuranceBonusPremium(); as premium) {
+                                                    {{ premium | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </th>
+                                            <th class="num">
+                                                @if (socialInsuranceBonusPremium(); as premium) {
+                                                    {{ premium | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </th>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    }
+                } @else {
+                    <p class="premium-note muted">この月の賞与は未登録のため、賞与に対する保険料を計算できません。</p>
+                }
+            </div>
+
+            <div class="premium-subsection total-premium-subsection">
+                <div class="premium-subsection-header">
+                    <span class="card-type-badge total">合計</span>
+                    <h3 class="premium-subsection-title">社会保険料の合計</h3>
+                </div>
+                
+                <p>{{ socialInsuranceTotalPremium() }}円</p>
             </div>
         </section>
+
+        <p>支払基礎日数：{{ paymentBaseDays() ?? '—' }}日</p>
     }
 </div>
 
@@ -625,6 +914,198 @@
         background: #fff;
         border: 1px solid #e5e7eb;
         border-radius: 12px;
+    }
+
+    .card-type-badge {
+        display: inline-block;
+        margin-bottom: 10px;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+    }
+
+    .card-type-badge.monthly {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .card-type-badge.bonus {
+        background: #ede9fe;
+        color: #5b21b6;
+    }
+
+    .monthly-reward-card {
+        border-top: 3px solid #3b82f6;
+    }
+
+    .bonus-card {
+        margin-bottom: 16px;
+        border-top: 3px solid #8b5cf6;
+        background: linear-gradient(180deg, #faf5ff 0%, #fff 48px);
+    }
+
+    .bonus-section-note {
+        margin: 0 0 14px;
+        font-size: 13px;
+        line-height: 1.5;
+        color: #6b7280;
+    }
+
+    .bonus-loading,
+    .bonus-empty {
+        margin: 0 0 14px;
+        font-size: 13px;
+        color: #6b7280;
+    }
+
+    .bonus-list {
+        margin-bottom: 16px;
+        padding: 12px 14px;
+        background: rgba(255, 255, 255, 0.85);
+        border: 1px solid #e9d5ff;
+        border-radius: 10px;
+    }
+
+    .bonus-list-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 8px;
+    }
+
+    .bonus-list-title {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 700;
+        color: #5b21b6;
+    }
+
+    .bonus-add-btn {
+        flex-shrink: 0;
+        height: 32px;
+        padding: 0 12px;
+        font-size: 12px;
+    }
+
+    .bonus-add-btn:hover {
+        background: #e9d5ff;
+    }
+
+    .bonus-add-btn:active {
+        background: #c4b5fd;
+    }
+
+    .bonus-list ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .bonus-list-item {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px 16px;
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #e9d5ff;
+        border-radius: 8px;
+        background: #fff;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .bonus-list-item:hover,
+    .bonus-list-item.active {
+        border-color: #c4b5fd;
+        background: #faf5ff;
+    }
+
+    .bonus-list-item.active {
+        box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
+    }
+
+    .bonus-list-date {
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .bonus-list-amount {
+        font-size: 14px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .bonus-list-standard {
+        font-size: 12px;
+        color: #6b7280;
+    }
+
+    .bonus-form {
+        padding: 14px;
+        background: #fff;
+        border: 1px dashed #c4b5fd;
+        border-radius: 10px;
+    }
+
+    .bonus-form-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 12px;
+    }
+
+    .bonus-form-title {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 700;
+        color: #5b21b6;
+    }
+
+    .bonus-close-btn {
+        flex-shrink: 0;
+        height: 32px;
+        padding: 0 12px;
+        font-size: 12px;
+    }
+
+    .bonus-form-fields {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px 16px;
+        margin-bottom: 12px;
+    }
+
+    @media (max-width: 520px) {
+        .bonus-form-fields {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .bonus-preview {
+        margin: 0 0 12px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #5b21b6;
+    }
+
+    .bonus-form-actions {
+        display: flex;
+        gap: 10px;
+    }
+
+    .bonus-save-btn {
+        flex: 1;
+        background: #7c3aed;
+        color: #fff;
     }
 
     .section-title {
@@ -920,6 +1401,59 @@
 
     .premium-card {
         margin-top: 0;
+    }
+
+    .premium-subsection {
+        margin-bottom: 24px;
+    }
+
+    .premium-subsection:last-child {
+        margin-bottom: 0;
+    }
+
+    .premium-subsection-header {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+        margin-bottom: 10px;
+    }
+
+    .premium-subsection-title {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .monthly-premium-subsection {
+        padding-bottom: 20px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .bonus-premium-subsection {
+        padding: 16px;
+        background: #faf5ff;
+        border: 1px solid #e9d5ff;
+        border-radius: 10px;
+    }
+
+    .bonus-premium-block + .bonus-premium-block {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px dashed #d8b4fe;
+    }
+
+    .bonus-premium-table thead th {
+        background: #f5f3ff;
+    }
+
+    .bonus-premium-table tfoot th {
+        background: #f5f3ff;
+    }
+
+    .premium-table .num.muted {
+        color: #9ca3af;
     }
 
     .premium-note {

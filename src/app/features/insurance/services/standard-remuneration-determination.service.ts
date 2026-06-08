@@ -10,6 +10,7 @@ import {
     formatYearMonthList,
     getFirstRegularDeterminationYearMonth,
     getQualificationDate,
+    getRegularBaseMonths,
     getRegularCalculationMonths,
     getRegularDeterminationBaseYear,
 } from '../utils/standard-remuneration-determination.util';
@@ -206,6 +207,7 @@ export class StandardRemunerationDeterminationService {
         targetYearMonth: string,
     ): EffectiveStandardRemuneration {
         const baseYear = getRegularDeterminationBaseYear(targetYearMonth);
+        const baseMonths = getRegularBaseMonths(employee, baseYear, qualificationDate);
         const calculationMonths = getRegularCalculationMonths(employee, baseYear, qualificationDate);
         const applyFrom = `${baseYear}-09`;
         const applyUntil = `${baseYear + 1}-08`;
@@ -214,21 +216,21 @@ export class StandardRemunerationDeterminationService {
             return this.incomplete(
                 'regular',
                 '定時決定',
-                `${formatYearMonthLabel(applyFrom)}〜${formatYearMonthLabel(applyUntil)}の定時決定対象ですが、${baseYear}年4〜6月に在籍月がありません。`,
+                `${formatYearMonthLabel(applyFrom)}〜${formatYearMonthLabel(applyUntil)}の定時決定対象ですが、${baseYear}年4〜6月に支払基礎日数17日以上の月がありません。`,
                 qualificationYearMonth,
-                calculationMonths,
+                baseMonths,
                 [],
             );
         }
 
-        const missingMonths = calculationMonths.filter((ym) => !rewardsByYearMonth[ym]);
+        const missingMonths = baseMonths.filter((ym) => !rewardsByYearMonth[ym]);
         if (missingMonths.length > 0) {
             return this.incomplete(
                 'regular',
                 '定時決定',
-                `${formatYearMonthLabel(applyFrom)}〜${formatYearMonthLabel(applyUntil)}の定時決定。${formatYearMonthList(calculationMonths)}の報酬情報が必要です（未登録: ${formatYearMonthList(missingMonths)}）。`,
+                `${formatYearMonthLabel(applyFrom)}〜${formatYearMonthLabel(applyUntil)}の定時決定。${formatYearMonthList(baseMonths)}の報酬情報が必要です（未登録: ${formatYearMonthList(missingMonths)}）。`,
                 qualificationYearMonth,
-                calculationMonths,
+                baseMonths,
                 missingMonths,
             );
         }
@@ -273,6 +275,7 @@ export class StandardRemunerationDeterminationService {
         targetYearMonth: string,
     ): EffectiveStandardRemuneration {
         const baseYear = getRegularDeterminationBaseYear(targetYearMonth);
+        const baseMonths = getRegularBaseMonths(employee, baseYear, qualificationDate);
         const calculationMonths = getRegularCalculationMonths(employee, baseYear, qualificationDate);
         const applyFrom = `${baseYear}-09`;
         const applyUntil = `${baseYear + 1}-08`;
@@ -281,20 +284,20 @@ export class StandardRemunerationDeterminationService {
             return this.incomplete(
                 'regular',
                 '定時決定',
-                `${formatYearMonthLabel(applyFrom)}〜${formatYearMonthLabel(applyUntil)}の定時決定対象ですが、${baseYear}年4〜6月に在籍月がありません。`,
+                `${formatYearMonthLabel(applyFrom)}〜${formatYearMonthLabel(applyUntil)}の定時決定対象ですが、${baseYear}年4〜6月に支払基礎日数17日以上の月がありません。`,
                 qualificationYearMonth,
-                calculationMonths,
+                baseMonths,
                 [],
             );
         }
 
-        const missingMonths = calculationMonths.filter((ym) => !rewardsByYearMonth[ym]);
+        const missingMonths = baseMonths.filter((ym) => !rewardsByYearMonth[ym]);
         return this.incomplete(
             'regular',
             '定時決定',
-            `${formatYearMonthLabel(applyFrom)}〜${formatYearMonthLabel(applyUntil)}の定時決定。${formatYearMonthList(calculationMonths)}の報酬情報が必要です（未登録: ${formatYearMonthList(missingMonths)}）。`,
+            `${formatYearMonthLabel(applyFrom)}〜${formatYearMonthLabel(applyUntil)}の定時決定。${formatYearMonthList(baseMonths)}の報酬情報が必要です（未登録: ${formatYearMonthList(missingMonths)}）。`,
             qualificationYearMonth,
-            calculationMonths,
+            baseMonths,
             missingMonths,
         );
     }

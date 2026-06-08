@@ -1,0 +1,20 @@
+<h1>手続き</h1>
+
+<h2>手続き一覧</h2>
+<div class="procedures-list">
+    <a 
+    [routerLink]="['/procedures', 'qualification']">資格取得手続き</a>
+    <a [routerLink]="['/procedures', 'loss']">資格喪失手続き</a>
+    <a [routerLink]="['/procedures', 'dependentChange']">扶養変更手続き</a>
+    <a [routerLink]="['/procedures', 'regularDecision']">算定基礎届</a>
+    <a [routerLink]="['/procedures', 'revision']">月額変更届</a>
+    <a [routerLink]="['/procedures', 'bonusPayment']">賞与支払届</a>
+    <a [routerLink]="['/procedures', 'premiumPayment']">保険料納付</a>
+</div>
+
+<style>
+    .procedures-list {
+        display: flex;
+        flex-direction: column;
+    }
+</style>

@@ -1,6 +1,7 @@
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 import {
     getAprJunYearMonths,
+    getRegularBaseMonths,
     getRegularCalculationMonths,
     getRegularDeterminationBaseYear,
 } from './standard-remuneration-determination.util';
@@ -44,10 +45,12 @@ function buildInitialRegularCandidates(
         });
     } else {
         const baseYear = getRegularDeterminationBaseYear(targetYearMonth);
+        const baseMonths = getRegularBaseMonths(employee, baseYear, qualificationDate);
         const calculationMonths = getRegularCalculationMonths(employee, baseYear, qualificationDate);
 
         if (
             calculationMonths.length > 0 &&
+            baseMonths.every((ym) => Boolean(rewardsByYearMonth[ym])) &&
             calculationMonths.every((ym) => Boolean(rewardsByYearMonth[ym]))
         ) {
             candidates.push({

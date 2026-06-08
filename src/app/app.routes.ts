@@ -14,6 +14,8 @@ import { EmployeeCreatePageComponent } from './features/employee/pages/employee-
 import { EmployeeDetailPageComponent } from './features/employee/pages/employee-detail-page.component';
 import { InsurancePremiumPageComponent } from './features/insurance/pages/insurance-premium-page.component';
 import { InsurancePremiumDetailPageComponent } from './features/insurance/pages/insurance-premium-detail-page.component';
+import { SocialInsuranceProceduresPageComponent } from './features/social-insurance/pages/social-insurance-procedures-page.component';
+import { SocialInsuranceProcedureDetailPageComponent } from './features/social-insurance/pages/social-insurance-procedure-detail-page.component';
 
 export const routes: Routes = [
     {
@@ -41,10 +43,12 @@ export const routes: Routes = [
         component: MainLayoutComponent,
         canActivate: [authGuard],
         children: [
+            // ホーム
             {
                 path: 'home',
                 component: HomePageComponent,
             },
+            // 会社・事業所情報
             {
                 path: 'company',
                 component: CompanyPageComponent,
@@ -53,6 +57,7 @@ export const routes: Routes = [
                 path: 'company/offices/:officeId',
                 component: OfficePageComponent,
             },
+            // 従業員管理
             {
                 path: 'employees',
                 component: EmployeePageComponent,
@@ -65,6 +70,7 @@ export const routes: Routes = [
                 path: 'employees/:employeeId',
                 component: EmployeeDetailPageComponent,
             },
+            // 保険料計算
             {
                 path: 'premium',
                 component: InsurancePremiumPageComponent,
@@ -72,7 +78,16 @@ export const routes: Routes = [
             {
                 path: 'premium/:employeeId',
                 component: InsurancePremiumDetailPageComponent,
-            }
+            },
+            // 手続き一覧
+            {
+                path: 'procedures',
+                component: SocialInsuranceProceduresPageComponent,
+            },
+            {
+                path: 'procedures/:procedureName',
+                component: SocialInsuranceProcedureDetailPageComponent,
+            },
         ]
     },
 ];
