@@ -8,7 +8,7 @@ import { CompanyService } from '../services/company.service';
 
 import { OfficeCreateModalComponent, OfficeFormData } from '../components/office-create-modal.component';
 import { OfficeService } from '../services/office.service';
-import { Office } from '../models/office.model';
+import { Office, OfficeCreateInput } from '../models/office.model';
 
 @Component({
     selector: 'app-company-page',
@@ -102,7 +102,7 @@ export class CompanyPageComponent {
 
         try {
             // 事業所の作成
-            const office = {
+            const office: OfficeCreateInput = {
                 companyId: company.id,
                 name: form.name,
                 prefecture: '',
@@ -113,8 +113,8 @@ export class CompanyPageComponent {
                 regularWeeklyScheduledWorkDays: null,
                 regularMonthlyScheduledWorkDays: null,
                 status: 'active',
-            } as Office;
-            
+            };
+
             await this.officeService.createOffice(office);
             // 事業所のロード
             await this.loadOffices();

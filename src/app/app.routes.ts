@@ -85,7 +85,7 @@ export const routes: Routes = [
                 component: SocialInsuranceProceduresPageComponent,
             },
             {
-                path: 'procedures/:procedureName',
+                path: 'procedures/:procedureId',
                 component: SocialInsuranceProcedureDetailPageComponent,
             },
         ]

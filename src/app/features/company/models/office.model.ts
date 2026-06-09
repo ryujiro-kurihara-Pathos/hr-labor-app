@@ -5,17 +5,20 @@ export type OfficeStatus = 'active' | 'disabled'; // 事業所のステータス
 
 export type Office = {
     id: string;
-    companyId: string; // 会社ID
 
-    name: string; // 事業所名
-    prefecture: string; // 都道府県
-    address: string; // 所在地
-    healthInsuranceType: HealthInsuranceType; // 健康保険の種類
+    companyId: string;                              // 会社ID
+
+    name: string;                                   // 事業所名
+    prefecture: string;                             // 都道府県
+    address: string;                                // 所在地
+    healthInsuranceType: HealthInsuranceType;       // 健康保険の種類
+    healthInsuranceOfficeSymbol: string;            // 健康保険事業所記号
+    pensionOfficeNumber: string;                    // 厚生年金事業所番号
 
     // 社会保険：当該事業所の通常の労働者の基準（加入要件判定用）
     regularWeeklyScheduledWorkHours: number | null; // 週の所定労働時間
-    regularMonthlyScheduledWorkHours: number | null; // 月の所定労働時間
-    regularWeeklyScheduledWorkDays: number | null; // 週の所定労働日数
+    regularMonthlyScheduledWorkHours: number | null;// 月の所定労働時間
+    regularWeeklyScheduledWorkDays: number | null;  // 週の所定労働日数
     regularMonthlyScheduledWorkDays: number | null; // 月の所定労働日数
 
     status: OfficeStatus; // 事業所のステータス
@@ -25,3 +28,12 @@ export type Office = {
 }
 
 export type OfficeInput = Omit<Office, 'id' | 'createdAt' | 'updatedAt'>;
+
+/** 事業所登録時。整理記号・事業所番号は未指定ならサービス側で自動採番する */
+export type OfficeCreateInput = Omit<
+    OfficeInput,
+    'healthInsuranceOfficeSymbol' | 'pensionOfficeNumber'
+> & {
+    healthInsuranceOfficeSymbol?: string;
+    pensionOfficeNumber?: string;
+};

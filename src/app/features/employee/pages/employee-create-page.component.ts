@@ -2,7 +2,7 @@ import { Component, signal, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
-import { EmployeeInput, EmploymentType } from '../models/employee.models';
+import { EmployeeInput, EmploymentType, createEmptyEmployeeInput } from '../models/employee.models';
 import { EmployeeService } from '../services/employee.service';
 import { AuthService } from '../../auth/services/auth.service';
 import { UserService } from '../../users/services/user.service';
@@ -30,20 +30,7 @@ export class EmployeeCreatePageComponent {
     isLoading = signal<boolean>(false);
 
     // 追加する従業員情報
-    employee: EmployeeInput = {
-        companyId: '',
-        officeId: '',
-        employeeNumber: '',
-        lastName: '',
-        firstName: '',
-        birthDate: '',
-        joinedDate: '',
-        employmentType: null,
-        department: '',
-        position: '',
-        status: 'active',
-        retiredDate: null,
-    };
+    employee: EmployeeInput = createEmptyEmployeeInput();
 
     // 初期処理
     async ngOnInit() {

@@ -28,9 +28,6 @@ export type Procedure = {
     procedureType: ProcedureType;       // 手続き種別
     status: ProcedureStatus;            // 対応状況
 
-    title: string;                      // 表示用タイトル 例: '資格取得手続き'
-    description?: string;               // 説明・補足
-
     occurredDate: string;               // 発生日 例: 入社日、退職日、賞与支給日
     dueDate: string;                    // 対応期限
     completedDate: string | null;       // 完了日

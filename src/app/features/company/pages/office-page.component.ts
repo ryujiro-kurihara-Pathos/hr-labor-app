@@ -28,6 +28,8 @@ export class OfficePageComponent {
     name = '';
     address = '';
     healthInsuranceType: HealthInsuranceType = 'kyokai';
+    healthInsuranceOfficeSymbol = '';
+    pensionOfficeNumber = '';
     regularWeeklyScheduledWorkHours = '';
     regularMonthlyScheduledWorkHours = '';
     regularWeeklyScheduledWorkDays = '';
@@ -120,6 +122,8 @@ export class OfficePageComponent {
                 prefecture: office.prefecture,
                 address: this.address,
                 healthInsuranceType: this.healthInsuranceType,
+                healthInsuranceOfficeSymbol: this.healthInsuranceOfficeSymbol.trim(),
+                pensionOfficeNumber: this.pensionOfficeNumber.trim(),
                 regularWeeklyScheduledWorkHours,
                 regularMonthlyScheduledWorkHours,
                 regularWeeklyScheduledWorkDays,
@@ -131,6 +135,8 @@ export class OfficePageComponent {
                 name: this.name,
                 address: this.address,
                 healthInsuranceType: this.healthInsuranceType,
+                healthInsuranceOfficeSymbol: this.healthInsuranceOfficeSymbol.trim(),
+                pensionOfficeNumber: this.pensionOfficeNumber.trim(),
                 regularWeeklyScheduledWorkHours,
                 regularMonthlyScheduledWorkHours,
                 regularWeeklyScheduledWorkDays,
@@ -209,6 +215,8 @@ export class OfficePageComponent {
         this.name = office.name;
         this.address = office.address;
         this.healthInsuranceType = office.healthInsuranceType;
+        this.healthInsuranceOfficeSymbol = office.healthInsuranceOfficeSymbol;
+        this.pensionOfficeNumber = office.pensionOfficeNumber;
         this.regularWeeklyScheduledWorkHours = this.numberToFormValue(office.regularWeeklyScheduledWorkHours);
         this.regularMonthlyScheduledWorkHours = this.numberToFormValue(office.regularMonthlyScheduledWorkHours);
         this.regularWeeklyScheduledWorkDays = this.numberToFormValue(office.regularWeeklyScheduledWorkDays);

@@ -1,5 +1,4 @@
 import { Injectable } from '@angular/core';
-
 import {
     doc,
     setDoc,
@@ -13,13 +12,46 @@ import {
     where,
 } from 'firebase/firestore';
 import { db } from '../../../core/firebase';
-import { Employee, EmployeeInput } from '../models/employee.models';
+import { Dependent, Employee, EmployeeInput } from '../models/employee.models';
 
 @Injectable({
     providedIn: 'root',
 })
 
 export class EmployeeService {
+
+    private toEmployee(id: string, data: Record<string, unknown>): Employee {
+        const gender = data['gender'];
+        return {
+            id,
+            companyId: String(data['companyId'] ?? ''),
+            officeId: String(data['officeId'] ?? ''),
+            employeeNumber: String(data['employeeNumber'] ?? ''),
+            lastName: String(data['lastName'] ?? ''),
+            firstName: String(data['firstName'] ?? ''),
+            lastNameKana: String(data['lastNameKana'] ?? ''),
+            firstNameKana: String(data['firstNameKana'] ?? ''),
+            gender: gender === 'female' ? 'female' : 'male',
+            postalCode: String(data['postalCode'] ?? ''),
+            prefecture: String(data['prefecture'] ?? ''),
+            city: String(data['city'] ?? ''),
+            streetAddress: String(data['streetAddress'] ?? data['address'] ?? ''),
+            buildingName: String(data['buildingName'] ?? ''),
+            roomNumber: String(data['roomNumber'] ?? ''),
+            phoneNumber: String(data['phoneNumber'] ?? ''),
+            birthDate: String(data['birthDate'] ?? ''),
+            joinedDate: String(data['joinedDate'] ?? ''),
+            dependents: Array.isArray(data['dependents']) ? (data['dependents'] as Dependent[]) : [],
+            employmentType: (data['employmentType'] as Employee['employmentType']) ?? null,
+            department: String(data['department'] ?? ''),
+            position: String(data['position'] ?? ''),
+            status: (data['status'] as Employee['status']) ?? 'active',
+            retiredDate: (data['retiredDate'] as Employee['retiredDate']) ?? null,
+            createdAt: data['createdAt'] as Employee['createdAt'],
+            updatedAt: data['updatedAt'] as Employee['updatedAt'],
+        };
+    }
+
     // Firestoreに従業員を登録
     async createEmployee(employeeInput: EmployeeInput): Promise<Employee> {
         const docRef = doc(collection(db, 'employees'));
@@ -27,6 +59,7 @@ export class EmployeeService {
         const employee: Employee = {
             id: docRef.id,
             ...employeeInput,
+            dependents: employeeInput.dependents ?? [],
             createdAt: createdAt,
             updatedAt: createdAt,
         }
@@ -44,8 +77,9 @@ export class EmployeeService {
 
         const employees: Employee[] = [];
         docSnap.forEach((docSnap) => {
-            employees.push({ id: docSnap.id, ...docSnap.data() } as Employee);
+            employees.push(this.toEmployee(docSnap.id, docSnap.data() as Record<string, unknown>));
         });
+
         return employees;
     }
 
@@ -56,14 +90,16 @@ export class EmployeeService {
 
         if (!docSnap.exists()) return null;
 
-        return { id: employeeId, ...docSnap.data() } as Employee;
+        return this.toEmployee(employeeId, docSnap.data() as Record<string, unknown>);
     }
 
     async updateEmployee(employeeId: string, employeeInput: EmployeeInput): Promise<void> {
         const docRef = doc(db, 'employees', employeeId);
         await updateDoc(docRef, {
             ...employeeInput,
+            dependents: employeeInput.dependents ?? [],
             updatedAt: serverTimestamp(),
         });
     }
+
 }

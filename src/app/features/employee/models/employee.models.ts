@@ -1,7 +1,34 @@
 import { Timestamp } from 'firebase/firestore';
 
+
+
 export type EmployeeStatus = 'active' | 'retired';
+
 export type EmploymentType = 'full-time' | 'part-time' | null;
+
+
+
+export type Dependent = {
+    id: string;                     // 扶養家族ID
+
+    lastName: string;               // 姓
+    firstName: string;              // 名
+    birthDate: string;             // 生年月日（YYYY-MM-DD）
+
+    relationship: 'spouse'         // 配偶者
+                | 'child'          // 子供
+                | 'parent'         // 父母
+                | 'other';         // その他
+
+    dependencyStartDate: string;    // 扶養開始日（YYYY-MM-DD）
+    dependencyEndDate: string | null; // 扶養終了日（YYYY-MM-DD）
+
+    status: 'active' | 'ended';     // 扶養状態
+
+    memo: string;                   // メモ
+};
+
+
 
 export type Employee = {
     id: string;                     // 従業員ID
@@ -14,8 +41,19 @@ export type Employee = {
     employeeNumber: string;         // 社員番号
     lastName: string;               // 姓
     firstName: string;              // 名
+    lastNameKana: string;           // 姓（カナ）
+    firstNameKana: string;          // 名（カナ）
+    gender: 'male' | 'female';      // 性別
+    postalCode: string;             // 郵便番号
+    prefecture: string;             // 都道府県
+    city: string;                   // 市区町村
+    streetAddress: string;          // 丁目番地
+    buildingName: string;           // 建物名
+    roomNumber: string;             // 号室
+    phoneNumber: string;            // 電話番号
     birthDate: string;              // 生年月日（YYYY-MM-DD）
     joinedDate: string;             // 入社日（YYYY-MM-DD）
+    dependents: Dependent[];        // 扶養家族
 
     // 雇用情報
     employmentType: EmploymentType; // 雇用区分
@@ -33,4 +71,70 @@ export type Employee = {
     updatedAt: Timestamp;           // 更新日時
 };
 
+
+
 export type EmployeeInput = Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>;
+
+export function createEmptyEmployeeInput(
+    overrides: Partial<EmployeeInput> = {},
+): EmployeeInput {
+    return {
+        companyId: '',
+        officeId: '',
+        employeeNumber: '',
+        lastName: '',
+        firstName: '',
+        lastNameKana: '',
+        firstNameKana: '',
+        gender: 'male',
+        postalCode: '',
+        prefecture: '',
+        city: '',
+        streetAddress: '',
+        buildingName: '',
+        roomNumber: '',
+        phoneNumber: '',
+        birthDate: '',
+        joinedDate: '',
+        dependents: [],
+        employmentType: null,
+        department: '',
+        position: '',
+        status: 'active',
+        retiredDate: null,
+        ...overrides,
+    };
+}
+
+export function toEmployeeInput(
+    employee: Employee,
+    overrides: Partial<EmployeeInput> = {},
+): EmployeeInput {
+    return {
+        companyId: employee.companyId,
+        officeId: employee.officeId,
+        employeeNumber: employee.employeeNumber,
+        lastName: employee.lastName,
+        firstName: employee.firstName,
+        lastNameKana: employee.lastNameKana,
+        firstNameKana: employee.firstNameKana,
+        gender: employee.gender,
+        postalCode: employee.postalCode,
+        prefecture: employee.prefecture,
+        city: employee.city,
+        streetAddress: employee.streetAddress,
+        buildingName: employee.buildingName,
+        roomNumber: employee.roomNumber,
+        phoneNumber: employee.phoneNumber,
+        birthDate: employee.birthDate,
+        joinedDate: employee.joinedDate,
+        dependents: employee.dependents ?? [],
+        employmentType: employee.employmentType,
+        department: employee.department,
+        position: employee.position,
+        status: employee.status,
+        retiredDate: employee.retiredDate,
+        ...overrides,
+    };
+}
+

@@ -48,6 +48,31 @@
                     </select>
                 </div>
 
+                <h2 class="section-title">社会保険番号</h2>
+                <p class="section-note">
+                    登録時にアプリ管理用の番号が自動で割り当てられます。日本年金機構等から正式な番号が届いた場合は、ここで上書きしてください。
+                </p>
+                <div class="form-field">
+                    <label for="health-insurance-office-symbol">事業所整理記号（管理用）</label>
+                    <input
+                        id="health-insurance-office-symbol"
+                        type="text"
+                        name="healthInsuranceOfficeSymbol"
+                        [(ngModel)]="healthInsuranceOfficeSymbol"
+                        placeholder="例: HI-000001"
+                    />
+                </div>
+                <div class="form-field">
+                    <label for="pension-office-number">事業所番号（管理用）</label>
+                    <input
+                        id="pension-office-number"
+                        type="text"
+                        name="pensionOfficeNumber"
+                        [(ngModel)]="pensionOfficeNumber"
+                        placeholder="例: PN-000001"
+                    />
+                </div>
+
                 <h2 class="section-title">社会保険（通常の労働者の基準）</h2>
                 <p class="section-note">
                     パート・アルバイトの加入要件判定（4分の3ルール）で参照します。未入力の項目は絶対基準のみで判定します。
@@ -133,6 +158,21 @@
                     <div class="detail-row">
                         <dt>健康保険の種類</dt>
                         <dd>{{ healthInsuranceLabel(office()!.healthInsuranceType) }}</dd>
+                    </div>
+                </dl>
+
+                <h2 class="section-title">社会保険番号</h2>
+                <p class="section-note">
+                    アプリ管理用の番号です。正式な届出番号は通知後に編集画面から上書きできます。
+                </p>
+                <dl class="detail-list">
+                    <div class="detail-row">
+                        <dt>事業所整理記号（管理用）</dt>
+                        <dd>{{ displayValue(office()!.healthInsuranceOfficeSymbol) }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>事業所番号（管理用）</dt>
+                        <dd>{{ displayValue(office()!.pensionOfficeNumber) }}</dd>
                     </div>
                 </dl>
 

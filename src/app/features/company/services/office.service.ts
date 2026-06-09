@@ -13,27 +13,38 @@ import {
     updateDoc,
     serverTimestamp,
 } from 'firebase/firestore';
-import { Office, OfficeInput } from '../models/office.model';
+import { Office, OfficeCreateInput, OfficeInput } from '../models/office.model';
 import { db } from '../../../core/firebase';
 
 @Injectable({ providedIn: 'root' })
 
 export class OfficeService {
     // 事業所の作成
-    async createOffice(officeInput: OfficeInput): Promise<Office> {
-        // 作成日時の設定
+    async createOffice(officeInput: OfficeCreateInput): Promise<Office> {
         const createdAt = serverTimestamp() as Timestamp;
-
-        // 事業所ドキュメントの作成
         const docRef = doc(collection(db, 'offices'));
+        const assigned = await this.assignOfficeSymbols(officeInput.companyId);
+
         const office: Office = {
             id: docRef.id,
-            ...officeInput,
+            companyId: officeInput.companyId,
+            name: officeInput.name,
+            prefecture: officeInput.prefecture,
+            address: officeInput.address,
+            healthInsuranceType: officeInput.healthInsuranceType,
+            healthInsuranceOfficeSymbol:
+                officeInput.healthInsuranceOfficeSymbol?.trim() || assigned.healthInsuranceOfficeSymbol,
+            pensionOfficeNumber:
+                officeInput.pensionOfficeNumber?.trim() || assigned.pensionOfficeNumber,
+            regularWeeklyScheduledWorkHours: officeInput.regularWeeklyScheduledWorkHours,
+            regularMonthlyScheduledWorkHours: officeInput.regularMonthlyScheduledWorkHours,
+            regularWeeklyScheduledWorkDays: officeInput.regularWeeklyScheduledWorkDays,
+            regularMonthlyScheduledWorkDays: officeInput.regularMonthlyScheduledWorkDays,
+            status: officeInput.status,
             createdAt: createdAt,
             updatedAt: createdAt,
-        }
+        };
 
-        // 事業所をFirestoreに登録
         await setDoc(docRef, office);
 
         return office;
@@ -41,19 +52,15 @@ export class OfficeService {
 
     // companyIdから事業所を取得
     async getOfficesByCompanyId(companyId: string): Promise<Office[]> {
-        // 事業所のコレクションを取得
         const docRef = collection(db, 'offices');
-        
-        // 事業所を取得
         const q = query(docRef, where('companyId', '==', companyId));
         const docSnap = await getDocs(q);
 
-        // 事業所の配列を作成
         const offices: Office[] = [];
         docSnap.forEach((doc) => {
             offices.push(this.normalizeOffice(doc.id, doc.data()));
         });
-        
+
         return offices;
     }
 
@@ -62,7 +69,7 @@ export class OfficeService {
         const docRef = doc(db, 'offices', officeId);
         const docSnap = await getDoc(docRef);
 
-        if(!docSnap.exists()) return null;
+        if (!docSnap.exists()) return null;
 
         return this.normalizeOffice(officeId, docSnap.data());
     }
@@ -100,6 +107,20 @@ export class OfficeService {
         });
     }
 
+    private async assignOfficeSymbols(companyId: string): Promise<{
+        healthInsuranceOfficeSymbol: string;
+        pensionOfficeNumber: string;
+    }> {
+        const offices = await this.getOfficesByCompanyId(companyId);
+        const next = offices.length + 1;
+        const seq = String(next).padStart(6, '0');
+
+        return {
+            healthInsuranceOfficeSymbol: `HI-${seq}`,
+            pensionOfficeNumber: `PN-${seq}`,
+        };
+    }
+
     private normalizeOffice(id: string, data: Record<string, unknown>): Office {
         return {
             id,
@@ -108,6 +129,8 @@ export class OfficeService {
             prefecture: String(data['prefecture'] ?? ''),
             address: String(data['address'] ?? ''),
             healthInsuranceType: (data['healthInsuranceType'] as Office['healthInsuranceType']) ?? 'kyokai',
+            healthInsuranceOfficeSymbol: String(data['healthInsuranceOfficeSymbol'] ?? ''),
+            pensionOfficeNumber: String(data['pensionOfficeNumber'] ?? ''),
             regularWeeklyScheduledWorkHours: this.toNullableNumber(data['regularWeeklyScheduledWorkHours']),
             regularMonthlyScheduledWorkHours: this.toNullableNumber(data['regularMonthlyScheduledWorkHours']),
             regularWeeklyScheduledWorkDays: this.toNullableNumber(data['regularWeeklyScheduledWorkDays']),

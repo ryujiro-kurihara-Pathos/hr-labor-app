@@ -1,9 +1,245 @@
-<h1>手続き詳細</h1>
+<div class="procedure-detail-page">
+    <a routerLink="/procedures" class="back-link">← 手続き一覧へ</a>
 
-@if(isLoading()) {
-    <p class="loading">読み込み中...</p>
-} @else if(errorMessage()) {
-    <p class="error-message">{{ errorMessage() }}</p>
-} @else {
-    <p>手続き: {{ procedureName() }}</p>
-}
+    @if (isLoading()) {
+        <p class="loading">読み込み中...</p>
+    } @else if (!procedure()) {
+        <p class="error">{{ errorMessage() || '手続きが見つかりませんでした' }}</p>
+    } @else {
+        @let item = procedure()!;
+
+        <section class="detail-card">
+            <div class="page-header">
+                <div class="page-header-title">
+                    <h1>手続き詳細</h1>
+                    <span
+                        class="status-badge"
+                        [class.not-started]="item.status === 'notStarted'"
+                        [class.in-progress]="item.status === 'inProgress'"
+                        [class.completed]="item.status === 'completed'"
+                    >
+                        {{ statusLabel(item.status) }}
+                    </span>
+                </div>
+                <button type="button" class="btn edit-btn">編集</button>
+            </div>
+
+            <p class="procedure-type">{{ procedureTypeLabel(item.procedureType) }}</p>
+
+            <h2 class="section-title">基本情報</h2>
+            <dl class="detail-meta">
+                <div class="meta-row">
+                    <dt>手続きID</dt>
+                    <dd>{{ item.id }}</dd>
+                </div>
+                <div class="meta-row">
+                    <dt>手続き種別</dt>
+                    <dd>{{ procedureTypeLabel(item.procedureType) }}</dd>
+                </div>
+                <div class="meta-row">
+                    <dt>対応状況</dt>
+                    <dd>{{ statusLabel(item.status) }}</dd>
+                </div>
+                <div class="meta-row">
+                    <dt>従業員</dt>
+                    <dd>
+                        @if (employee()) {
+                            <a class="employee-link" [routerLink]="['/employees', employee()!.id]">
+                                {{ employee()!.lastName }} {{ employee()!.firstName }}
+                            </a>
+    
+                        } @else {
+                            —
+                        }
+                    </dd>
+                </div>
+            </dl>
+
+            <h2 class="section-title">日程</h2>
+            <dl class="detail-meta">
+                <div class="meta-row">
+                    <dt>発生日</dt>
+                    <dd>{{ item.occurredDate || '—' }}</dd>
+                </div>
+                <div class="meta-row">
+                    <dt>対応期限</dt>
+                    <dd>{{ item.dueDate || '—' }}</dd>
+                </div>
+                <div class="meta-row">
+                    <dt>完了日</dt>
+                    <dd>{{ item.completedDate || '—' }}</dd>
+                </div>
+                <div class="meta-row">
+                    <dt>対象年月</dt>
+                    <dd>{{ item.targetYearMonth || '—' }}</dd>
+                </div>
+            </dl>
+
+            <h2 class="section-title">メモ</h2>
+            <p class="memo-text">{{ item.memo || '—' }}</p>
+        </section>
+    }
+</div>
+
+<style>
+    .procedure-detail-page {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 24px 16px 40px;
+    }
+
+    .back-link {
+        display: inline-block;
+        margin-bottom: 16px;
+        font-size: 14px;
+        color: #2563eb;
+        text-decoration: none;
+    }
+
+    .back-link:hover {
+        text-decoration: underline;
+    }
+
+    .loading {
+        color: #6b7280;
+        font-size: 14px;
+    }
+
+    .error {
+        color: #b91c1c;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .detail-card {
+        padding: 20px;
+        background-color: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 8px;
+    }
+
+    .page-header-title {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+    }
+
+    h1 {
+        margin: 0;
+        font-size: 22px;
+    }
+
+    .procedure-type {
+        margin: 0 0 20px;
+        font-size: 16px;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .status-badge.not-started {
+        background: #f3f4f6;
+        color: #4b5563;
+    }
+
+    .status-badge.in-progress {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .status-badge.completed {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .btn {
+        flex-shrink: 0;
+        height: 42px;
+        padding: 0 16px;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .edit-btn {
+        background: #e5e7eb;
+        color: #333;
+    }
+
+    .section-title {
+        margin: 24px 0 12px;
+        font-size: 17px;
+    }
+
+    .section-title:first-of-type {
+        margin-top: 0;
+    }
+
+    .detail-meta {
+        margin: 0;
+        display: grid;
+        gap: 10px;
+    }
+
+    .meta-row {
+        display: flex;
+        gap: 12px;
+        font-size: 14px;
+    }
+
+    .meta-row dt {
+        flex-shrink: 0;
+        width: 88px;
+        margin: 0;
+        color: #6b7280;
+        font-weight: 500;
+    }
+
+    .meta-row dd {
+        margin: 0;
+        color: #111827;
+        word-break: break-all;
+    }
+
+    .employee-link {
+        color: #2563eb;
+        text-decoration: none;
+    }
+
+    .employee-link:hover {
+        text-decoration: underline;
+    }
+
+    .memo-text {
+        margin: 0;
+        padding: 12px 14px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #111827;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+</style>

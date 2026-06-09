@@ -23,7 +23,6 @@ import {
     isRewardTargetMonth,
     rewardTargetMonthReason,
     yearMonthFromDateString,
-    yearMonthFromTimestamp,
 } from '../utils/reward-target-month.util';
 import {
     FIXED_WAGE_FIELD_KEYS,

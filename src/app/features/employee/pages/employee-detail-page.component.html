@@ -31,8 +31,51 @@
                     <input id="first-name" type="text" name="firstName" [(ngModel)]="firstName" />
                 </div>
                 <div class="form-field">
+                    <label for="last-name-kana">姓（カナ）</label>
+                    <input id="last-name-kana" type="text" name="lastNameKana" [(ngModel)]="lastNameKana" />
+                </div>
+                <div class="form-field">
+                    <label for="first-name-kana">名（カナ）</label>
+                    <input id="first-name-kana" type="text" name="firstNameKana" [(ngModel)]="firstNameKana" />
+                </div>
+                <div class="form-field">
+                    <label for="gender">性別</label>
+                    <select id="gender" name="gender" [(ngModel)]="gender">
+                        <option value="male">男性</option>
+                        <option value="female">女性</option>
+                    </select>
+                </div>
+                <div class="form-field">
                     <label for="employee-number">社員番号</label>
                     <input id="employee-number" type="text" name="employeeNumber" [(ngModel)]="employeeNumber" />
+                </div>
+                <div class="form-field">
+                    <label for="phone-number">電話番号</label>
+                    <input id="phone-number" type="text" name="phoneNumber" [(ngModel)]="phoneNumber" />
+                </div>
+                <div class="form-field">
+                    <label for="postal-code">郵便番号</label>
+                    <input id="postal-code" type="text" name="postalCode" [(ngModel)]="postalCode" placeholder="例: 1000001" />
+                </div>
+                <div class="form-field">
+                    <label for="prefecture">都道府県</label>
+                    <input id="prefecture" type="text" name="prefecture" [(ngModel)]="prefecture" />
+                </div>
+                <div class="form-field">
+                    <label for="city">市区町村</label>
+                    <input id="city" type="text" name="city" [(ngModel)]="city" />
+                </div>
+                <div class="form-field">
+                    <label for="street-address">丁目番地</label>
+                    <input id="street-address" type="text" name="streetAddress" [(ngModel)]="streetAddress" />
+                </div>
+                <div class="form-field">
+                    <label for="building-name">建物名</label>
+                    <input id="building-name" type="text" name="buildingName" [(ngModel)]="buildingName" />
+                </div>
+                <div class="form-field">
+                    <label for="room-number">号室</label>
+                    <input id="room-number" type="text" name="roomNumber" [(ngModel)]="roomNumber" />
                 </div>
                 <div class="form-field">
                     <label for="birth-date">生年月日</label>
@@ -57,8 +100,24 @@
                         <dd>{{ employee()!.lastName }} {{ employee()!.firstName }}</dd>
                     </div>
                     <div class="detail-row">
+                        <dt>氏名（カナ）</dt>
+                        <dd>{{ employee()!.lastNameKana || '—' }} {{ employee()!.firstNameKana || '—' }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>性別</dt>
+                        <dd>{{ genderLabel(employee()!.gender) }}</dd>
+                    </div>
+                    <div class="detail-row">
                         <dt>社員番号</dt>
                         <dd>{{ employee()!.employeeNumber || '—' }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>電話番号</dt>
+                        <dd>{{ employee()!.phoneNumber || '—' }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>住所</dt>
+                        <dd>{{ formatAddress(employee()!) }}</dd>
                     </div>
                     <div class="detail-row">
                         <dt>事業所</dt>
@@ -349,6 +408,73 @@
                 </div>
             </div>
 
+            <section class="qualification-procedure-section">
+                <h2 class="section-title">資格取得手続き</h2>
+
+                <div class="qualification-procedure-box">
+                    @if (qualificationProcedureExists()) {
+                        <div class="qualification-procedure-header">
+                            <p class="qualification-procedure-message">資格取得手続きが作成されています。</p>
+                            <span
+                                class="procedure-status-badge"
+                                [class.not-started]="qualificationProcedureStatus() === 'notStarted'"
+                                [class.in-progress]="qualificationProcedureStatus() === 'inProgress'"
+                                [class.completed]="qualificationProcedureStatus() === 'completed'"
+                            >
+                                {{ qualificationProcedureStatusLabel(qualificationProcedureStatus()) }}
+                            </span>
+                        </div>
+                        <a
+                            [routerLink]="['/procedures', qualificationProcedure()!.id]"
+                            class="btn sub-btn qualification-procedure-link"
+                        >
+                            資格取得手続き詳細へ
+                        </a>
+                    } @else if (isHealthInsuranceEligible()) {
+                        @if (showQualificationCreateConfirm()) {
+                            <div class="qualification-procedure-confirm">
+                                <p class="qualification-procedure-confirm-title">資格取得手続きがまだ作成されていません</p>
+                                <p class="section-note">この従業員の資格取得手続きを作成しますか？</p>
+                                @if (errorMessage()) {
+                                    <p class="error-message">{{ errorMessage() }}</p>
+                                }
+                                <div class="button-area qualification-procedure-actions">
+                                    <button
+                                        type="button"
+                                        class="btn sub-btn"
+                                        (click)="closeQualificationCreateConfirm()"
+                                        [disabled]="isCreatingQualificationProcedure()"
+                                    >
+                                        キャンセル
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="btn primary-btn"
+                                        (click)="createQualificationProcedure()"
+                                        [disabled]="isCreatingQualificationProcedure()"
+                                    >
+                                        @if (isCreatingQualificationProcedure()) {
+                                            作成中...
+                                        } @else {
+                                            はい
+                                        }
+                                    </button>
+                                </div>
+                            </div>
+                        } @else {
+                            <p class="section-note">健康保険の対象のため、資格取得手続きを作成できます。</p>
+                            <button
+                                type="button"
+                                class="btn primary-btn qualification-procedure-create-btn"
+                                (click)="openQualificationCreateConfirm()"
+                            >
+                                資格取得手続きを作成する
+                            </button>
+                        }
+                    }
+                </div>
+            </section>
+
             @if (isEditing()) {
                 @if (errorMessage()) {
                     <p class="error-message">{{ errorMessage() }}</p>
@@ -455,6 +581,98 @@
         margin-bottom: 8px;
         padding-top: 8px;
         border-top: 1px solid #f3f4f6;
+    }
+
+    .qualification-procedure-section {
+        margin-bottom: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #f3f4f6;
+    }
+
+    .qualification-procedure-section .section-title {
+        margin-top: 0;
+    }
+
+    .qualification-procedure-box {
+        padding: 14px 16px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+    }
+
+    .qualification-procedure-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .qualification-procedure-message {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.5;
+        color: #374151;
+    }
+
+    .procedure-status-badge {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .procedure-status-badge.not-started {
+        background: #f3f4f6;
+        color: #4b5563;
+    }
+
+    .procedure-status-badge.in-progress {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .procedure-status-badge.completed {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .qualification-procedure-confirm {
+        padding: 12px 14px;
+        background: #fff;
+        border: 1px solid #dbeafe;
+        border-radius: 8px;
+    }
+
+    .qualification-procedure-confirm-title {
+        margin: 0 0 6px;
+        font-size: 14px;
+        font-weight: 700;
+        color: #1e40af;
+    }
+
+    .qualification-procedure-confirm .section-note {
+        margin-bottom: 12px;
+    }
+
+    .qualification-procedure-actions {
+        margin-top: 0;
+    }
+
+    .qualification-procedure-link,
+    .qualification-procedure-create-btn {
+        display: block;
+        width: 100%;
+        text-align: center;
+        text-decoration: none;
+    }
+
+    .qualification-procedure-box .section-note {
+        margin-top: 0;
+        margin-bottom: 12px;
     }
 
     .section-title {

@@ -3,12 +3,15 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Timestamp } from 'firebase/firestore';
 
-import { Employee, EmployeeInput, EmployeeStatus, EmploymentType } from '../models/employee.models';
 import { EmployeeService } from '../services/employee.service';
-import { Office } from '../../company/models/office.model';
 import { OfficeService } from '../../company/services/office.service';
 import { SocialInsuranceStatusService } from '../../social-insurance/services/social-insurance-status.service';
+import { SocialInsuranceProcedureService } from '../../social-insurance/services/social-insurance-procedure.service';
+
+import { Office } from '../../company/models/office.model';
+import { Employee, EmployeeInput, EmployeeStatus, EmploymentType, toEmployeeInput } from '../models/employee.models';
 import { insuranceJoinStatus, SocialInsuranceStatus, SocialInsuranceStatusInput } from '../../social-insurance/models/social-insurance-status.model';
+import { Procedure, ProcedureStatus } from '../../social-insurance/models/procedures.model';
 
 type SocialInsuranceDraft = {
     weeklyScheduledWorkHours: string | number;
@@ -29,17 +32,25 @@ export class EmployeeDetailPageComponent {
     private readonly route = inject(ActivatedRoute);
     private readonly employeeService = inject(EmployeeService);
     private readonly officeService = inject(OfficeService);
-    private readonly socialInsuranceStatusService = inject(SocialInsuranceStatusService);
+    private readonly insuranceStatusService = inject(SocialInsuranceStatusService);
+    private readonly procedureService = inject(SocialInsuranceProcedureService);
 
+    // 従業員情報
     employee = signal<Employee | null>(null);
     office = signal<Office | null>(null);
     officeName = signal<string>('');
+    
+    // 取得資格手続きのID
+    qualificationProcedure = signal<Procedure | null>(null);
 
+    // ローディング
     isLoading = signal<boolean>(false);
     isSaving = signal<boolean>(false);
     isRetiring = signal<boolean>(false);
     isEditing = signal<boolean>(false);
     isRetireFormOpen = signal<boolean>(false);
+    showQualificationCreateConfirm = signal<boolean>(false);
+    isCreatingQualificationProcedure = signal<boolean>(false);
     errorMessage = signal<string>('');
     age = computed(() => this.ageToday(this.birthDate));
 
@@ -47,6 +58,16 @@ export class EmployeeDetailPageComponent {
 
     lastName = '';
     firstName = '';
+    lastNameKana = '';
+    firstNameKana = '';
+    gender: Employee['gender'] = 'male';
+    postalCode = '';
+    prefecture = '';
+    city = '';
+    streetAddress = '';
+    buildingName = '';
+    roomNumber = '';
+    phoneNumber = '';
     employeeNumber = '';
     birthDate = '';
     joinedDate = '';
@@ -63,10 +84,10 @@ export class EmployeeDetailPageComponent {
 
     private socialInsuranceSnapshot: SocialInsuranceDraft = this.createEmptySocialInsuranceDraft();
 
-
     // 社会保険情報
     socialInsuranceStatus = signal<SocialInsuranceStatus | null>(null);
 
+    // 初期処理
     async ngOnInit() {
         const employeeId = this.route.snapshot.params['employeeId'];
 
@@ -78,6 +99,7 @@ export class EmployeeDetailPageComponent {
         await this.loadEmployee(employeeId);
     }
 
+    // 従業員情報の読み込み
     async loadEmployee(employeeId: string): Promise<void> {
         this.isLoading.set(true);
         this.errorMessage.set('');
@@ -102,14 +124,102 @@ export class EmployeeDetailPageComponent {
             this.syncFormFromEmployee(employee);
 
             // 社会保険情報を取得
-            const socialInsuranceStatus = await this.socialInsuranceStatusService.getInsuranceStatusByEmployeeId(employeeId);
+            const socialInsuranceStatus = await this.insuranceStatusService.getInsuranceStatusByEmployeeId(employeeId);
             this.socialInsuranceStatus.set(socialInsuranceStatus);
             this.syncFormFromSocialInsuranceStatus(socialInsuranceStatus);
+
+            // 資格取得手続きを取得
+            await this.loadQualificationProcedure();
         } catch (error) {
             console.error('従業員の取得に失敗しました', error);
             this.errorMessage.set('従業員の取得に失敗しました');
         } finally {
             this.isLoading.set(false);
+        }
+    }
+
+    // 資格取得手続きの読み込み
+    async loadQualificationProcedure(): Promise<void> {
+        this.qualificationProcedure.set(null);
+
+        const employee = this.employee();
+        if(!employee) return;
+
+        try {
+            const procedure = await this.procedureService.getQualificationProcedureByEmployeeId(employee.id, employee.companyId);
+            this.qualificationProcedure.set(procedure);
+        } catch (error) {
+            console.error('資格取得手続きの取得に失敗しました', error);
+            this.errorMessage.set('資格取得手続きの取得に失敗しました');
+            this.isLoading.set(false);
+        }
+    }
+
+    // 資格取得手続きの存在判定
+    qualificationProcedureExists = computed((): boolean => {
+        const procedure = this.qualificationProcedure();
+        return procedure !== null;
+    })
+
+    // 資格取得手続きの進捗
+    qualificationProcedureStatus = computed((): ProcedureStatus => {
+        const status = this.qualificationProcedure()?.status;
+        if(!status) return 'notStarted';
+        return status;
+    });
+
+    openQualificationCreateConfirm(): void {
+        this.errorMessage.set('');
+        this.showQualificationCreateConfirm.set(true);
+    }
+
+    closeQualificationCreateConfirm(): void {
+        this.showQualificationCreateConfirm.set(false);
+    }
+
+    isHealthInsuranceEligible(): boolean {
+        if (this.isEditing()) {
+            return this.judgeHealthInsurance() === 'active';
+        }
+
+        return this.socialInsuranceStatus()?.healthInsuranceStatus === 'active';
+    }
+
+    qualificationProcedureStatusLabel(status: ProcedureStatus): string {
+        const labels: Record<ProcedureStatus, string> = {
+            notStarted: '未対応',
+            inProgress: '対応中',
+            completed: '完了',
+        };
+        return labels[status];
+    }
+
+    async createQualificationProcedure(): Promise<void> {
+        const employee = this.employee();
+        if (!employee || this.qualificationProcedureExists()) return;
+
+        this.isCreatingQualificationProcedure.set(true);
+        this.errorMessage.set('');
+
+        try {
+            const procedure = await this.procedureService.createProcedure({
+                companyId: employee.companyId,
+                employeeId: employee.id,
+                procedureType: 'qualification',
+                status: 'notStarted',
+                occurredDate: employee.joinedDate,
+                dueDate: '',
+                completedDate: null,
+                targetYearMonth: null,
+                memo: '',
+            });
+            this.qualificationProcedure.set(procedure);
+            this.showQualificationCreateConfirm.set(false);
+        } catch (error) {
+            console.error('資格取得手続きの作成に失敗しました', error);
+            this.errorMessage.set('資格取得手続きの作成に失敗しました');
+        } finally {
+            this.isCreatingQualificationProcedure.set(false);
         }
     }
 
@@ -148,8 +258,19 @@ export class EmployeeDetailPageComponent {
             employeeNumber: this.employeeNumber,
             lastName: this.lastName,
             firstName: this.firstName,
+            lastNameKana: this.lastNameKana,
+            firstNameKana: this.firstNameKana,
+            gender: this.gender,
+            postalCode: this.postalCode,
+            prefecture: this.prefecture,
+            city: this.city,
+            streetAddress: this.streetAddress,
+            buildingName: this.buildingName,
+            roomNumber: this.roomNumber,
+            phoneNumber: this.phoneNumber,
             birthDate: this.birthDate,
             joinedDate: this.joinedDate,
+            dependents: employee.dependents ?? [],
             employmentType: this.employmentType,
             department: this.department,
             position: this.position,
@@ -185,7 +306,7 @@ export class EmployeeDetailPageComponent {
                 throw new Error('社会保険情報が見つかりません');
             }
 
-            await this.socialInsuranceStatusService.updateSocialInsuranceStatus(
+            await this.insuranceStatusService.updateSocialInsuranceStatus(
                 currentSocialInsuranceStatus.id,
                 socialInsuranceStatusInput,
             );
@@ -206,6 +327,22 @@ export class EmployeeDetailPageComponent {
 
     statusLabel(status: EmployeeStatus): string {
         return status === 'active' ? '在籍' : '退職';
+    }
+
+    genderLabel(gender: Employee['gender']): string {
+        return gender === 'female' ? '女性' : '男性';
+    }
+
+    formatAddress(employee: Employee): string {
+        const parts = [
+            employee.postalCode ? `〒${employee.postalCode}` : '',
+            employee.prefecture,
+            employee.city,
+            employee.streetAddress,
+            employee.buildingName,
+            employee.roomNumber,
+        ].filter((part) => part.trim());
+        return parts.length > 0 ? parts.join(' ') : '—';
     }
 
     isActiveEmployee(): boolean {
@@ -252,20 +389,10 @@ export class EmployeeDetailPageComponent {
         this.isRetiring.set(true);
         this.errorMessage.set('');
 
-        const input: EmployeeInput = {
-            companyId: employee.companyId,
-            officeId: employee.officeId,
-            employeeNumber: employee.employeeNumber,
-            lastName: employee.lastName,
-            firstName: employee.firstName,
-            birthDate: employee.birthDate,
-            joinedDate: employee.joinedDate,
-            employmentType: employee.employmentType,
-            department: employee.department,
-            position: employee.position,
+        const input: EmployeeInput = toEmployeeInput(employee, {
             status: 'retired',
             retiredDate: Timestamp.fromDate(retiredDate),
-        };
+        });
 
         try {
             await this.employeeService.updateEmployee(employee.id, input);
@@ -291,20 +418,10 @@ export class EmployeeDetailPageComponent {
         this.isRetiring.set(true);
         this.errorMessage.set('');
 
-        const input: EmployeeInput = {
-            companyId: employee.companyId,
-            officeId: employee.officeId,
-            employeeNumber: employee.employeeNumber,
-            lastName: employee.lastName,
-            firstName: employee.firstName,
-            birthDate: employee.birthDate,
-            joinedDate: employee.joinedDate,
-            employmentType: employee.employmentType,
-            department: employee.department,
-            position: employee.position,
+        const input: EmployeeInput = toEmployeeInput(employee, {
             status: 'active',
             retiredDate: null,
-        };
+        });
 
         try {
             await this.employeeService.updateEmployee(employee.id, input);
@@ -461,6 +578,16 @@ export class EmployeeDetailPageComponent {
     private syncFormFromEmployee(employee: Employee): void {
         this.lastName = employee.lastName;
         this.firstName = employee.firstName;
+        this.lastNameKana = employee.lastNameKana;
+        this.firstNameKana = employee.firstNameKana;
+        this.gender = employee.gender;
+        this.postalCode = employee.postalCode;
+        this.prefecture = employee.prefecture;
+        this.city = employee.city;
+        this.streetAddress = employee.streetAddress;
+        this.buildingName = employee.buildingName;
+        this.roomNumber = employee.roomNumber;
+        this.phoneNumber = employee.phoneNumber;
         this.employeeNumber = employee.employeeNumber;
         this.birthDate = employee.birthDate;
         this.joinedDate = employee.joinedDate;
