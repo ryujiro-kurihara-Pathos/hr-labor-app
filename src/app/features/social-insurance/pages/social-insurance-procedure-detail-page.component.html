@@ -77,6 +77,12 @@
 
             <h2 class="section-title">メモ</h2>
             <p class="memo-text">{{ item.memo || '—' }}</p>
+
+            @if (item.status === 'completed') {
+                <p>提出済み</p>
+            } @else {
+                <button type="button" class="btn primary-btn" (click)="submitProcedure()">提出</button>
+            }
         </section>
     }
 </div>

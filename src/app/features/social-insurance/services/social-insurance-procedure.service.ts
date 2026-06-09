@@ -11,6 +11,7 @@ import {
     getDocs,
     query,
     where,
+    updateDoc,
 } from 'firebase/firestore';
 
 import { Procedure, ProcedureInput } from '../models/procedures.model';
@@ -62,5 +63,14 @@ export class SocialInsuranceProcedureService {
 
         const procedure = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Procedure;
         return procedure;
+    }
+
+    // 手続きを更新
+    async updateProcedure(procedure: Procedure): Promise<void> {
+        const id = procedure.id;
+        const docRef = doc(db, this.collectionName, id);
+        const updatedAt = serverTimestamp() as Timestamp;
+        
+        await updateDoc(docRef, procedure);
     }
 }

@@ -6,6 +6,7 @@ import { EmployeeService } from '../../employee/services/employee.service';
 
 import { Procedure, ProcedureInput, ProcedureStatus, ProcedureType } from '../models/procedures.model';
 import { Employee } from '../../employee/models/employee.models';
+import { serverTimestamp, Timestamp } from 'firebase/firestore';
 
 @Component({
     selector: 'app-social-insurance-procedure-detail-page',
@@ -109,6 +110,36 @@ export class SocialInsuranceProcedureDetailPageComponent {
             this.errorMessage.set('手続きの登録に失敗しました。');
         } finally {
             this.isLoading.set(false);
+        }
+    }
+
+    // 手続きを提出する
+    async submitProcedure(): Promise<void> {
+        const procedure = this.procedure();
+        if(!procedure) return;
+
+        const newProcedure: Procedure = {
+            id: procedure.id,
+            companyId: procedure.companyId,
+            employeeId: procedure.employeeId,
+            procedureType: procedure.procedureType,
+            status: 'completed',
+            occurredDate: procedure.occurredDate,
+            dueDate: procedure.dueDate,
+            completedDate: new Date().toISOString(),
+            targetYearMonth: procedure.targetYearMonth,
+            memo: procedure.memo,
+            createdAt: procedure.createdAt,
+            updatedAt: serverTimestamp() as Timestamp,
+        };
+
+        try {
+            await this.procedureService.updateProcedure(newProcedure);
+            this.procedure.set(newProcedure);
+            console.log('手続きの提出に成功しました。');
+        } catch (error) {
+            console.error('手続きの提出に失敗しました。', error);
+            this.errorMessage.set('手続きの提出に失敗しました。');
         }
     }
 
