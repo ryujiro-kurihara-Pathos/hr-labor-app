@@ -24,6 +24,14 @@
                     [socialInsuranceStatus]="socialInsuranceStatus()"
                 />
             }
+            @case ('dependentChange') {
+                <app-dependent-procedure
+                    [procedure]="procedure()!"
+                    [employee]="employee()!"
+                    [office]="office()!"
+                    [company]="company()!"
+                />
+            }
             @default {
                 <p class="error">{{ errorMessage() || '手続きの種類が不明です' }}</p>
             }

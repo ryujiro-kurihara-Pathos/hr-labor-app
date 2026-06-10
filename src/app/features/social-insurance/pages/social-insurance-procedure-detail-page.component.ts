@@ -15,11 +15,12 @@ import { Company } from '../../company/models/company.model';
 
 import { QualificationProcedureComponent } from './qualification-procedure.component';
 import { LossProcedureComponent } from './loss-procedure.component';
+import { DependentProcedureComponent } from './dependent-procedure.component';
 
 @Component({
     selector: 'app-social-insurance-procedure-detail-page',
     standalone: true,
-    imports: [RouterLink, QualificationProcedureComponent, LossProcedureComponent],
+    imports: [RouterLink, QualificationProcedureComponent, LossProcedureComponent, DependentProcedureComponent],
     templateUrl: './social-insurance-procedure-detail-page.component.html',
 })
 

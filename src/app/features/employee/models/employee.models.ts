@@ -53,7 +53,6 @@ export type Employee = {
     phoneNumber: string;            // 電話番号
     birthDate: string;              // 生年月日（YYYY-MM-DD）
     joinedDate: string;             // 入社日（YYYY-MM-DD）
-    dependents: Dependent[];        // 扶養家族
 
     // 雇用情報
     employmentType: EmploymentType; // 雇用区分
@@ -96,7 +95,6 @@ export function createEmptyEmployeeInput(
         phoneNumber: '',
         birthDate: '',
         joinedDate: '',
-        dependents: [],
         employmentType: null,
         department: '',
         position: '',
@@ -128,7 +126,6 @@ export function toEmployeeInput(
         phoneNumber: employee.phoneNumber,
         birthDate: employee.birthDate,
         joinedDate: employee.joinedDate,
-        dependents: employee.dependents ?? [],
         employmentType: employee.employmentType,
         department: employee.department,
         position: employee.position,

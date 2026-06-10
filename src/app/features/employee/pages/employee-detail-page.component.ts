@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink, Router } from '@angular/router';
 import { Timestamp } from 'firebase/firestore';
 
 import { EmployeeService } from '../services/employee.service';
@@ -30,6 +30,7 @@ type SocialInsuranceDraft = {
 
 export class EmployeeDetailPageComponent {
     private readonly route = inject(ActivatedRoute);
+    private readonly router = inject(Router);
     private readonly employeeService = inject(EmployeeService);
     private readonly officeService = inject(OfficeService);
     private readonly insuranceStatusService = inject(SocialInsuranceStatusService);
@@ -74,7 +75,6 @@ export class EmployeeDetailPageComponent {
     department = '';
     position = '';
     employmentType: EmploymentType = null;
-    dependents: Dependent[] = [];
 
     // 社会保険 加入要件
     weeklyScheduledWorkHours: string | number = ''; // number入力だが空を許容するため文字列
@@ -98,6 +98,7 @@ export class EmployeeDetailPageComponent {
         }
 
         await this.loadEmployee(employeeId);
+        await this.loadDependents();
     }
 
     // 従業員情報の読み込み
@@ -169,8 +170,24 @@ export class EmployeeDetailPageComponent {
         return status;
     });
 
-    // 扶養家族の人数の取得
-    dependentCount = computed(() => this.employee()?.dependents.length ?? 0);
+    // 扶養家族
+    dependents = signal<Dependent[]>([]);
+
+    // 扶養家族の取得
+    async loadDependents(): Promise<void> {
+        this.dependents.set([]);
+
+        const employee = this.employee();
+        if(!employee) return;
+
+        try {
+            const dependents = await this.employeeService.getDependentsByEmployeeId(employee.id);
+            this.dependents.set(dependents);
+        } catch (error) {
+            console.error('扶養家族の取得に失敗しました', error);
+            this.errorMessage.set('扶養家族の取得に失敗しました');
+        }
+    }
 
     openQualificationCreateConfirm(): void {
         this.errorMessage.set('');
@@ -198,6 +215,7 @@ export class EmployeeDetailPageComponent {
         return labels[status];
     }
 
+    // 資格取得手続きの作成
     async createQualificationProcedure(): Promise<void> {
         const employee = this.employee();
         if (!employee || this.qualificationProcedureExists()) return;
@@ -226,6 +244,43 @@ export class EmployeeDetailPageComponent {
             this.errorMessage.set('資格取得手続きの作成に失敗しました');
         } finally {
             this.isCreatingQualificationProcedure.set(false);
+        }
+    }
+
+    // 資格喪失手続きの追加
+    async createLossProcedure(): Promise<void> {
+
+    }
+
+    // 扶養家族手続きID
+    dependentProcedureId = signal<string | null>(null);
+
+    // 扶養家族手続きの追加
+    async createDependentProcedure(): Promise<void> {
+        const employee = this.employee();
+        if (!employee) return;
+
+        try {
+            const procedure = await this.procedureService.createProcedure({
+                companyId: employee.companyId,
+                officeId: employee.officeId,
+                employeeId: employee.id,
+                procedureType: 'dependentChange',
+                status: 'notStarted',
+                occurredDate: employee.joinedDate,
+                dueDate: '',
+                completedDate: null,
+                targetYearMonth: null,
+                memo: '',
+                lossReason: null,
+            });
+            if(!procedure) return;
+            this.dependentProcedureId.set(procedure.id);
+            console.log('procedure', procedure);
+            this.router.navigate(['/procedures', procedure.id]);
+        } catch (error) {
+            console.error('扶養家族手続きの追加に失敗しました', error);
+            this.errorMessage.set('扶養家族手続きの追加に失敗しました');
         }
     }
 
@@ -276,7 +331,6 @@ export class EmployeeDetailPageComponent {
             phoneNumber: this.phoneNumber,
             birthDate: this.birthDate,
             joinedDate: this.joinedDate,
-            dependents: employee.dependents ?? [],
             employmentType: this.employmentType,
             department: this.department,
             position: this.position,

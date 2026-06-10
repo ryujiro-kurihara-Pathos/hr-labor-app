@@ -52,7 +52,6 @@ export class EmployeeService {
             phoneNumber: String(data['phoneNumber'] ?? ''),
             birthDate: String(data['birthDate'] ?? ''),
             joinedDate: String(data['joinedDate'] ?? ''),
-            dependents: Array.isArray(data['dependents']) ? (data['dependents'] as Dependent[]) : [],
             employmentType: (data['employmentType'] as Employee['employmentType']) ?? null,
             department: String(data['department'] ?? ''),
             position: String(data['position'] ?? ''),
@@ -70,7 +69,6 @@ export class EmployeeService {
         const employee: Employee = {
             id: docRef.id,
             ...employeeInput,
-            dependents: employeeInput.dependents ?? [],
             createdAt: createdAt,
             updatedAt: createdAt,
         }
@@ -108,9 +106,21 @@ export class EmployeeService {
         const docRef = doc(db, 'employees', employeeId);
         await updateDoc(docRef, {
             ...employeeInput,
-            dependents: employeeInput.dependents ?? [],
             updatedAt: serverTimestamp(),
         });
     }
 
+    // employeeIdから扶養家族を取得
+    async getDependentsByEmployeeId(employeeId: string): Promise<Dependent[]> {
+        const docRef = collection(db, 'employees', employeeId, 'dependents');
+        const snap = await getDocs(docRef);
+        if(snap.empty) return [];
+
+        const dependents: Dependent[] = [];
+        snap.forEach((docSnap) => {
+            dependents.push({...docSnap.data() as Dependent});
+        });
+        
+        return dependents;
+    }
 }

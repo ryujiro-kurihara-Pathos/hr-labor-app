@@ -157,7 +157,8 @@
                     </div>
                     <div class="detail-row">
                         <dt>扶養家族</dt>
-                        <dd>{{ dependentCount() }}人</dd>
+                        <dd>{{ dependents().length }}人</dd>
+                        <dd><a class="btn sub-btn" (click)="createDependentProcedure()">扶養家族を追加する</a></dd>
                     </div>
                     <div class="detail-row">
                         <dt>在籍状態</dt>
@@ -428,7 +429,7 @@
             </div>
 
             <section class="qualification-procedure-section">
-                <h2 class="section-title">資格取得手続き</h2>
+                <h2 class="section-title">手続き一覧</h2>
 
                 <div class="qualification-procedure-box">
                     @if (qualificationProcedureExists()) {
@@ -490,6 +491,8 @@
                                 資格取得手続きを作成する
                             </button>
                         }
+                    } @else {
+                        <p class="section-note">健康保険の対象外のため、資格取得手続きを作成できません。</p>
                     }
                 </div>
             </section>
