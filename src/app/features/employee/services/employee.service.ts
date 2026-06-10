@@ -20,6 +20,17 @@ import { Dependent, Employee, EmployeeInput } from '../models/employee.models';
 
 export class EmployeeService {
 
+    private normalizeBuildingName(data: Record<string, unknown>): string {
+        const buildingName = String(data['buildingName'] ?? '').trim();
+        const roomNumber = String(data['roomNumber'] ?? '').trim();
+
+        if (buildingName && roomNumber) {
+            return `${buildingName} ${roomNumber}`;
+        }
+
+        return buildingName || roomNumber;
+    }
+
     private toEmployee(id: string, data: Record<string, unknown>): Employee {
         const gender = data['gender'];
         return {
@@ -31,13 +42,13 @@ export class EmployeeService {
             firstName: String(data['firstName'] ?? ''),
             lastNameKana: String(data['lastNameKana'] ?? ''),
             firstNameKana: String(data['firstNameKana'] ?? ''),
+            myNumber: String(data['myNumber'] ?? ''),
             gender: gender === 'female' ? 'female' : 'male',
             postalCode: String(data['postalCode'] ?? ''),
             prefecture: String(data['prefecture'] ?? ''),
             city: String(data['city'] ?? ''),
             streetAddress: String(data['streetAddress'] ?? data['address'] ?? ''),
-            buildingName: String(data['buildingName'] ?? ''),
-            roomNumber: String(data['roomNumber'] ?? ''),
+            buildingName: this.normalizeBuildingName(data),
             phoneNumber: String(data['phoneNumber'] ?? ''),
             birthDate: String(data['birthDate'] ?? ''),
             joinedDate: String(data['joinedDate'] ?? ''),

@@ -43,13 +43,13 @@ export type Employee = {
     firstName: string;              // 名
     lastNameKana: string;           // 姓（カナ）
     firstNameKana: string;          // 名（カナ）
+    myNumber: string;               // マイナンバー
     gender: 'male' | 'female';      // 性別
     postalCode: string;             // 郵便番号
     prefecture: string;             // 都道府県
     city: string;                   // 市区町村
     streetAddress: string;          // 丁目番地
-    buildingName: string;           // 建物名
-    roomNumber: string;             // 号室
+    buildingName: string;           // 建物名・号室
     phoneNumber: string;            // 電話番号
     birthDate: string;              // 生年月日（YYYY-MM-DD）
     joinedDate: string;             // 入社日（YYYY-MM-DD）
@@ -86,13 +86,13 @@ export function createEmptyEmployeeInput(
         firstName: '',
         lastNameKana: '',
         firstNameKana: '',
+        myNumber: '',
         gender: 'male',
         postalCode: '',
         prefecture: '',
         city: '',
         streetAddress: '',
         buildingName: '',
-        roomNumber: '',
         phoneNumber: '',
         birthDate: '',
         joinedDate: '',
@@ -118,13 +118,13 @@ export function toEmployeeInput(
         firstName: employee.firstName,
         lastNameKana: employee.lastNameKana,
         firstNameKana: employee.firstNameKana,
+        myNumber: employee.myNumber,
         gender: employee.gender,
         postalCode: employee.postalCode,
         prefecture: employee.prefecture,
         city: employee.city,
         streetAddress: employee.streetAddress,
         buildingName: employee.buildingName,
-        roomNumber: employee.roomNumber,
         phoneNumber: employee.phoneNumber,
         birthDate: employee.birthDate,
         joinedDate: employee.joinedDate,

@@ -14,6 +14,12 @@ import {
     serverTimestamp,
 } from 'firebase/firestore';
 import { Office, OfficeCreateInput, OfficeInput } from '../models/office.model';
+import {
+    generateRandomOfficeNumber,
+    generateRandomOfficeSymbol,
+    normalizeOfficeNumber,
+    normalizeOfficeSymbol,
+} from '../utils/office-format.util';
 import { db } from '../../../core/firebase';
 
 @Injectable({ providedIn: 'root' })
@@ -29,13 +35,19 @@ export class OfficeService {
             id: docRef.id,
             companyId: officeInput.companyId,
             name: officeInput.name,
+            postalCode: officeInput.postalCode,
             prefecture: officeInput.prefecture,
-            address: officeInput.address,
+            city: officeInput.city,
+            streetAddress: officeInput.streetAddress,
+            buildingName: officeInput.buildingName,
+            phoneNumber: officeInput.phoneNumber,
             healthInsuranceType: officeInput.healthInsuranceType,
-            healthInsuranceOfficeSymbol:
-                officeInput.healthInsuranceOfficeSymbol?.trim() || assigned.healthInsuranceOfficeSymbol,
-            pensionOfficeNumber:
-                officeInput.pensionOfficeNumber?.trim() || assigned.pensionOfficeNumber,
+            officeSymbol: normalizeOfficeSymbol(
+                officeInput.officeSymbol?.trim() || assigned.officeSymbol,
+            ),
+            officeNumber: normalizeOfficeNumber(
+                officeInput.officeNumber?.trim() || assigned.officeNumber,
+            ),
             regularWeeklyScheduledWorkHours: officeInput.regularWeeklyScheduledWorkHours,
             regularMonthlyScheduledWorkHours: officeInput.regularMonthlyScheduledWorkHours,
             regularWeeklyScheduledWorkDays: officeInput.regularWeeklyScheduledWorkDays,
@@ -108,29 +120,51 @@ export class OfficeService {
     }
 
     private async assignOfficeSymbols(companyId: string): Promise<{
-        healthInsuranceOfficeSymbol: string;
-        pensionOfficeNumber: string;
+        officeSymbol: string;
+        officeNumber: string;
     }> {
         const offices = await this.getOfficesByCompanyId(companyId);
-        const next = offices.length + 1;
-        const seq = String(next).padStart(6, '0');
+        const existingSymbols = new Set(offices.map((office) => office.officeSymbol));
+        const existingNumbers = new Set(offices.map((office) => office.officeNumber));
 
-        return {
-            healthInsuranceOfficeSymbol: `HI-${seq}`,
-            pensionOfficeNumber: `PN-${seq}`,
-        };
+        let officeSymbol = generateRandomOfficeSymbol();
+        for (let attempt = 0; attempt < 50 && existingSymbols.has(officeSymbol); attempt++) {
+            officeSymbol = generateRandomOfficeSymbol();
+        }
+
+        let officeNumber = generateRandomOfficeNumber();
+        for (let attempt = 0; attempt < 50 && existingNumbers.has(officeNumber); attempt++) {
+            officeNumber = generateRandomOfficeNumber();
+        }
+
+        return { officeSymbol, officeNumber };
     }
 
     private normalizeOffice(id: string, data: Record<string, unknown>): Office {
+        const rawSymbol = String(
+            data['officeSymbol']
+                ?? data['kyokaiInsuranceSymbol']
+                ?? data['healthInsuranceOfficeSymbol']
+                ?? '',
+        );
+        const legacyAddress = String(data['address'] ?? '').trim();
+        const streetAddress = String(data['streetAddress'] ?? '').trim();
+
         return {
             id,
             companyId: String(data['companyId'] ?? ''),
             name: String(data['name'] ?? ''),
+            postalCode: String(data['postalCode'] ?? ''),
             prefecture: String(data['prefecture'] ?? ''),
-            address: String(data['address'] ?? ''),
+            city: String(data['city'] ?? ''),
+            streetAddress: streetAddress || legacyAddress,
+            buildingName: String(data['buildingName'] ?? ''),
+            phoneNumber: String(data['phoneNumber'] ?? ''),
             healthInsuranceType: (data['healthInsuranceType'] as Office['healthInsuranceType']) ?? 'kyokai',
-            healthInsuranceOfficeSymbol: String(data['healthInsuranceOfficeSymbol'] ?? ''),
-            pensionOfficeNumber: String(data['pensionOfficeNumber'] ?? ''),
+            officeSymbol: normalizeOfficeSymbol(rawSymbol),
+            officeNumber: normalizeOfficeNumber(
+                String(data['officeNumber'] ?? data['pensionOfficeNumber'] ?? ''),
+            ),
             regularWeeklyScheduledWorkHours: this.toNullableNumber(data['regularWeeklyScheduledWorkHours']),
             regularMonthlyScheduledWorkHours: this.toNullableNumber(data['regularMonthlyScheduledWorkHours']),
             regularWeeklyScheduledWorkDays: this.toNullableNumber(data['regularWeeklyScheduledWorkDays']),
@@ -147,3 +181,4 @@ export class OfficeService {
         return Number.isFinite(num) ? num : null;
     }
 }
+

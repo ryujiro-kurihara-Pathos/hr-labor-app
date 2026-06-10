@@ -9,6 +9,7 @@ import { CompanyService } from '../services/company.service';
 import { OfficeCreateModalComponent, OfficeFormData } from '../components/office-create-modal.component';
 import { OfficeService } from '../services/office.service';
 import { Office, OfficeCreateInput } from '../models/office.model';
+import { formatOfficeAddress } from '../utils/office-format.util';
 
 @Component({
     selector: 'app-company-page',
@@ -74,6 +75,10 @@ export class CompanyPageComponent {
         }
     }
 
+    formatOfficeAddress(office: Office): string {
+        return formatOfficeAddress(office);
+    }
+
     //// 事業所
     // 登録モーダル
     isOfficeModalOpen = signal<boolean>(false);
@@ -105,8 +110,12 @@ export class CompanyPageComponent {
             const office: OfficeCreateInput = {
                 companyId: company.id,
                 name: form.name,
+                postalCode: '',
                 prefecture: '',
-                address: form.address,
+                city: '',
+                streetAddress: form.address,
+                buildingName: '',
+                phoneNumber: '',
                 healthInsuranceType: form.healthInsuranceType,
                 regularWeeklyScheduledWorkHours: null,
                 regularMonthlyScheduledWorkHours: null,

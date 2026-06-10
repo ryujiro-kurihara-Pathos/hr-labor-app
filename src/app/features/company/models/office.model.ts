@@ -9,11 +9,16 @@ export type Office = {
     companyId: string;                              // 会社ID
 
     name: string;                                   // 事業所名
+    postalCode: string;                             // 郵便番号
     prefecture: string;                             // 都道府県
-    address: string;                                // 所在地
+    city: string;                                   // 市区町村
+    streetAddress: string;                          // 丁目番地
+    buildingName: string;                           // 建物名・号室
+    phoneNumber: string;                            // 電話番号
+
     healthInsuranceType: HealthInsuranceType;       // 健康保険の種類
-    healthInsuranceOfficeSymbol: string;            // 健康保険事業所記号
-    pensionOfficeNumber: string;                    // 厚生年金事業所番号
+    officeSymbol: string;                           // 事業所整理記号 例: '00-ケイト'
+    officeNumber: string;                           // 事業所番号（5桁）
 
     // 社会保険：当該事業所の通常の労働者の基準（加入要件判定用）
     regularWeeklyScheduledWorkHours: number | null; // 週の所定労働時間
@@ -32,8 +37,9 @@ export type OfficeInput = Omit<Office, 'id' | 'createdAt' | 'updatedAt'>;
 /** 事業所登録時。整理記号・事業所番号は未指定ならサービス側で自動採番する */
 export type OfficeCreateInput = Omit<
     OfficeInput,
-    'healthInsuranceOfficeSymbol' | 'pensionOfficeNumber'
+    'officeSymbol' | 'officeNumber'
 > & {
-    healthInsuranceOfficeSymbol?: string;
-    pensionOfficeNumber?: string;
+    officeSymbol?: string;
+    officeNumber?: string;
 };
+

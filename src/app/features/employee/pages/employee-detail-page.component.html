@@ -39,6 +39,18 @@
                     <input id="first-name-kana" type="text" name="firstNameKana" [(ngModel)]="firstNameKana" />
                 </div>
                 <div class="form-field">
+                    <label for="my-number">マイナンバー</label>
+                    <input
+                        id="my-number"
+                        type="text"
+                        name="myNumber"
+                        [(ngModel)]="myNumber"
+                        inputmode="numeric"
+                        autocomplete="off"
+                        placeholder="12桁（ハイフンなし）"
+                    />
+                </div>
+                <div class="form-field">
                     <label for="gender">性別</label>
                     <select id="gender" name="gender" [(ngModel)]="gender">
                         <option value="male">男性</option>
@@ -70,12 +82,8 @@
                     <input id="street-address" type="text" name="streetAddress" [(ngModel)]="streetAddress" />
                 </div>
                 <div class="form-field">
-                    <label for="building-name">建物名</label>
+                    <label for="building-name">建物名・号室</label>
                     <input id="building-name" type="text" name="buildingName" [(ngModel)]="buildingName" />
-                </div>
-                <div class="form-field">
-                    <label for="room-number">号室</label>
-                    <input id="room-number" type="text" name="roomNumber" [(ngModel)]="roomNumber" />
                 </div>
                 <div class="form-field">
                     <label for="birth-date">生年月日</label>
@@ -102,6 +110,10 @@
                     <div class="detail-row">
                         <dt>氏名（カナ）</dt>
                         <dd>{{ employee()!.lastNameKana || '—' }} {{ employee()!.firstNameKana || '—' }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>マイナンバー</dt>
+                        <dd>{{ employee()!.myNumber || '—' }}</dd>
                     </div>
                     <div class="detail-row">
                         <dt>性別</dt>

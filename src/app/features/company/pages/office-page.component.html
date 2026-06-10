@@ -27,13 +27,34 @@
                 </div>
 
                 <div class="form-field">
-                    <label for="office-address">所在地</label>
+                    <label for="postal-code">郵便番号</label>
                     <input
-                        id="office-address"
+                        id="postal-code"
                         type="text"
-                        name="address"
-                        [(ngModel)]="address"
+                        name="postalCode"
+                        [(ngModel)]="postalCode"
+                        placeholder="例: 1000001"
                     />
+                </div>
+                <div class="form-field">
+                    <label for="prefecture">都道府県</label>
+                    <input id="prefecture" type="text" name="prefecture" [(ngModel)]="prefecture" />
+                </div>
+                <div class="form-field">
+                    <label for="city">市区町村</label>
+                    <input id="city" type="text" name="city" [(ngModel)]="city" />
+                </div>
+                <div class="form-field">
+                    <label for="street-address">丁目番地</label>
+                    <input id="street-address" type="text" name="streetAddress" [(ngModel)]="streetAddress" />
+                </div>
+                <div class="form-field">
+                    <label for="building-name">建物名・号室</label>
+                    <input id="building-name" type="text" name="buildingName" [(ngModel)]="buildingName" />
+                </div>
+                <div class="form-field">
+                    <label for="phone-number">電話番号</label>
+                    <input id="phone-number" type="text" name="phoneNumber" [(ngModel)]="phoneNumber" />
                 </div>
 
                 <div class="form-field">
@@ -50,26 +71,29 @@
 
                 <h2 class="section-title">社会保険番号</h2>
                 <p class="section-note">
-                    登録時にアプリ管理用の番号が自動で割り当てられます。日本年金機構等から正式な番号が届いた場合は、ここで上書きしてください。
+                    納入告知書の形式どおり「事業所整理記号（2桁-カタカナ1～4桁）」「事業所番号（5桁）」で入力してください。未入力の場合は仮番号がランダムで自動割り当てされます。
                 </p>
                 <div class="form-field">
-                    <label for="health-insurance-office-symbol">事業所整理記号（管理用）</label>
+                    <label for="health-insurance-office-symbol">事業所整理記号</label>
                     <input
                         id="health-insurance-office-symbol"
                         type="text"
-                        name="healthInsuranceOfficeSymbol"
-                        [(ngModel)]="healthInsuranceOfficeSymbol"
-                        placeholder="例: HI-000001"
+                        name="officeSymbol"
+                        [(ngModel)]="officeSymbol"
+                        placeholder="例: 00-ケイト"
+                        maxlength="7"
                     />
                 </div>
                 <div class="form-field">
-                    <label for="pension-office-number">事業所番号（管理用）</label>
+                    <label for="pension-office-number">事業所番号</label>
                     <input
                         id="pension-office-number"
                         type="text"
-                        name="pensionOfficeNumber"
-                        [(ngModel)]="pensionOfficeNumber"
-                        placeholder="例: PN-000001"
+                        name="officeNumber"
+                        [(ngModel)]="officeNumber"
+                        inputmode="numeric"
+                        placeholder="例: 12345"
+                        maxlength="5"
                     />
                 </div>
 
@@ -153,7 +177,11 @@
                     </div>
                     <div class="detail-row">
                         <dt>所在地</dt>
-                        <dd>{{ office()!.address }}</dd>
+                        <dd>{{ formatAddress(office()!) }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>電話番号</dt>
+                        <dd>{{ displayValue(office()!.phoneNumber) }}</dd>
                     </div>
                     <div class="detail-row">
                         <dt>健康保険の種類</dt>
@@ -162,17 +190,14 @@
                 </dl>
 
                 <h2 class="section-title">社会保険番号</h2>
-                <p class="section-note">
-                    アプリ管理用の番号です。正式な届出番号は通知後に編集画面から上書きできます。
-                </p>
                 <dl class="detail-list">
                     <div class="detail-row">
-                        <dt>事業所整理記号（管理用）</dt>
-                        <dd>{{ displayValue(office()!.healthInsuranceOfficeSymbol) }}</dd>
+                        <dt>事業所整理記号</dt>
+                        <dd>{{ displayValue(office()!.officeSymbol) }}</dd>
                     </div>
                     <div class="detail-row">
-                        <dt>事業所番号（管理用）</dt>
-                        <dd>{{ displayValue(office()!.pensionOfficeNumber) }}</dd>
+                        <dt>事業所番号</dt>
+                        <dd>{{ displayValue(office()!.officeNumber) }}</dd>
                     </div>
                 </dl>
 

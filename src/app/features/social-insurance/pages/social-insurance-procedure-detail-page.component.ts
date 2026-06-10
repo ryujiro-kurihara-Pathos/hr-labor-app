@@ -3,15 +3,20 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { SocialInsuranceProcedureService } from '../services/social-insurance-procedure.service';
 import { EmployeeService } from '../../employee/services/employee.service';
+import { OfficeService } from '../../company/services/office.service';
+import { CompanyService } from '../../company/services/company.service';
 
-import { Procedure, ProcedureInput, ProcedureStatus, ProcedureType } from '../models/procedures.model';
+import { Procedure } from '../models/procedures.model';
 import { Employee } from '../../employee/models/employee.models';
-import { serverTimestamp, Timestamp } from 'firebase/firestore';
+import { Office } from '../../company/models/office.model';
+import { Company } from '../../company/models/company.model';
+
+import { QualificationProcedureComponent } from './qualification-procedure.component';
 
 @Component({
     selector: 'app-social-insurance-procedure-detail-page',
     standalone: true,
-    imports: [RouterLink],
+    imports: [RouterLink, QualificationProcedureComponent],
     templateUrl: './social-insurance-procedure-detail-page.component.html',
 })
 
@@ -19,41 +24,43 @@ export class SocialInsuranceProcedureDetailPageComponent {
     private readonly route = inject(ActivatedRoute);
     private readonly procedureService = inject(SocialInsuranceProcedureService);
     private readonly employeeService = inject(EmployeeService);
+    private readonly officeService = inject(OfficeService);
+    private readonly companyService = inject(CompanyService);
 
-    // 手続き情報
     procedure = signal<Procedure | null>(null);
-    procedureId = signal<string | null>(null);
     employee = signal<Employee | null>(null);
-    employeeId = signal<string | null>(null);
+    office = signal<Office | null>(null);
+    company = signal<Company | null>(null);
 
-    // ローディング
     isLoading = signal<boolean>(false);
     errorMessage = signal<string>('');
 
-    async ngOnInit() {
+    async ngOnInit(): Promise<void> {
         this.isLoading.set(true);
         this.errorMessage.set('');
 
         const procedureId = this.route.snapshot.params['procedureId'] ?? '';
-        this.procedureId.set(procedureId);
-
         if (!procedureId) {
             this.errorMessage.set('手続きが見つかりませんでした');
+            this.isLoading.set(false);
             return;
         }
 
-        await this.loadProcedure();
+        await this.loadProcedure(procedureId);
+        if (!this.procedure()) {
+            this.isLoading.set(false);
+            return;
+        }
+
         await this.loadEmployee();
+        await this.loadOffice();
+        await this.loadCompany();
 
         this.isLoading.set(false);
     }
 
-    // 手続きの読み込み
-    async loadProcedure(): Promise<void> {
+    private async loadProcedure(procedureId: string): Promise<void> {
         this.procedure.set(null);
-
-        const procedureId = this.procedureId();
-        if(!procedureId) return;
 
         try {
             const procedure = await this.procedureService.getProcedureById(procedureId);
@@ -61,23 +68,18 @@ export class SocialInsuranceProcedureDetailPageComponent {
 
             if (!procedure) {
                 this.errorMessage.set('手続きが見つかりませんでした');
-                return;
             }
-
-            this.employeeId.set(procedure.employeeId);
         } catch (error) {
             console.error('手続きの取得に失敗しました', error);
             this.errorMessage.set('手続きの取得に失敗しました');
-            this.isLoading.set(false);
         }
     }
 
-    // 従業員の読み込み
-    async loadEmployee(): Promise<void> {
+    private async loadEmployee(): Promise<void> {
         this.employee.set(null);
 
-        const employeeId = this.employeeId();
-        if(!employeeId) return;
+        const employeeId = this.procedure()?.employeeId;
+        if (!employeeId) return;
 
         try {
             const employee = await this.employeeService.getEmployeeById(employeeId);
@@ -85,83 +87,38 @@ export class SocialInsuranceProcedureDetailPageComponent {
         } catch (error) {
             console.error('従業員の取得に失敗しました', error);
             this.errorMessage.set('従業員の取得に失敗しました');
-            this.isLoading.set(false);
         }
     }
 
-    // 手続きを登録する
-    async onCreateProcedure(type: ProcedureType) {
-        const input: ProcedureInput = {
-            companyId: '',
-            employeeId: null,
-            procedureType: type,
-            status: 'inProgress',
-            occurredDate: '',
-            dueDate: '',
-            completedDate: null,
-            targetYearMonth: null,
-            memo: '',
-        };
-        try {
-            await this.procedureService.createProcedure(input);
-            console.log('手続きの登録に成功しました。');
-        } catch (error) {
-            console.error('手続きの登録に失敗しました。', error);
-            this.errorMessage.set('手続きの登録に失敗しました。');
-        } finally {
-            this.isLoading.set(false);
-        }
-    }
+    private async loadOffice(): Promise<void> {
+        this.office.set(null);
 
-    // 手続きを提出する
-    async submitProcedure(): Promise<void> {
         const procedure = this.procedure();
-        if(!procedure) return;
-
-        const newProcedure: Procedure = {
-            id: procedure.id,
-            companyId: procedure.companyId,
-            employeeId: procedure.employeeId,
-            procedureType: procedure.procedureType,
-            status: 'completed',
-            occurredDate: procedure.occurredDate,
-            dueDate: procedure.dueDate,
-            completedDate: new Date().toISOString(),
-            targetYearMonth: procedure.targetYearMonth,
-            memo: procedure.memo,
-            createdAt: procedure.createdAt,
-            updatedAt: serverTimestamp() as Timestamp,
-        };
+        const employee = this.employee();
+        const officeId = procedure?.officeId || employee?.officeId;
+        if (!officeId) return;
 
         try {
-            await this.procedureService.updateProcedure(newProcedure);
-            this.procedure.set(newProcedure);
-            console.log('手続きの提出に成功しました。');
+            const office = await this.officeService.getOfficeById(officeId);
+            this.office.set(office);
         } catch (error) {
-            console.error('手続きの提出に失敗しました。', error);
-            this.errorMessage.set('手続きの提出に失敗しました。');
+            console.error('事業所の取得に失敗しました', error);
+            this.errorMessage.set('事業所の取得に失敗しました');
         }
     }
 
-    procedureTypeLabel(type: ProcedureType): string {
-        const labels: Record<ProcedureType, string> = {
-            qualification: '資格取得',
-            loss: '資格喪失',
-            dependentChange: '扶養変更',
-            regularDecision: '算定基礎届',
-            revision: '月額変更届',
-            bonusPayment: '賞与支払届',
-            premiumPayment: '保険料納付',
-        };
-        return labels[type];
-    }
+    private async loadCompany(): Promise<void> {
+        this.company.set(null);
 
-    statusLabel(status: ProcedureStatus): string {
-        const labels: Record<ProcedureStatus, string> = {
-            notStarted: '未対応',
-            inProgress: '対応中',
-            completed: '完了',
-        };
-        return labels[status];
+        const companyId = this.employee()?.companyId;
+        if (!companyId) return;
+
+        try {
+            const company = await this.companyService.getCompanyById(companyId);
+            this.company.set(company);
+        } catch (error) {
+            console.error('会社の取得に失敗しました', error);
+            this.errorMessage.set('会社の取得に失敗しました');
+        }
     }
 }

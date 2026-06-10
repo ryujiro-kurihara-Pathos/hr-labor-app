@@ -56,10 +56,10 @@
     </div>
 
     <p>姓</p>
-    <input type="text" name="lastName" [(ngModel)]="employee.lastName">
+    <input type="text" name="lastName" [(ngModel)]="employee.lastName" placeholder="例：山田">
 
     <p>名</p>
-    <input type="text" name="firstName" [(ngModel)]="employee.firstName">
+    <input type="text" name="firstName" [(ngModel)]="employee.firstName" placeholder="例：太郎">
 
     <div class="form-row">
         <div class="form-row-label">
@@ -109,6 +109,38 @@
             <span class="date-unit">日</span>
         </div>
         <input type="hidden" name="birthDate" [(ngModel)]="employee.birthDate" />
+    </div>
+
+    <div class="form-row">
+        <div class="form-row-label">
+            <label for="my-number">マイナンバー</label>
+            <span class="required-badge">必須</span>
+        </div>
+        <input type="text" name="myNumber" [(ngModel)]="employee.myNumber" disabled>
+        <p>※このアプリでは仮のマイナンバーは自動生成されます。</p>
+    </div>
+
+    <div>
+        <p>住所</p>
+        <p>〒</p>
+        <input type="text" name="postalCode" [(ngModel)]="employee.postalCode" placeholder="例：1000001">
+        <button>検索</button>
+
+        <p>都道府県</p>
+        <select name="prefecture" [(ngModel)]="employee.prefecture">
+            @for (prefecture of prefectures; track prefecture) {
+                <option [value]="prefecture">{{ prefecture }}</option>
+            }
+        </select>
+
+        <p>市区町村</p>
+        <input type="text" name="city" [(ngModel)]="employee.city" placeholder="例：千代田区">
+
+        <p>丁目番地</p>
+        <input type="text" name="streetAddress" [(ngModel)]="employee.streetAddress" placeholder="例：永田町1-7-1">
+
+        <p>建物名・号室</p>
+        <input type="text" name="buildingName" [(ngModel)]="employee.buildingName" placeholder="例：永田町ビル101号室">
     </div>
 
     <p>事業所</p>

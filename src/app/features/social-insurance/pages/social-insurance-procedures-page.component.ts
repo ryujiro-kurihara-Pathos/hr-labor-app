@@ -65,4 +65,26 @@ export class SocialInsuranceProceduresPageComponent {
         };
         return labels[status];
     }
+
+    // 手続きの作成
+    async createProcedure(procedureType: ProcedureType) {
+        const procedureInput: ProcedureInput = {
+            companyId: 'EF7Dtp9JYQwby3eqD2qh',
+            officeId: 'n8ufJE71qFq51Kgf62Tj',
+            employeeId: 'KpFpz33VMOAlIqFU1aeh',
+            procedureType: procedureType,
+            status: 'notStarted',
+            occurredDate: '',
+            dueDate: '',
+            completedDate: null,
+            targetYearMonth: null,
+            memo: '',
+        }
+        try {
+            
+        } catch (error) {
+            console.error('手続きの作成に失敗しました', error);
+            this.errorMessage.set('手続きの作成に失敗しました');
+        }
+    }
 }

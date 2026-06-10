@@ -60,13 +60,13 @@ export class EmployeeDetailPageComponent {
     firstName = '';
     lastNameKana = '';
     firstNameKana = '';
+    myNumber = '';
     gender: Employee['gender'] = 'male';
     postalCode = '';
     prefecture = '';
     city = '';
     streetAddress = '';
     buildingName = '';
-    roomNumber = '';
     phoneNumber = '';
     employeeNumber = '';
     birthDate = '';
@@ -204,6 +204,7 @@ export class EmployeeDetailPageComponent {
         try {
             const procedure = await this.procedureService.createProcedure({
                 companyId: employee.companyId,
+                officeId: employee.officeId,
                 employeeId: employee.id,
                 procedureType: 'qualification',
                 status: 'notStarted',
@@ -260,13 +261,13 @@ export class EmployeeDetailPageComponent {
             firstName: this.firstName,
             lastNameKana: this.lastNameKana,
             firstNameKana: this.firstNameKana,
+            myNumber: this.myNumber,
             gender: this.gender,
             postalCode: this.postalCode,
             prefecture: this.prefecture,
             city: this.city,
             streetAddress: this.streetAddress,
             buildingName: this.buildingName,
-            roomNumber: this.roomNumber,
             phoneNumber: this.phoneNumber,
             birthDate: this.birthDate,
             joinedDate: this.joinedDate,
@@ -340,7 +341,6 @@ export class EmployeeDetailPageComponent {
             employee.city,
             employee.streetAddress,
             employee.buildingName,
-            employee.roomNumber,
         ].filter((part) => part.trim());
         return parts.length > 0 ? parts.join(' ') : '—';
     }
@@ -580,13 +580,13 @@ export class EmployeeDetailPageComponent {
         this.firstName = employee.firstName;
         this.lastNameKana = employee.lastNameKana;
         this.firstNameKana = employee.firstNameKana;
+        this.myNumber = employee.myNumber;
         this.gender = employee.gender;
         this.postalCode = employee.postalCode;
         this.prefecture = employee.prefecture;
         this.city = employee.city;
         this.streetAddress = employee.streetAddress;
         this.buildingName = employee.buildingName;
-        this.roomNumber = employee.roomNumber;
         this.phoneNumber = employee.phoneNumber;
         this.employeeNumber = employee.employeeNumber;
         this.birthDate = employee.birthDate;

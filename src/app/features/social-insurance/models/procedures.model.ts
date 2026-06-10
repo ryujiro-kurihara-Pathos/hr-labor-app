@@ -18,6 +18,7 @@ export type Procedure = {
     id: string;                         // FirestoreドキュメントID
 
     companyId: string;                  // 会社ID
+    officeId: string;                   // 事業所ID
 
     /**
      * 従業員に紐づく手続きの場合は employeeId を入れる。

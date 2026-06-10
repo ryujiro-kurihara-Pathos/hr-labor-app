@@ -4,6 +4,11 @@ import { ActivatedRoute, Router } from '@angular/router';
 
 import { HealthInsuranceType, Office } from '../models/office.model';
 import { OfficeService } from '../services/office.service';
+import {
+    formatOfficeAddress,
+    normalizeOfficeNumber,
+    normalizeOfficeSymbol,
+} from '../utils/office-format.util';
 
 @Component({
     selector: 'app-office-page',
@@ -26,10 +31,15 @@ export class OfficePageComponent {
     errorMessage = signal<string>('');
 
     name = '';
-    address = '';
+    postalCode = '';
+    prefecture = '';
+    city = '';
+    streetAddress = '';
+    buildingName = '';
+    phoneNumber = '';
     healthInsuranceType: HealthInsuranceType = 'kyokai';
-    healthInsuranceOfficeSymbol = '';
-    pensionOfficeNumber = '';
+    officeSymbol = '';
+    officeNumber = '';
     regularWeeklyScheduledWorkHours = '';
     regularMonthlyScheduledWorkHours = '';
     regularWeeklyScheduledWorkDays = '';
@@ -78,6 +88,10 @@ export class OfficePageComponent {
         return value.trim() ? value : '—';
     }
 
+    formatAddress(office: Office): string {
+        return formatOfficeAddress(office);
+    }
+
     displayNumber(value: number | null | undefined): string {
         return value !== null && value !== undefined ? String(value) : '—';
     }
@@ -116,14 +130,20 @@ export class OfficePageComponent {
             const regularWeeklyScheduledWorkDays = this.toNullableNumber(this.regularWeeklyScheduledWorkDays);
             const regularMonthlyScheduledWorkDays = this.toNullableNumber(this.regularMonthlyScheduledWorkDays);
 
+            const officeSymbol = normalizeOfficeSymbol(this.officeSymbol);
+
             await this.officeService.updateOffice(office.id, {
                 companyId: office.companyId,
                 name: this.name,
-                prefecture: office.prefecture,
-                address: this.address,
+                postalCode: this.postalCode,
+                prefecture: this.prefecture,
+                city: this.city,
+                streetAddress: this.streetAddress,
+                buildingName: this.buildingName,
+                phoneNumber: this.phoneNumber,
                 healthInsuranceType: this.healthInsuranceType,
-                healthInsuranceOfficeSymbol: this.healthInsuranceOfficeSymbol.trim(),
-                pensionOfficeNumber: this.pensionOfficeNumber.trim(),
+                officeSymbol,
+                officeNumber: normalizeOfficeNumber(this.officeNumber),
                 regularWeeklyScheduledWorkHours,
                 regularMonthlyScheduledWorkHours,
                 regularWeeklyScheduledWorkDays,
@@ -133,10 +153,15 @@ export class OfficePageComponent {
             this.office.set({
                 ...office,
                 name: this.name,
-                address: this.address,
+                postalCode: this.postalCode,
+                prefecture: this.prefecture,
+                city: this.city,
+                streetAddress: this.streetAddress,
+                buildingName: this.buildingName,
+                phoneNumber: this.phoneNumber,
                 healthInsuranceType: this.healthInsuranceType,
-                healthInsuranceOfficeSymbol: this.healthInsuranceOfficeSymbol.trim(),
-                pensionOfficeNumber: this.pensionOfficeNumber.trim(),
+                officeSymbol,
+                officeNumber: normalizeOfficeNumber(this.officeNumber),
                 regularWeeklyScheduledWorkHours,
                 regularMonthlyScheduledWorkHours,
                 regularWeeklyScheduledWorkDays,
@@ -213,10 +238,15 @@ export class OfficePageComponent {
 
     private syncFormFromOffice(office: Office): void {
         this.name = office.name;
-        this.address = office.address;
+        this.postalCode = office.postalCode;
+        this.prefecture = office.prefecture;
+        this.city = office.city;
+        this.streetAddress = office.streetAddress;
+        this.buildingName = office.buildingName;
+        this.phoneNumber = office.phoneNumber;
         this.healthInsuranceType = office.healthInsuranceType;
-        this.healthInsuranceOfficeSymbol = office.healthInsuranceOfficeSymbol;
-        this.pensionOfficeNumber = office.pensionOfficeNumber;
+        this.officeSymbol = office.officeSymbol;
+        this.officeNumber = office.officeNumber;
         this.regularWeeklyScheduledWorkHours = this.numberToFormValue(office.regularWeeklyScheduledWorkHours);
         this.regularMonthlyScheduledWorkHours = this.numberToFormValue(office.regularMonthlyScheduledWorkHours);
         this.regularWeeklyScheduledWorkDays = this.numberToFormValue(office.regularWeeklyScheduledWorkDays);
