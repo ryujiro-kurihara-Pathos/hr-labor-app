@@ -18,10 +18,9 @@
 
     <div class="title">
         <div class="title-sub">
-          <span>健康保険</span>
-          <span>厚生年金保険</span>
+            <span>健康保険</span>
+            <span>厚生年金保険</span>
         </div>
-      
         <div class="title-main">被保険者資格取得届</div>
     </div>
 
@@ -42,59 +41,113 @@
         <div class="office-code-group">
             <span class="office-code-label">事業所番号</span>
             <div class="office-code-boxes" aria-label="事業所番号">
-                <p>{{ office()?.officeNumber || '—' }}</p>
+                <p>{{ office().officeNumber || '—' }}</p>
             </div>
         </div>
     </div>
 
-    <p>事業所所在地</p>
-    <p>〒{{ office()?.postalCode }} {{ office()?.prefecture }} {{ office()?.city }} {{ office()?.streetAddress }} {{ office()?.buildingName }}</p>
-
-    <p>事業所名称</p>
-    <p>{{ company()?.name }} {{ office()?.name }}</p>
-
-    <p>事業主氏名</p>
-    <p>{{ company()?.representativeName }}</p>
-
-    <p>電話番号</p>
-    <p>{{ office()?.phoneNumber || '—' }}</p>
+    <dl class="detail-meta office-meta">
+        <div class="meta-row">
+            <dt>事業所名称</dt>
+            <dd>{{ company().name }} {{ office().name }}</dd>
+        </div>
+        <div class="meta-row">
+            <dt>事業所所在地</dt>
+            <dd>〒{{ office().postalCode }} {{ office().prefecture }}{{ office().city }}{{ office().streetAddress }} {{ office().buildingName }}</dd>
+        </div>
+        <div class="meta-row">
+            <dt>事業主氏名</dt>
+            <dd>{{ company().representativeName || '—' }}</dd>
+        </div>
+        <div class="meta-row">
+            <dt>電話番号</dt>
+            <dd>{{ office().phoneNumber || '—' }}</dd>
+        </div>
+    </dl>
 
     <h2 class="section-title">被保険者情報</h2>
     <dl class="detail-meta">
         <div class="meta-row">
-            <dt>氏名</dt>
-            <dd>{{ employee()?.lastName }} {{ employee()?.firstName }}</dd>
+            <dt>被保険者氏名</dt>
+            <dd>{{ employee().lastName }} {{ employee().firstName }}</dd>
         </div>
         <div class="meta-row">
-            <dt>氏名（カナ）</dt>
-            <dd>{{ employee()?.lastNameKana }} {{ employee()?.firstNameKana }}</dd>
+            <dt>フリガナ</dt>
+            <dd>{{ employee().lastNameKana || '—' }} {{ employee().firstNameKana || '—' }}</dd>
         </div>
         <div class="meta-row">
             <dt>生年月日</dt>
-            <dd>{{ dateLabel(employee()?.birthDate) }}</dd>
+            <dd>{{ dateLabel(employee().birthDate) }}</dd>
         </div>
         <div class="meta-row">
-            <dt>性別</dt>
-            <dd>{{ genderLabel(employee()?.gender) }}</dd>
+            <dt>個人番号または基礎年金番号</dt>
+            <dd>{{ employee().myNumber || '—' }}</dd>
         </div>
         <div class="meta-row">
-            <dt>個人番号</dt>
-            <dd>{{ employee()?.myNumber || '—' }}</dd>
+            <dt>住所</dt>
+            <dd>{{ employeeAddressLabel(employee()) }}</dd>
         </div>
         <div class="meta-row">
-            <dt>取得日</dt>
-            <dd>{{ dateLabel(employee()?.joinedDate) }}</dd>
+            <dt>資格取得日</dt>
+            <dd>{{ dateLabel(qualificationDate()) }}</dd>
         </div>
         <div class="meta-row">
-            <dt>被扶養者</dt>
-            <dd>無or有</dd>
+            <dt>取得理由</dt>
+            <dd>—</dd>
         </div>
+        @if (monthlyReward(); as reward) {
+            <div class="meta-row">
+                <dt>対象年月</dt>
+                <dd>{{ reward.targetYearMonth }}（入社月）</dd>
+            </div>
+            @if (reward.isMidMonthJoin) {
+                <div class="meta-row note-row">
+                    <dt></dt>
+                    <dd class="field-note">途中入社のため、1か月分として計算した報酬月額を表示しています。</dd>
+                </div>
+            }
+            <div class="meta-row">
+                <dt>通貨による報酬</dt>
+                <dd>{{ formatYen(reward.cashAmount) }}</dd>
+            </div>
+            <div class="meta-row">
+                <dt>現物による報酬</dt>
+                <dd>{{ formatYen(reward.inKindAmount) }}</dd>
+            </div>
+            <div class="meta-row">
+                <dt>報酬月額合計</dt>
+                <dd>{{ formatYen(reward.totalAmount) }}</dd>
+            </div>
+        } @else {
+            <div class="meta-row">
+                <dt>通貨による報酬</dt>
+                <dd>—</dd>
+            </div>
+            <div class="meta-row">
+                <dt>現物による報酬</dt>
+                <dd>—</dd>
+            </div>
+            <div class="meta-row">
+                <dt>報酬月額合計</dt>
+                <dd>—</dd>
+            </div>
+            <div class="meta-row note-row">
+                <dt></dt>
+                <dd class="field-note">入社月の報酬月額が未登録です。保険料計算画面で登録してください。</dd>
+            </div>
+        }
         <div class="meta-row">
-            <dt>報酬月額</dt>
-            <dd>円</dd>
+            <dt>扶養の有無</dt>
+            <dd>{{ hasDependents() ? '有' : '無' }}</dd>
         </div>
     </dl>
-    <button>エクスポート</button>
+
+    @if (item.memo) {
+        <h2 class="section-title">メモ</h2>
+        <p class="memo-text">{{ item.memo }}</p>
+    }
+
+    <button type="button" class="btn export-btn">エクスポート</button>
 </section>
 
 <style>
@@ -121,10 +174,7 @@
         gap: 10px;
     }
 
-    h1 {
-        margin: 0;
-        font-size: 22px;
-    }
+    h1 { margin: 0; font-size: 22px; }
 
     .status-badge {
         display: inline-flex;
@@ -135,23 +185,11 @@
         font-weight: 700;
     }
 
-    .status-badge.not-started {
-        background: #f3f4f6;
-        color: #4b5563;
-    }
-
-    .status-badge.in-progress {
-        background: #fef3c7;
-        color: #92400e;
-    }
-
-    .status-badge.completed {
-        background: #dcfce7;
-        color: #166534;
-    }
+    .status-badge.not-started { background: #f3f4f6; color: #4b5563; }
+    .status-badge.in-progress { background: #fef3c7; color: #92400e; }
+    .status-badge.completed { background: #dcfce7; color: #166534; }
 
     .btn {
-        flex-shrink: 0;
         height: 42px;
         padding: 0 16px;
         border: none;
@@ -161,15 +199,14 @@
         cursor: pointer;
     }
 
-    .edit-btn {
-        background: #e5e7eb;
-        color: #333;
-    }
+    .edit-btn { background: #e5e7eb; color: #333; }
+    .export-btn { margin-top: 20px; background: #2563eb; color: #fff; }
 
     .title {
         display: flex;
         align-items: center;
         gap: 14px;
+        margin: 16px 0;
         color: #222;
         font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif;
     }
@@ -193,14 +230,7 @@
         white-space: nowrap;
     }
 
-    .section-title {
-        margin: 24px 0 12px;
-        font-size: 17px;
-    }
-
-    .section-title:first-of-type {
-        margin-top: 0;
-    }
+    .section-title { margin: 24px 0 12px; font-size: 17px; }
 
     .office-code-panel {
         display: flex;
@@ -213,24 +243,10 @@
         border-radius: 8px;
     }
 
-    .office-code-group {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-
-    .office-code-label {
-        font-size: 13px;
-        font-weight: 600;
-        color: #374151;
-        white-space: nowrap;
-    }
-
-    .office-code-boxes {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-    }
+    .office-code-group { display: flex; flex-direction: column; gap: 8px; }
+    .office-code-label { font-size: 13px; font-weight: 600; color: #374151; }
+    .office-code-boxes { display: flex; align-items: center; gap: 4px; }
+    .office-code-boxes p { margin: 0; font-size: 18px; font-weight: 600; color: #111827; }
 
     .code-box {
         display: inline-flex;
@@ -244,56 +260,27 @@
         font-size: 18px;
         font-weight: 600;
         color: #111827;
-        line-height: 1;
     }
 
-    .code-box-kana {
-        width: 32px;
-        font-size: 16px;
-    }
+    .code-box-kana { width: 32px; font-size: 16px; }
+    .code-separator { margin: 0 2px; font-size: 20px; font-weight: 700; color: #6b7280; }
 
-    .code-separator {
-        margin: 0 2px;
-        font-size: 20px;
-        font-weight: 700;
-        color: #6b7280;
-        line-height: 1;
-    }
+    .detail-meta { margin: 0; display: grid; gap: 10px; }
+    .office-meta { margin-top: 12px; }
 
-    .detail-meta {
-        margin: 0;
-        display: grid;
-        gap: 10px;
-    }
-
-    .meta-row {
-        display: flex;
-        gap: 12px;
-        font-size: 14px;
-    }
-
+    .meta-row { display: flex; gap: 12px; font-size: 14px; }
     .meta-row dt {
         flex-shrink: 0;
-        min-width: 7.5em;
+        min-width: 11em;
         margin: 0;
         color: #6b7280;
         font-weight: 500;
-        white-space: nowrap;
     }
+    .meta-row dd { margin: 0; color: #111827; word-break: break-all; }
 
-    .meta-row dd {
-        margin: 0;
-        color: #111827;
-        word-break: break-all;
-    }
-
-    .employee-link {
-        color: #2563eb;
-        text-decoration: none;
-    }
-
-    .employee-link:hover {
-        text-decoration: underline;
+    .note-row dd.field-note {
+        color: #6b7280;
+        font-size: 13px;
     }
 
     .memo-text {
@@ -304,8 +291,6 @@
         border-radius: 8px;
         font-size: 14px;
         line-height: 1.6;
-        color: #111827;
         white-space: pre-wrap;
-        word-break: break-word;
     }
 </style>

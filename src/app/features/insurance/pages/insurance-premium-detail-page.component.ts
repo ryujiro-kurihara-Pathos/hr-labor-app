@@ -47,6 +47,12 @@ import { KYOKAI_HEALTH_INSURANCE_RATE_FILES } from '../../insurance-rate/data/in
 import { insuranceJoinStatus } from '../../social-insurance/models/social-insurance-status.model';
 import { BonusReward } from '../../bonus/models/bonus-reward.model';
 import { BonusRewardService } from '../../bonus/services/bonus-reward.service';
+import {
+    bonusesForStandardBonusPremium,
+    effectiveMonthlyRewardFromBase,
+    shouldTreatBonusAsMonthlyRemuneration,
+    sumBonusAmountInMonth,
+} from '../utils/effective-monthly-reward.util';
 import { roundInsurancePremium } from '../utils/insurance-premium-rounding.util';
 
 type MonthRewardStatus = 'loading' | 'registered' | 'unregistered' | 'excluded';
@@ -92,6 +98,7 @@ export class InsurancePremiumDetailPageComponent {
     };
 
     // 賞与
+    employeeBonuses = signal<BonusReward[]>([]);
     monthBonuses = signal<BonusReward[]>([]);
     isBonusFormVisible = signal(false);
     bonusForm = {
@@ -135,7 +142,34 @@ export class InsurancePremiumDetailPageComponent {
             this.employeeRewards(),
             yearMonth,
             this.healthInsuranceStartDate(),
+            this.employeeBonuses(),
         );
+    });
+
+    /** 対象月の暦年で賞与が年4回以上の場合、報酬月額に算入する */
+    treatBonusAsMonthlyRemuneration = computed(() => {
+        const yearMonth = this.targetYearMonth();
+        if (!yearMonth) return false;
+        return shouldTreatBonusAsMonthlyRemuneration(this.employeeBonuses(), yearMonth);
+    });
+
+    /** 標準賞与額・賞与保険料の対象（年4回以上の場合は除外） */
+    bonusesForPremium = computed(() => {
+        const yearMonth = this.targetYearMonth();
+        if (!yearMonth) return [];
+        return bonusesForStandardBonusPremium(
+            this.monthBonuses(),
+            yearMonth,
+            this.employeeBonuses(),
+        );
+    });
+
+    /** 報酬月額に算入した賞与額（対象月） */
+    includedBonusInMonth = computed(() => {
+        if (!this.treatBonusAsMonthlyRemuneration()) return 0;
+        const yearMonth = this.targetYearMonth();
+        if (!yearMonth) return 0;
+        return sumBonusAmountInMonth(this.employeeBonuses(), yearMonth);
     });
 
     // 月次報酬のステータス
@@ -169,8 +203,13 @@ export class InsurancePremiumDetailPageComponent {
         const saved = this.standardReward();
         // if (saved) return this.sumRewardFields(saved);
 
-        // フォームの合計を取得
-        const monthlyReward = this.getMonthlyReward();
+        // フォームの合計を取得（年4回以上の賞与を含む）
+        const yearMonth = targetYearMonth;
+        const monthlyReward = effectiveMonthlyRewardFromBase(
+            this.getMonthlyReward(),
+            yearMonth,
+            this.employeeBonuses(),
+        );
 
         // 在籍日数を取得
         const paymentBaseDays = this.paymentBaseDays();
@@ -260,6 +299,7 @@ export class InsurancePremiumDetailPageComponent {
             qualificationDate,
             this.employeeRewards(),
             (monthlyReward) => this.calculator.calculate(monthlyReward),
+            this.employeeBonuses(),
         );
 
         if (!result.eligible) {
@@ -898,6 +938,7 @@ export class InsurancePremiumDetailPageComponent {
                 employee.companyId,
                 employeeId,
             );
+            this.employeeBonuses.set(all);
             const filtered = all
                 .filter((bonus) => bonus.targetYearMonth === targetYearMonth)
                 .sort((a, b) => a.paymentDate.localeCompare(b.paymentDate));

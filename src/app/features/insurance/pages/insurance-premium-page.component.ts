@@ -10,6 +10,8 @@ import { UserService } from '../../users/services/user.service';
 import { OfficeService } from '../../company/services/office.service';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 import { EffectiveStandardRemuneration } from '../models/standard-remuneration-determination.model';
+import { BonusReward } from '../../bonus/models/bonus-reward.model';
+import { BonusRewardService } from '../../bonus/services/bonus-reward.service';
 import { StandardMonthlyRewardService } from '../services/standard-monthly-reward.service';
 import { StandardRemunerationDeterminationService } from '../services/standard-remuneration-determination.service';
 import { SocialInsuranceStatusService } from '../../social-insurance/services/social-insurance-status.service';
@@ -37,6 +39,7 @@ export class InsurancePremiumPageComponent {
     private readonly userService = inject(UserService);
     private readonly rewardService = inject(StandardMonthlyRewardService);
     private readonly determinationService = inject(StandardRemunerationDeterminationService);
+    private readonly bonusRewardService = inject(BonusRewardService);
     private readonly socialInsuranceStatusService = inject(SocialInsuranceStatusService);
 
     isLoading = signal(false);
@@ -45,6 +48,7 @@ export class InsurancePremiumPageComponent {
     employees = signal<Employee[]>([]);
     officeNameById = signal<Record<string, string>>({});
     rewardsByEmployeeId = signal<Record<string, Record<string, StandardMonthlyReward>>>({});
+    bonusesByEmployeeId = signal<Record<string, BonusReward[]>>({});
     healthInsuranceStartDateByEmployeeId = signal<Record<string, string | null>>({});
 
     targetYearMonth = signal(this.currentYearMonth());
@@ -111,22 +115,34 @@ export class InsurancePremiumPageComponent {
         const employees = this.employees();
         if (employees.length === 0) {
             this.rewardsByEmployeeId.set({});
+            this.bonusesByEmployeeId.set({});
             return;
         }
 
-        const rewardLists = await Promise.all(
-            employees.map((employee) => this.rewardService.listByEmployee(employee.id)),
-        );
+        const [rewardLists, bonusLists] = await Promise.all([
+            Promise.all(employees.map((employee) => this.rewardService.listByEmployee(employee.id))),
+            Promise.all(
+                employees.map((employee) =>
+                    this.bonusRewardService.getBonusRewardsByEmployee(
+                        employee.companyId,
+                        employee.id,
+                    ),
+                ),
+            ),
+        ]);
 
         const byEmployee: Record<string, Record<string, StandardMonthlyReward>> = {};
+        const bonusesByEmployee: Record<string, BonusReward[]> = {};
         for (let i = 0; i < employees.length; i++) {
             const map: Record<string, StandardMonthlyReward> = {};
             for (const reward of rewardLists[i]) {
                 map[reward.targetYearMonth] = reward;
             }
             byEmployee[employees[i].id] = map;
+            bonusesByEmployee[employees[i].id] = bonusLists[i];
         }
         this.rewardsByEmployeeId.set(byEmployee);
+        this.bonusesByEmployeeId.set(bonusesByEmployee);
     }
 
     private async loadHealthInsuranceStartDates(employees: Employee[]) {
@@ -141,6 +157,7 @@ export class InsurancePremiumPageComponent {
 
     private buildRows(): InsurancePremiumListRow[] {
         const byEmployee = this.rewardsByEmployeeId();
+        const bonusesByEmployee = this.bonusesByEmployeeId();
         const ym = this.targetYearMonth();
         const healthDates = this.healthInsuranceStartDateByEmployeeId();
         return this.employees().map((employee) => {
@@ -152,6 +169,7 @@ export class InsurancePremiumPageComponent {
                 employeeRewards,
                 ym,
                 healthDates[employee.id],
+                bonusesByEmployee[employee.id] ?? [],
             );
             return {
                 employee,

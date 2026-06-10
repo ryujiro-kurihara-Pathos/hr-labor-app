@@ -1,8 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 
+import { BonusReward } from '../../bonus/models/bonus-reward.model';
 import { Employee } from '../../employee/models/employee.models';
 import { EffectiveStandardRemuneration } from '../models/standard-remuneration-determination.model';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
+import { effectiveMonthlyRewardTotal } from '../utils/effective-monthly-reward.util';
 import { pickWinningDeterminationCandidate } from '../utils/determination-precedence.util';
 import { addMonthsToYearMonth, yearMonthFromDateString } from '../utils/reward-target-month.util';
 import {
@@ -31,6 +33,7 @@ export class StandardRemunerationDeterminationService {
         rewardsByYearMonth: Record<string, StandardMonthlyReward>,
         targetYearMonth: string,
         healthInsuranceStartDate?: string | null,
+        allBonuses: BonusReward[] = [],
     ): EffectiveStandardRemuneration {
         // 資格取得日を取得
         const qualificationDate = getQualificationDate(employee, healthInsuranceStartDate);
@@ -61,6 +64,7 @@ export class StandardRemunerationDeterminationService {
             qualificationDate,
             rewardsByYearMonth,
             (monthlyReward) => this.calculator.calculate(monthlyReward),
+            allBonuses,
         );
 
         if (!winner) {
@@ -69,6 +73,7 @@ export class StandardRemunerationDeterminationService {
                     qualificationYearMonth,
                     rewardsByYearMonth,
                     qualificationDate,
+                    allBonuses,
                 );
             }
             return this.resolveRegularIncomplete(
@@ -86,12 +91,14 @@ export class StandardRemunerationDeterminationService {
                     qualificationYearMonth,
                     rewardsByYearMonth,
                     qualificationDate,
+                    allBonuses,
                 );
             case 'revision':
                 return this.resolveRevision(
                     winner.revisionOriginMonth!,
                     qualificationYearMonth,
                     rewardsByYearMonth,
+                    allBonuses,
                 );
             case 'regular':
                 return this.resolveRegular(
@@ -100,6 +107,7 @@ export class StandardRemunerationDeterminationService {
                     qualificationYearMonth,
                     rewardsByYearMonth,
                     targetYearMonth,
+                    allBonuses,
                 );
         }
     }
@@ -109,6 +117,7 @@ export class StandardRemunerationDeterminationService {
         qualificationYearMonth: string,
         rewardsByYearMonth: Record<string, StandardMonthlyReward>,
         qualificationDate: string,
+        allBonuses: BonusReward[],
     ): EffectiveStandardRemuneration {
         const firstRegularYm = getFirstRegularDeterminationYearMonth(qualificationDate);
         const untilYm = this.addMonths(firstRegularYm, -1);
@@ -132,8 +141,16 @@ export class StandardRemunerationDeterminationService {
             description: `${formatYearMonthLabel(qualificationYearMonth)}の報酬に基づく標準報酬月額を適用（${untilLabel}まで）。`,
             qualificationYearMonth,
             calculationMonths: [qualificationYearMonth],
-            averageMonthlyReward: this.monthlyReward(initialReward),
-            calculation: this.calculationFromReward(initialReward),
+            averageMonthlyReward: this.monthlyReward(
+                initialReward,
+                qualificationYearMonth,
+                allBonuses,
+            ),
+            calculation: this.calculationFromReward(
+                initialReward,
+                qualificationYearMonth,
+                allBonuses,
+            ),
             isComplete: true,
             missingMonths: [],
         };
@@ -144,6 +161,7 @@ export class StandardRemunerationDeterminationService {
         revisionOriginMonth: string,
         qualificationYearMonth: string,
         rewardsByYearMonth: Record<string, StandardMonthlyReward>,
+        allBonuses: BonusReward[],
     ): EffectiveStandardRemuneration {
         const calculationMonths = [
             revisionOriginMonth,
@@ -165,7 +183,8 @@ export class StandardRemunerationDeterminationService {
         }
 
         const total = calculationMonths.reduce(
-            (sum, ym) => sum + this.monthlyReward(rewardsByYearMonth[ym]),
+            (sum, ym) =>
+                sum + this.monthlyReward(rewardsByYearMonth[ym], ym, allBonuses),
             0,
         );
 
@@ -205,6 +224,7 @@ export class StandardRemunerationDeterminationService {
         qualificationYearMonth: string,
         rewardsByYearMonth: Record<string, StandardMonthlyReward>,
         targetYearMonth: string,
+        allBonuses: BonusReward[],
     ): EffectiveStandardRemuneration {
         const baseYear = getRegularDeterminationBaseYear(targetYearMonth);
         const baseMonths = getRegularBaseMonths(employee, baseYear, qualificationDate);
@@ -236,7 +256,8 @@ export class StandardRemunerationDeterminationService {
         }
 
         const total = calculationMonths.reduce(
-            (sum, ym) => sum + this.monthlyReward(rewardsByYearMonth[ym]),
+            (sum, ym) =>
+                sum + this.monthlyReward(rewardsByYearMonth[ym], ym, allBonuses),
             0,
         );
         const averageMonthlyReward = Math.round(total / calculationMonths.length);
@@ -303,35 +324,33 @@ export class StandardRemunerationDeterminationService {
     }
 
     // 報酬から標準報酬月額の計算
-    private calculationFromReward(reward: StandardMonthlyReward): StandardMonthlyRewardCalculation {
+    private calculationFromReward(
+        reward: StandardMonthlyReward,
+        yearMonth: string,
+        allBonuses: BonusReward[],
+    ): StandardMonthlyRewardCalculation {
+        const monthlyReward = this.monthlyReward(reward, yearMonth, allBonuses);
+        const calculated = this.calculator.calculate(monthlyReward);
         return {
-            monthlyReward: this.monthlyReward(reward),
-            health: {
+            monthlyReward,
+            health: calculated.health ?? {
                 grade: reward.healthInsuranceGrade,
                 standardMonthlyAmount: reward.healthInsuranceStandardMonthlyAmount,
             },
-            pension: {
+            pension: calculated.pension ?? {
                 grade: reward.pensionInsuranceGrade,
                 standardMonthlyAmount: reward.pensionInsuranceStandardMonthlyAmount,
             },
         };
     }
 
-    // 報酬から月額報酬の計算
-    private monthlyReward(reward: StandardMonthlyReward): number {
-        return (
-            reward.basicSalary +
-            reward.commutingAllowance +
-            reward.positionAllowance +
-            reward.housingAllowance +
-            reward.fixedOvertimePay +
-            reward.otherFixedAllowance +
-            reward.overtimePay +
-            reward.holidayPay +
-            reward.nightPay +
-            reward.commissionPay +
-            reward.otherVariablePay
-        );
+    // 報酬から月額報酬の計算（年4回以上の賞与を含む）
+    private monthlyReward(
+        reward: StandardMonthlyReward,
+        yearMonth: string,
+        allBonuses: BonusReward[],
+    ): number {
+        return effectiveMonthlyRewardTotal(reward, yearMonth, allBonuses);
     }
 
     // 決定不能の場合

@@ -77,6 +77,7 @@ export class SocialInsuranceProceduresPageComponent {
             occurredDate: '',
             dueDate: '',
             completedDate: null,
+            submittedDate: null,
             targetYearMonth: null,
             memo: '',
             lossReason: null,

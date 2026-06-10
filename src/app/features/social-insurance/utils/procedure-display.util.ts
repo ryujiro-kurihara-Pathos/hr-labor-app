@@ -1,5 +1,6 @@
 import { Timestamp } from 'firebase/firestore';
 
+import { Employee } from '../../employee/models/employee.models';
 import {
     LOSS_REASON_LABELS,
     LossReason,
@@ -18,7 +19,7 @@ export function procedureStatusLabel(status: ProcedureStatus): string {
 
 export function procedureTypeLabel(type: ProcedureType): string {
     const labels: Record<ProcedureType, string> = {
-        qualification: '資格取得',
+        qualification: '被保険者資格取得届',
         loss: '資格喪失',
         dependentChange: '扶養変更',
         regularDecision: '算定基礎届',
@@ -56,6 +57,17 @@ export function lossReasonLabel(reason: LossReason | null | undefined): string {
 }
 
 /** 健康保険・厚生年金の喪失日、手続き発生日の順で表示用の喪失日を解決する */
+export function employeeAddressLabel(employee: Employee): string {
+    const parts = [
+        employee.postalCode ? `〒${employee.postalCode}` : '',
+        employee.prefecture,
+        employee.city,
+        employee.streetAddress,
+        employee.buildingName,
+    ].filter((part) => part.trim());
+    return parts.length > 0 ? parts.join(' ') : '—';
+}
+
 export function resolveLossDate(
     healthInsuranceEndDate: string | null | undefined,
     pensionInsuranceEndDate: string | null | undefined,

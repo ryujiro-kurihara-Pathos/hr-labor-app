@@ -1,5 +1,7 @@
+import { BonusReward } from '../../bonus/models/bonus-reward.model';
 import { GradeLookupResult } from '../models/standard-monthly-reward-table.model';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
+import { effectiveMonthlyRewardTotal } from './effective-monthly-reward.util';
 import { addMonthsToYearMonth } from './reward-target-month.util';
 
 /** 随時改定成立に必要な等級差（健康保険・厚生年金それぞれ） */
@@ -46,6 +48,7 @@ export function monthlyRewardTotal(reward: StandardMonthlyReward): number {
 export function calculateRevisionAverageMonthlyReward(
     rewardsByYearMonth: Record<string, StandardMonthlyReward>,
     originMonth: string,
+    allBonuses: BonusReward[] = [],
 ): number | null {
     const calculationMonths = getRevisionCalculationMonths(originMonth);
     if (!calculationMonths.every((ym) => rewardsByYearMonth[ym])) {
@@ -53,7 +56,8 @@ export function calculateRevisionAverageMonthlyReward(
     }
 
     const total = calculationMonths.reduce(
-        (sum, ym) => sum + monthlyRewardTotal(rewardsByYearMonth[ym]),
+        (sum, ym) =>
+            sum + effectiveMonthlyRewardTotal(rewardsByYearMonth[ym], ym, allBonuses),
         0,
     );
     return Math.round(total / calculationMonths.length);

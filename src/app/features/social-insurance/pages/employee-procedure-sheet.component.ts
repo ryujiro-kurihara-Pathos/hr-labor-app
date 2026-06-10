@@ -4,6 +4,7 @@ import { Procedure } from '../models/procedures.model';
 import { Employee } from '../../employee/models/employee.models';
 import { Office } from '../../company/models/office.model';
 import { Company } from '../../company/models/company.model';
+import { ProcedureCommonInfoComponent } from './procedure-common-info.component';
 import { splitOfficeSymbol } from '../../company/utils/office-format.util';
 import {
     dateLabel,
@@ -16,7 +17,7 @@ export type RemunerationProcedureVariant = 'regularDecision' | 'revision' | 'bon
 @Component({
     selector: 'app-employee-procedure-sheet',
     standalone: true,
-    imports: [],
+    imports: [ProcedureCommonInfoComponent],
     templateUrl: './employee-procedure-sheet.component.html',
 })
 export class EmployeeProcedureSheetComponent {

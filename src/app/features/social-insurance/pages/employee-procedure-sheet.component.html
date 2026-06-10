@@ -16,6 +16,12 @@
         <button type="button" class="btn edit-btn">編集</button>
     </div>
 
+    <app-procedure-common-info
+        [procedure]="item"
+        [employee]="employee()"
+        [office]="office()"
+    />
+
     <div class="title">
         <div class="title-sub">
             <span>健康保険</span>

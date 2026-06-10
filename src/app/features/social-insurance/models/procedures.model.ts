@@ -48,6 +48,7 @@ export type Procedure = {
     occurredDate: string;               // 発生日 例: 入社日、退職日、賞与支給日
     dueDate: string;                    // 対応期限
     completedDate: string | null;       // 完了日
+    submittedDate: string | null;       // 提出日
 
     targetYearMonth: string | null;     // 対象年月 例: '2026-06'
 

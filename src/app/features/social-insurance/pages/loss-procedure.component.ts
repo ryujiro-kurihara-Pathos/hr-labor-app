@@ -5,6 +5,7 @@ import { Office } from '../../company/models/office.model';
 import { Company } from '../../company/models/company.model';
 import { Procedure } from '../models/procedures.model';
 import { SocialInsuranceStatus } from '../models/social-insurance-status.model';
+import { ProcedureCommonInfoComponent } from './procedure-common-info.component';
 import { splitOfficeSymbol } from '../../company/utils/office-format.util';
 import {
     dateLabel,
@@ -18,7 +19,7 @@ import {
 @Component({
     selector: 'app-loss-procedure',
     standalone: true,
-    imports: [],
+    imports: [ProcedureCommonInfoComponent],
     templateUrl: './loss-procedure.component.html',
 })
 export class LossProcedureComponent {

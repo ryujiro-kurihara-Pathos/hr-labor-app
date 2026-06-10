@@ -1,4 +1,6 @@
+import { BonusReward } from '../../bonus/models/bonus-reward.model';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
+import { effectiveMonthlyRewardTotal } from './effective-monthly-reward.util';
 import {
     getAprJunYearMonths,
     getRegularBaseMonths,
@@ -15,7 +17,6 @@ import {
     getRevisionApplyFromMonth,
     getRevisionCalculationMonths,
     hasRevisionGradeDifference,
-    monthlyRewardTotal,
     formatRevisionGradeComparison,
 } from './revision-determination.util';
 
@@ -71,6 +72,7 @@ function resolveGradesFromWinner(
     qualificationDate: string,
     qualificationYearMonth: string,
     calculate: RevisionCalculateFn,
+    allBonuses: BonusReward[],
 ): RevisionGradePair | null {
     switch (winner.kind) {
         case 'initial': {
@@ -83,7 +85,11 @@ function resolveGradesFromWinner(
         }
         case 'revision': {
             const originMonth = winner.revisionOriginMonth!;
-            const average = calculateRevisionAverageMonthlyReward(rewardsByYearMonth, originMonth);
+            const average = calculateRevisionAverageMonthlyReward(
+                rewardsByYearMonth,
+                originMonth,
+                allBonuses,
+            );
             if (average === null) return null;
             const calculation = calculate(average);
             if (!calculation.health || !calculation.pension) return null;
@@ -104,7 +110,9 @@ function resolveGradesFromWinner(
             if (!calculationMonths.every((ym) => rewardsByYearMonth[ym])) return null;
 
             const total = calculationMonths.reduce(
-                (sum, ym) => sum + monthlyRewardTotal(rewardsByYearMonth[ym]),
+                (sum, ym) =>
+                    sum +
+                    effectiveMonthlyRewardTotal(rewardsByYearMonth[ym], ym, allBonuses),
                 0,
             );
             const average = Math.round(total / calculationMonths.length);
@@ -141,6 +149,7 @@ export function listEligibleRevisionCandidates(
     qualificationDate: string,
     rewardsByYearMonth: Record<string, StandardMonthlyReward>,
     calculate: RevisionCalculateFn,
+    allBonuses: BonusReward[] = [],
 ): DeterminationCandidate[] {
     const originMonths = Object.entries(rewardsByYearMonth)
         .filter(([, reward]) => reward.fixedWageChanged)
@@ -159,6 +168,7 @@ export function listEligibleRevisionCandidates(
             qualificationDate,
             rewardsByYearMonth,
             calculate,
+            allBonuses,
         );
 
         if (result.eligible) {
@@ -182,6 +192,7 @@ export function evaluateRevisionAtOrigin(
     qualificationDate: string,
     rewardsByYearMonth: Record<string, StandardMonthlyReward>,
     calculate: RevisionCalculateFn,
+    allBonuses: BonusReward[] = [],
 ): RevisionEligibilityResult {
     const originReward = rewardsByYearMonth[originMonth];
     if (!originReward?.fixedWageChanged) {
@@ -209,6 +220,7 @@ export function evaluateRevisionAtOrigin(
             qualificationDate,
             rewardsByYearMonth,
             calculate,
+            allBonuses,
         );
         if (result.eligible) {
             priorEligible.push({
@@ -243,6 +255,7 @@ export function evaluateRevisionAtOrigin(
         qualificationDate,
         qualificationYearMonth,
         calculate,
+        allBonuses,
     );
     if (!previousGrades) {
         return { eligible: false, reason: 'no_previous_grades' };
@@ -251,6 +264,7 @@ export function evaluateRevisionAtOrigin(
     const averageMonthlyReward = calculateRevisionAverageMonthlyReward(
         rewardsByYearMonth,
         originMonth,
+        allBonuses,
     );
     if (averageMonthlyReward === null) {
         return { eligible: false, reason: 'missing_months' };
@@ -291,6 +305,7 @@ export function pickWinningDeterminationCandidate(
     qualificationDate: string,
     rewardsByYearMonth: Record<string, StandardMonthlyReward>,
     calculate: RevisionCalculateFn,
+    allBonuses: BonusReward[] = [],
 ): DeterminationCandidate | null {
     const revisionCandidates = listEligibleRevisionCandidates(
         qualificationYearMonth,
@@ -299,6 +314,7 @@ export function pickWinningDeterminationCandidate(
         qualificationDate,
         rewardsByYearMonth,
         calculate,
+        allBonuses,
     );
 
     const candidates = [

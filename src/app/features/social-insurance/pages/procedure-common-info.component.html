@@ -1,0 +1,59 @@
+@let item = procedure()!;
+
+<h2 class="section-title">手続き情報</h2>
+<dl class="detail-meta">
+    <div class="meta-row">
+        <dt>手続きID</dt>
+        <dd>{{ item.id }}</dd>
+    </div>
+    <div class="meta-row">
+        <dt>手続き種別</dt>
+        <dd>{{ procedureTypeLabel(item.procedureType) }}</dd>
+    </div>
+    <div class="meta-row">
+        <dt>対応状況</dt>
+        <dd>{{ statusLabel(item.status) }}</dd>
+    </div>
+    <div class="meta-row">
+        <dt>対象従業員ID</dt>
+        <dd>{{ employee().id }}</dd>
+    </div>
+    <div class="meta-row">
+        <dt>対象従業員名</dt>
+        <dd>{{ employee().lastName }} {{ employee().firstName }}</dd>
+    </div>
+    <div class="meta-row">
+        <dt>事業所整理記号</dt>
+        <dd>{{ office().officeSymbol || '—' }}</dd>
+    </div>
+    <div class="meta-row">
+        <dt>事業所番号</dt>
+        <dd>{{ office().officeNumber || '—' }}</dd>
+    </div>
+    <div class="meta-row">
+        <dt>事業所名</dt>
+        <dd>{{ office().name || '—' }}</dd>
+    </div>
+    <div class="meta-row">
+        <dt>提出日</dt>
+        <dd>{{ dateLabel(item.submittedDate) }}</dd>
+    </div>
+    <div class="meta-row">
+        <dt>完了日</dt>
+        <dd>{{ dateLabel(item.completedDate) }}</dd>
+    </div>
+</dl>
+
+<style>
+    .section-title { margin: 0 0 12px; font-size: 17px; }
+    .detail-meta { margin: 0 0 8px; display: grid; gap: 10px; }
+    .meta-row { display: flex; gap: 12px; font-size: 14px; }
+    .meta-row dt {
+        flex-shrink: 0;
+        min-width: 9em;
+        margin: 0;
+        color: #6b7280;
+        font-weight: 500;
+    }
+    .meta-row dd { margin: 0; color: #111827; word-break: break-all; }
+</style>

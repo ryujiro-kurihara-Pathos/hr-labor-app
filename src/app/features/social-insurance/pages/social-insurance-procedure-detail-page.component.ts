@@ -6,9 +6,14 @@ import { SocialInsuranceStatusService } from '../services/social-insurance-statu
 import { EmployeeService } from '../../employee/services/employee.service';
 import { OfficeService } from '../../company/services/office.service';
 import { CompanyService } from '../../company/services/company.service';
+import { BonusRewardService } from '../../bonus/services/bonus-reward.service';
+import { StandardMonthlyRewardService } from '../../insurance/services/standard-monthly-reward.service';
+import { yearMonthFromDateString } from '../../insurance/utils/reward-target-month.util';
 
+import { BonusReward } from '../../bonus/models/bonus-reward.model';
 import { Procedure } from '../models/procedures.model';
 import { SocialInsuranceStatus } from '../models/social-insurance-status.model';
+import { StandardMonthlyReward } from '../../insurance/models/standard-monthly-reward.model';
 import { Employee } from '../../employee/models/employee.models';
 import { Office } from '../../company/models/office.model';
 import { Company } from '../../company/models/company.model';
@@ -32,9 +37,14 @@ export class SocialInsuranceProcedureDetailPageComponent {
     private readonly employeeService = inject(EmployeeService);
     private readonly officeService = inject(OfficeService);
     private readonly companyService = inject(CompanyService);
+    private readonly rewardService = inject(StandardMonthlyRewardService);
+    private readonly bonusRewardService = inject(BonusRewardService);
 
     procedure = signal<Procedure | null>(null);
     socialInsuranceStatus = signal<SocialInsuranceStatus | null>(null);
+    hasActiveDependents = signal(false);
+    joinMonthReward = signal<StandardMonthlyReward | null>(null);
+    employeeBonuses = signal<BonusReward[]>([]);
     employee = signal<Employee | null>(null);
     office = signal<Office | null>(null);
     company = signal<Company | null>(null);
@@ -61,6 +71,8 @@ export class SocialInsuranceProcedureDetailPageComponent {
 
         await this.loadEmployee();
         await this.loadSocialInsuranceStatus();
+        await this.loadDependents();
+        await Promise.all([this.loadJoinMonthReward(), this.loadEmployeeBonuses()]);
         await this.loadOffice();
         await this.loadCompany();
 
@@ -102,7 +114,8 @@ export class SocialInsuranceProcedureDetailPageComponent {
         this.socialInsuranceStatus.set(null);
 
         const employeeId = this.procedure()?.employeeId;
-        if (!employeeId || this.procedure()?.procedureType !== 'loss') return;
+        const procedureType = this.procedure()?.procedureType;
+        if (!employeeId || (procedureType !== 'loss' && procedureType !== 'qualification')) return;
 
         try {
             const status = await this.socialInsuranceStatusService.getInsuranceStatusByEmployeeId(employeeId);
@@ -110,6 +123,54 @@ export class SocialInsuranceProcedureDetailPageComponent {
         } catch (error) {
             console.error('社会保険加入状況の取得に失敗しました', error);
             this.errorMessage.set('社会保険加入状況の取得に失敗しました');
+        }
+    }
+
+    private async loadDependents(): Promise<void> {
+        this.hasActiveDependents.set(false);
+
+        const employeeId = this.procedure()?.employeeId;
+        if (!employeeId || this.procedure()?.procedureType !== 'qualification') return;
+
+        try {
+            const dependents = await this.employeeService.getDependentsByEmployeeId(employeeId);
+            this.hasActiveDependents.set(dependents.some((d) => d.status === 'active'));
+        } catch (error) {
+            console.error('扶養家族の取得に失敗しました', error);
+        }
+    }
+
+    private async loadJoinMonthReward(): Promise<void> {
+        this.joinMonthReward.set(null);
+
+        const employee = this.employee();
+        if (!employee || this.procedure()?.procedureType !== 'qualification') return;
+
+        const joinYearMonth = yearMonthFromDateString(employee.joinedDate);
+        if (!joinYearMonth) return;
+
+        try {
+            const reward = await this.rewardService.getByEmployeeAndMonth(employee.id, joinYearMonth);
+            this.joinMonthReward.set(reward);
+        } catch (error) {
+            console.error('入社月の報酬月額の取得に失敗しました', error);
+        }
+    }
+
+    private async loadEmployeeBonuses(): Promise<void> {
+        this.employeeBonuses.set([]);
+
+        const employee = this.employee();
+        if (!employee?.companyId) return;
+
+        try {
+            const bonuses = await this.bonusRewardService.getBonusRewardsByEmployee(
+                employee.companyId,
+                employee.id,
+            );
+            this.employeeBonuses.set(bonuses);
+        } catch (error) {
+            console.error('賞与の取得に失敗しました', error);
         }
     }
 

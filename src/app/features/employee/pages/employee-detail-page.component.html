@@ -445,67 +445,39 @@
                 <h2 class="section-title">手続き一覧</h2>
 
                 <div class="qualification-procedure-box">
-                    @if (qualificationProcedureExists()) {
-                        <div class="qualification-procedure-header">
-                            <p class="qualification-procedure-message">資格取得手続きが作成されています。</p>
-                            <span
-                                class="procedure-status-badge"
-                                [class.not-started]="qualificationProcedureStatus() === 'notStarted'"
-                                [class.in-progress]="qualificationProcedureStatus() === 'inProgress'"
-                                [class.completed]="qualificationProcedureStatus() === 'completed'"
-                            >
-                                {{ qualificationProcedureStatusLabel(qualificationProcedureStatus()) }}
-                            </span>
-                        </div>
-                        <a
-                            [routerLink]="['/procedures', qualificationProcedure()!.id]"
-                            class="btn sub-btn qualification-procedure-link"
-                        >
-                            資格取得手続き詳細へ
-                        </a>
-                    } @else if (isHealthInsuranceEligible()) {
-                        @if (showQualificationCreateConfirm()) {
-                            <div class="qualification-procedure-confirm">
-                                <p class="qualification-procedure-confirm-title">資格取得手続きがまだ作成されていません</p>
-                                <p class="section-note">この従業員の資格取得手続きを作成しますか？</p>
-                                @if (errorMessage()) {
-                                    <p class="error-message">{{ errorMessage() }}</p>
-                                }
-                                <div class="button-area qualification-procedure-actions">
-                                    <button
-                                        type="button"
-                                        class="btn sub-btn"
-                                        (click)="closeQualificationCreateConfirm()"
-                                        [disabled]="isCreatingQualificationProcedure()"
-                                    >
-                                        キャンセル
-                                    </button>
-                                    <button
-                                        type="button"
-                                        class="btn primary-btn"
-                                        (click)="createQualificationProcedure()"
-                                        [disabled]="isCreatingQualificationProcedure()"
-                                    >
-                                        @if (isCreatingQualificationProcedure()) {
-                                            作成中...
-                                        } @else {
-                                            はい
-                                        }
-                                    </button>
-                                </div>
+                    @if (isHealthInsuranceEligible()) {
+                        @if (qualificationProcedureExists()) {
+                            <div class="qualification-procedure-header">
+                                <p class="qualification-procedure-message">資格取得手続きが作成されています。</p>
+                                <span
+                                    class="procedure-status-badge"
+                                    [class.not-started]="qualificationProcedureStatus() === 'notStarted'"
+                                    [class.in-progress]="qualificationProcedureStatus() === 'inProgress'"
+                                    [class.completed]="qualificationProcedureStatus() === 'completed'"
+                                >
+                                    {{ qualificationProcedureStatusLabel(qualificationProcedureStatus()) }}
+                                </span>
                             </div>
                         } @else {
-                            <p class="section-note">健康保険の対象のため、資格取得手続きを作成できます。</p>
-                            <button
-                                type="button"
-                                class="btn primary-btn qualification-procedure-create-btn"
-                                (click)="openQualificationCreateConfirm()"
-                            >
-                                資格取得手続きを作成する
-                            </button>
+                            <p class="section-note">健康保険・厚生年金の加入対象のため、資格取得届の手続きを行えます。</p>
                         }
+                        @if (errorMessage()) {
+                            <p class="error-message">{{ errorMessage() }}</p>
+                        }
+                        <button
+                            type="button"
+                            class="btn primary-btn qualification-procedure-create-btn"
+                            (click)="openQualificationProcedure()"
+                            [disabled]="isCreatingQualificationProcedure()"
+                        >
+                            @if (isCreatingQualificationProcedure()) {
+                                作成中...
+                            } @else {
+                                資格取得手続きを行う
+                            }
+                        </button>
                     } @else {
-                        <p class="section-note">健康保険の対象外のため、資格取得手続きを作成できません。</p>
+                        <p class="section-note">健康保険・厚生年金の加入対象外のため、資格取得手続きを作成できません。</p>
                     }
                 </div>
             </section>

@@ -34,6 +34,7 @@ export class SocialInsuranceProcedureService {
             occurredDate: String(data['occurredDate'] ?? ''),
             dueDate: String(data['dueDate'] ?? ''),
             completedDate: (data['completedDate'] as string | null) ?? null,
+            submittedDate: (data['submittedDate'] as string | null) ?? null,
             targetYearMonth: (data['targetYearMonth'] as string | null) ?? null,
             memo: String(data['memo'] ?? ''),
             lossReason: (data['lossReason'] as Procedure['lossReason']) ?? null,

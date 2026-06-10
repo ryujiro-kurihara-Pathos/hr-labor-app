@@ -50,7 +50,6 @@ export class EmployeeDetailPageComponent {
     isRetiring = signal<boolean>(false);
     isEditing = signal<boolean>(false);
     isRetireFormOpen = signal<boolean>(false);
-    showQualificationCreateConfirm = signal<boolean>(false);
     isCreatingQualificationProcedure = signal<boolean>(false);
     errorMessage = signal<string>('');
     age = computed(() => this.ageToday(this.birthDate));
@@ -189,21 +188,19 @@ export class EmployeeDetailPageComponent {
         }
     }
 
-    openQualificationCreateConfirm(): void {
-        this.errorMessage.set('');
-        this.showQualificationCreateConfirm.set(true);
-    }
-
-    closeQualificationCreateConfirm(): void {
-        this.showQualificationCreateConfirm.set(false);
-    }
-
     isHealthInsuranceEligible(): boolean {
         if (this.isEditing()) {
-            return this.judgeHealthInsurance() === 'active';
+            return (
+                this.judgeHealthInsurance() === 'active' &&
+                this.judgePensionInsurance() === 'active'
+            );
         }
 
-        return this.socialInsuranceStatus()?.healthInsuranceStatus === 'active';
+        const status = this.socialInsuranceStatus();
+        return (
+            status?.healthInsuranceStatus === 'active' &&
+            status?.pensionInsuranceStatus === 'active'
+        );
     }
 
     qualificationProcedureStatusLabel(status: ProcedureStatus): string {
@@ -215,10 +212,15 @@ export class EmployeeDetailPageComponent {
         return labels[status];
     }
 
-    // 資格取得手続きの作成
-    async createQualificationProcedure(): Promise<void> {
+    async openQualificationProcedure(): Promise<void> {
         const employee = this.employee();
-        if (!employee || this.qualificationProcedureExists()) return;
+        if (!employee || !this.isHealthInsuranceEligible()) return;
+
+        const existing = this.qualificationProcedure();
+        if (existing) {
+            this.router.navigate(['/procedures', existing.id]);
+            return;
+        }
 
         this.isCreatingQualificationProcedure.set(true);
         this.errorMessage.set('');
@@ -233,13 +235,14 @@ export class EmployeeDetailPageComponent {
                 occurredDate: employee.joinedDate,
                 dueDate: '',
                 completedDate: null,
+                submittedDate: null,
                 targetYearMonth: null,
                 memo: '',
                 lossReason: null,
                 dependentChanges: null,
             });
             this.qualificationProcedure.set(procedure);
-            this.showQualificationCreateConfirm.set(false);
+            this.router.navigate(['/procedures', procedure.id]);
         } catch (error) {
             console.error('資格取得手続きの作成に失敗しました', error);
             this.errorMessage.set('資格取得手続きの作成に失敗しました');
@@ -293,6 +296,7 @@ export class EmployeeDetailPageComponent {
                 occurredDate: employee.joinedDate,
                 dueDate: '',
                 completedDate: null,
+                submittedDate: null,
                 targetYearMonth: null,
                 memo: '',
                 lossReason: null,

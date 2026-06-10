@@ -4,6 +4,7 @@ import { Procedure } from '../models/procedures.model';
 import { Employee } from '../../employee/models/employee.models';
 import { Office } from '../../company/models/office.model';
 import { Company } from '../../company/models/company.model';
+import { ProcedureCommonInfoComponent } from './procedure-common-info.component';
 import { splitOfficeSymbol } from '../../company/utils/office-format.util';
 import {
     dateLabel,
@@ -15,7 +16,7 @@ import {
 @Component({
     selector: 'app-dependent-procedure',
     standalone: true,
-    imports: [],
+    imports: [ProcedureCommonInfoComponent],
     templateUrl: './dependent-procedure.component.html',
 })
 

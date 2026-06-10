@@ -305,6 +305,11 @@
                         <dd>
                             @if (targetMonthMonthlyReward(); as monthlyReward) {
                                 {{ monthlyReward | number }}円
+                                @if (includedBonusInMonth() > 0) {
+                                    <span class="included-bonus-note">
+                                        （うち賞与算入 {{ includedBonusInMonth() | number }}円）
+                                    </span>
+                                }
                             } @else {
                                 —
                             }
@@ -355,7 +360,11 @@
             <span class="card-type-badge bonus">賞与</span>
             <h2 class="section-title">賞与入力（{{ targetYearMonthLabel() }}）</h2>
             <p class="bonus-section-note">
-                月次報酬とは別に、賞与支給時の金額を登録します。標準賞与額は1,000円未満を切り捨てて計算されます。
+                @if (treatBonusAsMonthlyRemuneration()) {
+                    この従業員は{{ targetYearMonthLabel() }}の暦年に賞与が年4回以上支給されているため、賞与は報酬月額に算入します。標準賞与額・賞与保険料は計算しません。
+                } @else {
+                    月次報酬とは別に、賞与支給時の金額を登録します。標準賞与額は1,000円未満を切り捨てて計算されます（年3回以下の賞与は賞与支払届の対象です）。
+                }
             </p>
 
             @if (bonusMessage()) {
@@ -609,8 +618,8 @@
                     <h3 class="premium-subsection-title">賞与に対する保険料</h3>
                 </div>
 
-                @if (monthBonuses().length > 0) {
-                    @for (bonus of monthBonuses(); track bonus.id) {
+                @if (bonusesForPremium().length > 0) {
+                    @for (bonus of bonusesForPremium(); track bonus.id) {
                         <div class="bonus-premium-block">
                             <p class="premium-note">
                                 支給日 {{ bonus.paymentDate }}
@@ -742,6 +751,10 @@
                             </div>
                         </div>
                     }
+                } @else if (treatBonusAsMonthlyRemuneration() && monthBonuses().length > 0) {
+                    <p class="premium-note muted">
+                        年4回以上の賞与支給のため、賞与は報酬月額に算入済みです。賞与に対する保険料は計算しません。
+                    </p>
                 } @else {
                     <p class="premium-note muted">この月の賞与は未登録のため、賞与に対する保険料を計算できません。</p>
                 }
