@@ -101,6 +101,9 @@
                     <label for="position">役職</label>
                     <input id="position" type="text" name="position" [(ngModel)]="position" />
                 </div>
+                <div class="form-field">
+                    <label for="dependents">扶養家族</label>
+                </div>
             } @else {
                 <dl class="detail-list">
                     <div class="detail-row">
@@ -151,6 +154,10 @@
                     <div class="detail-row">
                         <dt>役職</dt>
                         <dd>{{ employee()!.position || '—' }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>扶養家族</dt>
+                        <dd>{{ dependentCount() }}人</dd>
                     </div>
                     <div class="detail-row">
                         <dt>在籍状態</dt>

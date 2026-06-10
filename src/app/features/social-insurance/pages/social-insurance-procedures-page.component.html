@@ -4,8 +4,8 @@
         <p class="page-note">社会保険に関する手続きの一覧です。カードをクリックして詳細を確認できます。</p>
     </header>
 
-    <button>資格取得手続きの作成</button>
-    <button>資格喪失手続きの作成</button>
+    <button (click)="createProcedure('qualification')">資格取得手続きの作成</button>
+    <button (click)="createProcedure('loss')">資格喪失手続きの作成</button>
 
     <section class="list-section">
         <h2 class="section-title">手続き一覧</h2>

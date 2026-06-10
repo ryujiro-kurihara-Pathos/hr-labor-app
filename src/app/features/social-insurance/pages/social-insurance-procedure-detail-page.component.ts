@@ -2,32 +2,37 @@ import { Component, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { SocialInsuranceProcedureService } from '../services/social-insurance-procedure.service';
+import { SocialInsuranceStatusService } from '../services/social-insurance-status.service';
 import { EmployeeService } from '../../employee/services/employee.service';
 import { OfficeService } from '../../company/services/office.service';
 import { CompanyService } from '../../company/services/company.service';
 
 import { Procedure } from '../models/procedures.model';
+import { SocialInsuranceStatus } from '../models/social-insurance-status.model';
 import { Employee } from '../../employee/models/employee.models';
 import { Office } from '../../company/models/office.model';
 import { Company } from '../../company/models/company.model';
 
 import { QualificationProcedureComponent } from './qualification-procedure.component';
+import { LossProcedureComponent } from './loss-procedure.component';
 
 @Component({
     selector: 'app-social-insurance-procedure-detail-page',
     standalone: true,
-    imports: [RouterLink, QualificationProcedureComponent],
+    imports: [RouterLink, QualificationProcedureComponent, LossProcedureComponent],
     templateUrl: './social-insurance-procedure-detail-page.component.html',
 })
 
 export class SocialInsuranceProcedureDetailPageComponent {
     private readonly route = inject(ActivatedRoute);
     private readonly procedureService = inject(SocialInsuranceProcedureService);
+    private readonly socialInsuranceStatusService = inject(SocialInsuranceStatusService);
     private readonly employeeService = inject(EmployeeService);
     private readonly officeService = inject(OfficeService);
     private readonly companyService = inject(CompanyService);
 
     procedure = signal<Procedure | null>(null);
+    socialInsuranceStatus = signal<SocialInsuranceStatus | null>(null);
     employee = signal<Employee | null>(null);
     office = signal<Office | null>(null);
     company = signal<Company | null>(null);
@@ -53,6 +58,7 @@ export class SocialInsuranceProcedureDetailPageComponent {
         }
 
         await this.loadEmployee();
+        await this.loadSocialInsuranceStatus();
         await this.loadOffice();
         await this.loadCompany();
 
@@ -87,6 +93,21 @@ export class SocialInsuranceProcedureDetailPageComponent {
         } catch (error) {
             console.error('従業員の取得に失敗しました', error);
             this.errorMessage.set('従業員の取得に失敗しました');
+        }
+    }
+
+    private async loadSocialInsuranceStatus(): Promise<void> {
+        this.socialInsuranceStatus.set(null);
+
+        const employeeId = this.procedure()?.employeeId;
+        if (!employeeId || this.procedure()?.procedureType !== 'loss') return;
+
+        try {
+            const status = await this.socialInsuranceStatusService.getInsuranceStatusByEmployeeId(employeeId);
+            this.socialInsuranceStatus.set(status);
+        } catch (error) {
+            console.error('社会保険加入状況の取得に失敗しました', error);
+            this.errorMessage.set('社会保険加入状況の取得に失敗しました');
         }
     }
 

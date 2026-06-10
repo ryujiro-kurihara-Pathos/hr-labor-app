@@ -14,6 +14,22 @@ export type ProcedureStatus =
     | 'inProgress'         // 対応中
     | 'completed';         // 完了
 
+/** 被保険者資格喪失届の資格喪失理由 */
+export type LossReason =
+    | 'retirement'         // 退職
+    | 'death'              // 死亡
+    | 'age70'              // 70歳到達
+    | 'age75'              // 75歳到達
+    | 'other';             // その他
+
+export const LOSS_REASON_LABELS: Record<LossReason, string> = {
+    retirement: '退職',
+    death: '死亡',
+    age70: '70歳到達',
+    age75: '75歳到達',
+    other: 'その他',
+};
+
 export type Procedure = {
     id: string;                         // FirestoreドキュメントID
 
@@ -36,6 +52,9 @@ export type Procedure = {
     targetYearMonth: string | null;     // 対象年月 例: '2026-06'
 
     memo: string;                       // メモ
+
+    /** 資格喪失手続き（loss）のときのみ使用 */
+    lossReason: LossReason | null;
 
     createdAt: Timestamp;
     updatedAt: Timestamp;

@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-import { Procedure, ProcedureStatus, ProcedureType } from '../models/procedures.model';
+import { Procedure, ProcedureStatus, ProcedureType, ProcedureInput } from '../models/procedures.model';
 import { SocialInsuranceProcedureService } from '../services/social-insurance-procedure.service';
 
 @Component({
@@ -79,9 +79,11 @@ export class SocialInsuranceProceduresPageComponent {
             completedDate: null,
             targetYearMonth: null,
             memo: '',
+            lossReason: null,
         }
         try {
-            
+            await this.procedureService.createProcedure(procedureInput);
+            console.log('手続きの作成に成功しました');
         } catch (error) {
             console.error('手続きの作成に失敗しました', error);
             this.errorMessage.set('手続きの作成に失敗しました');

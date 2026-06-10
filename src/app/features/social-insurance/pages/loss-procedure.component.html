@@ -18,11 +18,11 @@
 
     <div class="title">
         <div class="title-sub">
-          <span>健康保険</span>
-          <span>厚生年金保険</span>
+            <span>健康保険</span>
+            <span>厚生年金保険</span>
         </div>
-      
-        <div class="title-main">被保険者資格取得届</div>
+
+        <div class="title-main">被保険者資格喪失届</div>
     </div>
 
     <h2 class="section-title">事業所情報</h2>
@@ -42,59 +42,74 @@
         <div class="office-code-group">
             <span class="office-code-label">事業所番号</span>
             <div class="office-code-boxes" aria-label="事業所番号">
-                <p>{{ office()?.officeNumber || '—' }}</p>
+                <p>{{ office().officeNumber || '—' }}</p>
             </div>
         </div>
     </div>
 
-    <p>事業所所在地</p>
-    <p>〒{{ office()?.postalCode }} {{ office()?.prefecture }} {{ office()?.city }} {{ office()?.streetAddress }} {{ office()?.buildingName }}</p>
-
-    <p>事業所名称</p>
-    <p>{{ company()?.name }} {{ office()?.name }}</p>
-
-    <p>事業主氏名</p>
-    <p>{{ company()?.representativeName }}</p>
-
-    <p>電話番号</p>
-    <p>{{ office()?.phoneNumber || '—' }}</p>
+    <dl class="detail-meta office-meta">
+        <div class="meta-row">
+            <dt>事業所所在地</dt>
+            <dd>〒{{ office().postalCode }} {{ office().prefecture }}{{ office().city }}{{ office().streetAddress }} {{ office().buildingName }}</dd>
+        </div>
+        <div class="meta-row">
+            <dt>事業所名称</dt>
+            <dd>{{ company().name }} {{ office().name }}</dd>
+        </div>
+        <div class="meta-row">
+            <dt>事業主氏名</dt>
+            <dd>{{ company().representativeName }}</dd>
+        </div>
+        <div class="meta-row">
+            <dt>電話番号</dt>
+            <dd>{{ office().phoneNumber || '—' }}</dd>
+        </div>
+    </dl>
 
     <h2 class="section-title">被保険者情報</h2>
     <dl class="detail-meta">
         <div class="meta-row">
             <dt>氏名</dt>
-            <dd>{{ employee()?.lastName }} {{ employee()?.firstName }}</dd>
+            <dd>{{ employee().lastName }} {{ employee().firstName }}</dd>
         </div>
         <div class="meta-row">
             <dt>氏名（カナ）</dt>
-            <dd>{{ employee()?.lastNameKana }} {{ employee()?.firstNameKana }}</dd>
+            <dd>{{ employee().lastNameKana }} {{ employee().firstNameKana }}</dd>
         </div>
         <div class="meta-row">
             <dt>生年月日</dt>
-            <dd>{{ dateLabel(employee()?.birthDate) }}</dd>
+            <dd>{{ dateLabel(employee().birthDate) }}</dd>
         </div>
         <div class="meta-row">
             <dt>性別</dt>
-            <dd>{{ genderLabel(employee()?.gender) }}</dd>
+            <dd>{{ genderLabel(employee().gender) }}</dd>
         </div>
         <div class="meta-row">
             <dt>個人番号</dt>
-            <dd>{{ employee()?.myNumber || '—' }}</dd>
+            <dd>{{ employee().myNumber || '—' }}</dd>
         </div>
         <div class="meta-row">
-            <dt>取得日</dt>
-            <dd>{{ dateLabel(employee()?.joinedDate) }}</dd>
+            <dt>資格喪失年月日</dt>
+            <dd>{{ dateLabel(lossDate()) }}</dd>
         </div>
         <div class="meta-row">
-            <dt>被扶養者</dt>
-            <dd>無or有</dd>
+            <dt>資格喪失理由</dt>
+            <dd>{{ lossReasonLabel(item.lossReason) }}</dd>
         </div>
-        <div class="meta-row">
-            <dt>報酬月額</dt>
-            <dd>円</dd>
-        </div>
+        @if (showRetiredDate()) {
+            <div class="meta-row">
+                <dt>退職年月日</dt>
+                <dd>{{ timestampDateLabel(employee().retiredDate) }}</dd>
+            </div>
+        }
     </dl>
-    <button>エクスポート</button>
+
+    @if (item.memo) {
+        <h2 class="section-title">メモ</h2>
+        <p class="memo-text">{{ item.memo }}</p>
+    }
+
+    <button type="button" class="btn export-btn">エクスポート</button>
 </section>
 
 <style>
@@ -166,10 +181,17 @@
         color: #333;
     }
 
+    .export-btn {
+        margin-top: 20px;
+        background: #2563eb;
+        color: #fff;
+    }
+
     .title {
         display: flex;
         align-items: center;
         gap: 14px;
+        margin: 16px 0;
         color: #222;
         font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif;
     }
@@ -232,6 +254,13 @@
         gap: 4px;
     }
 
+    .office-code-boxes p {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: #111827;
+    }
+
     .code-box {
         display: inline-flex;
         align-items: center;
@@ -266,6 +295,10 @@
         gap: 10px;
     }
 
+    .office-meta {
+        margin-top: 12px;
+    }
+
     .meta-row {
         display: flex;
         gap: 12px;
@@ -285,15 +318,6 @@
         margin: 0;
         color: #111827;
         word-break: break-all;
-    }
-
-    .employee-link {
-        color: #2563eb;
-        text-decoration: none;
-    }
-
-    .employee-link:hover {
-        text-decoration: underline;
     }
 
     .memo-text {

@@ -9,7 +9,7 @@ import { SocialInsuranceStatusService } from '../../social-insurance/services/so
 import { SocialInsuranceProcedureService } from '../../social-insurance/services/social-insurance-procedure.service';
 
 import { Office } from '../../company/models/office.model';
-import { Employee, EmployeeInput, EmployeeStatus, EmploymentType, toEmployeeInput } from '../models/employee.models';
+import { Dependent, Employee, EmployeeInput, EmployeeStatus, EmploymentType, toEmployeeInput } from '../models/employee.models';
 import { insuranceJoinStatus, SocialInsuranceStatus, SocialInsuranceStatusInput } from '../../social-insurance/models/social-insurance-status.model';
 import { Procedure, ProcedureStatus } from '../../social-insurance/models/procedures.model';
 
@@ -74,6 +74,7 @@ export class EmployeeDetailPageComponent {
     department = '';
     position = '';
     employmentType: EmploymentType = null;
+    dependents: Dependent[] = [];
 
     // 社会保険 加入要件
     weeklyScheduledWorkHours: string | number = ''; // number入力だが空を許容するため文字列
@@ -168,6 +169,9 @@ export class EmployeeDetailPageComponent {
         return status;
     });
 
+    // 扶養家族の人数の取得
+    dependentCount = computed(() => this.employee()?.dependents.length ?? 0);
+
     openQualificationCreateConfirm(): void {
         this.errorMessage.set('');
         this.showQualificationCreateConfirm.set(true);
@@ -213,6 +217,7 @@ export class EmployeeDetailPageComponent {
                 completedDate: null,
                 targetYearMonth: null,
                 memo: '',
+                lossReason: null,
             });
             this.qualificationProcedure.set(procedure);
             this.showQualificationCreateConfirm.set(false);
