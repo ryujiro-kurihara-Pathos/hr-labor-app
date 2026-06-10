@@ -37,6 +37,7 @@ export class SocialInsuranceProcedureService {
             targetYearMonth: (data['targetYearMonth'] as string | null) ?? null,
             memo: String(data['memo'] ?? ''),
             lossReason: (data['lossReason'] as Procedure['lossReason']) ?? null,
+            dependentChanges: (data['dependentChanges'] as Procedure['dependentChanges']) ?? null,
             createdAt: data['createdAt'] as Procedure['createdAt'],
             updatedAt: data['updatedAt'] as Procedure['updatedAt'],
         };
@@ -73,6 +74,21 @@ export class SocialInsuranceProcedureService {
         return this.toProcedure(procedureId, snapshot.data() as Record<string, unknown>);
     }
 
+    async getOpenDependentChangeProcedureByEmployeeId(employeeId: string): Promise<Procedure | null> {
+        const docRef = collection(db, this.collectionName);
+        const q = query(
+            docRef,
+            where('employeeId', '==', employeeId),
+            where('procedureType', '==', 'dependentChange'),
+        );
+        const snapshot = await getDocs(q);
+        const open = snapshot.docs
+            .map((item) => this.toProcedure(item.id, item.data() as Record<string, unknown>))
+            .find((procedure) => procedure.status !== 'completed');
+
+        return open ?? null;
+    }
+
     // employeeIdから資格取得手続きを取得
     async getQualificationProcedureByEmployeeId(employeeId: string, companyId: string): Promise<Procedure | null> {
         const docRef = collection(db, this.collectionName);
@@ -91,4 +107,5 @@ export class SocialInsuranceProcedureService {
         
         await updateDoc(docRef, procedure);
     }
+
 }

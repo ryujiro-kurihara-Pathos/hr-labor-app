@@ -1,0 +1,294 @@
+@let item = procedure()!;
+
+<section class="detail-card">
+    <div class="page-header">
+        <div class="page-header-title">
+            <h1>手続き詳細</h1>
+            <span
+                class="status-badge"
+                [class.not-started]="item.status === 'notStarted'"
+                [class.in-progress]="item.status === 'inProgress'"
+                [class.completed]="item.status === 'completed'"
+            >
+                {{ statusLabel(item.status) }}
+            </span>
+        </div>
+        <button type="button" class="btn edit-btn">編集</button>
+    </div>
+
+    <div class="title">
+        <div class="title-sub">
+            <span>健康保険</span>
+            <span>厚生年金保険</span>
+        </div>
+        <div class="title-main">{{ formTitle() }}</div>
+    </div>
+
+    <h2 class="section-title">事業所情報</h2>
+    <div class="office-code-panel">
+        <div class="office-code-group">
+            <span class="office-code-label">事業所整理記号</span>
+            <div class="office-code-boxes" aria-label="事業所整理記号">
+                @for (char of officeSymbolPrefixChars(); track $index) {
+                    <span class="code-box">{{ char.trim() ? char : '' }}</span>
+                }
+                <span class="code-separator">-</span>
+                @for (char of officeSymbolSuffixChars(); track $index) {
+                    <span class="code-box code-box-kana">{{ char.trim() ? char : '' }}</span>
+                }
+            </div>
+        </div>
+        <div class="office-code-group">
+            <span class="office-code-label">事業所番号</span>
+            <div class="office-code-boxes" aria-label="事業所番号">
+                <p>{{ office().officeNumber || '—' }}</p>
+            </div>
+        </div>
+    </div>
+
+    <dl class="detail-meta office-meta">
+        <div class="meta-row">
+            <dt>事業所所在地</dt>
+            <dd>〒{{ office().postalCode }} {{ office().prefecture }}{{ office().city }}{{ office().streetAddress }} {{ office().buildingName }}</dd>
+        </div>
+        <div class="meta-row">
+            <dt>事業所名称</dt>
+            <dd>{{ company().name }} {{ office().name }}</dd>
+        </div>
+        <div class="meta-row">
+            <dt>事業主氏名</dt>
+            <dd>{{ company().representativeName }}</dd>
+        </div>
+        <div class="meta-row">
+            <dt>電話番号</dt>
+            <dd>{{ office().phoneNumber || '—' }}</dd>
+        </div>
+    </dl>
+
+    <h2 class="section-title">被保険者情報</h2>
+    <dl class="detail-meta">
+        <div class="meta-row">
+            <dt>氏名</dt>
+            <dd>{{ employee().lastName }} {{ employee().firstName }}</dd>
+        </div>
+        <div class="meta-row">
+            <dt>氏名（カナ）</dt>
+            <dd>{{ employee().lastNameKana || '—' }} {{ employee().firstNameKana || '—' }}</dd>
+        </div>
+        <div class="meta-row">
+            <dt>生年月日</dt>
+            <dd>{{ dateLabel(employee().birthDate) }}</dd>
+        </div>
+        <div class="meta-row">
+            <dt>性別</dt>
+            <dd>{{ genderLabel(employee().gender) }}</dd>
+        </div>
+        <div class="meta-row">
+            <dt>個人番号</dt>
+            <dd>{{ employee().myNumber || '—' }}</dd>
+        </div>
+
+        @switch (variant()) {
+            @case ('regularDecision') {
+                <div class="meta-row">
+                    <dt>対象年月</dt>
+                    <dd>{{ yearMonthLabel(item.targetYearMonth) }}（4〜6月）</dd>
+                </div>
+                <div class="meta-row">
+                    <dt>4〜6月報酬月額</dt>
+                    <dd>— 円</dd>
+                </div>
+                <div class="meta-row">
+                    <dt>標準報酬月額</dt>
+                    <dd>— 円</dd>
+                </div>
+                <div class="meta-row">
+                    <dt>改定年月</dt>
+                    <dd>—</dd>
+                </div>
+            }
+            @case ('revision') {
+                <div class="meta-row">
+                    <dt>改定年月</dt>
+                    <dd>{{ yearMonthLabel(item.targetYearMonth) }}</dd>
+                </div>
+                <div class="meta-row">
+                    <dt>改定前報酬月額</dt>
+                    <dd>— 円</dd>
+                </div>
+                <div class="meta-row">
+                    <dt>改定後報酬月額</dt>
+                    <dd>— 円</dd>
+                </div>
+                <div class="meta-row">
+                    <dt>改定理由</dt>
+                    <dd>—</dd>
+                </div>
+            }
+            @case ('bonusPayment') {
+                <div class="meta-row">
+                    <dt>賞与支給日</dt>
+                    <dd>{{ dateLabel(item.occurredDate) }}</dd>
+                </div>
+                <div class="meta-row">
+                    <dt>賞与額</dt>
+                    <dd>— 円</dd>
+                </div>
+                <div class="meta-row">
+                    <dt>対象年月</dt>
+                    <dd>{{ yearMonthLabel(item.targetYearMonth) }}</dd>
+                </div>
+            }
+        }
+    </dl>
+
+    @if (item.memo) {
+        <h2 class="section-title">メモ</h2>
+        <p class="memo-text">{{ item.memo }}</p>
+    }
+
+    <button type="button" class="btn export-btn">エクスポート</button>
+</section>
+
+<style>
+    .detail-card {
+        padding: 20px;
+        background-color: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 8px;
+    }
+
+    .page-header-title {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+    }
+
+    h1 {
+        margin: 0;
+        font-size: 22px;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .status-badge.not-started { background: #f3f4f6; color: #4b5563; }
+    .status-badge.in-progress { background: #fef3c7; color: #92400e; }
+    .status-badge.completed { background: #dcfce7; color: #166534; }
+
+    .btn {
+        height: 42px;
+        padding: 0 16px;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .edit-btn { background: #e5e7eb; color: #333; }
+    .export-btn { margin-top: 20px; background: #2563eb; color: #fff; }
+
+    .title {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin: 16px 0;
+        color: #222;
+        font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif;
+    }
+
+    .title-sub {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.2;
+        letter-spacing: 0.04em;
+        white-space: nowrap;
+    }
+
+    .title-main {
+        font-size: 34px;
+        font-weight: 500;
+        line-height: 1;
+        letter-spacing: 0.08em;
+        white-space: nowrap;
+    }
+
+    .section-title { margin: 24px 0 12px; font-size: 17px; }
+
+    .office-code-panel {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 20px 28px;
+        padding: 14px 16px;
+        background: #f9fafb;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+    }
+
+    .office-code-group { display: flex; flex-direction: column; gap: 8px; }
+    .office-code-label { font-size: 13px; font-weight: 600; color: #374151; }
+    .office-code-boxes { display: flex; align-items: center; gap: 4px; }
+    .office-code-boxes p { margin: 0; font-size: 18px; font-weight: 600; color: #111827; }
+
+    .code-box {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 34px;
+        border: 1px solid #9ca3af;
+        border-radius: 2px;
+        background: #fff;
+        font-size: 18px;
+        font-weight: 600;
+        color: #111827;
+    }
+
+    .code-box-kana { width: 32px; font-size: 16px; }
+    .code-separator { margin: 0 2px; font-size: 20px; font-weight: 700; color: #6b7280; }
+
+    .detail-meta { margin: 0; display: grid; gap: 10px; }
+    .office-meta { margin-top: 12px; }
+
+    .meta-row { display: flex; gap: 12px; font-size: 14px; }
+    .meta-row dt {
+        flex-shrink: 0;
+        min-width: 9em;
+        margin: 0;
+        color: #6b7280;
+        font-weight: 500;
+    }
+    .meta-row dd { margin: 0; color: #111827; word-break: break-all; }
+
+    .memo-text {
+        margin: 0;
+        padding: 12px 14px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 14px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+    }
+</style>

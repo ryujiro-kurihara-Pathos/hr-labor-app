@@ -32,6 +32,36 @@
                     [company]="company()!"
                 />
             }
+            @case ('regularDecision') {
+                <app-employee-procedure-sheet
+                    [procedure]="procedure()!"
+                    [employee]="employee()!"
+                    [office]="office()!"
+                    [company]="company()!"
+                    formTitle="算定基礎届"
+                    variant="regularDecision"
+                />
+            }
+            @case ('revision') {
+                <app-employee-procedure-sheet
+                    [procedure]="procedure()!"
+                    [employee]="employee()!"
+                    [office]="office()!"
+                    [company]="company()!"
+                    formTitle="報酬月額変更届"
+                    variant="revision"
+                />
+            }
+            @case ('bonusPayment') {
+                <app-employee-procedure-sheet
+                    [procedure]="procedure()!"
+                    [employee]="employee()!"
+                    [office]="office()!"
+                    [company]="company()!"
+                    formTitle="賞与支払届"
+                    variant="bonusPayment"
+                />
+            }
             @default {
                 <p class="error">{{ errorMessage() || '手続きの種類が不明です' }}</p>
             }

@@ -130,8 +130,8 @@ export class EmployeeDetailPageComponent {
             this.socialInsuranceStatus.set(socialInsuranceStatus);
             this.syncFormFromSocialInsuranceStatus(socialInsuranceStatus);
 
-            // 資格取得手続きを取得
             await this.loadQualificationProcedure();
+            await this.loadOpenDependentChangeProcedure();
         } catch (error) {
             console.error('従業員の取得に失敗しました', error);
             this.errorMessage.set('従業員の取得に失敗しました');
@@ -236,6 +236,7 @@ export class EmployeeDetailPageComponent {
                 targetYearMonth: null,
                 memo: '',
                 lossReason: null,
+                dependentChanges: null,
             });
             this.qualificationProcedure.set(procedure);
             this.showQualificationCreateConfirm.set(false);
@@ -252,13 +253,35 @@ export class EmployeeDetailPageComponent {
 
     }
 
-    // 扶養家族手続きID
-    dependentProcedureId = signal<string | null>(null);
+    // 扶養変更手続き
+    openDependentChangeProcedure = signal<Procedure | null>(null);
 
-    // 扶養家族手続きの追加
+    // 扶養変更手続きの取得
+    async loadOpenDependentChangeProcedure(): Promise<void> {
+        this.openDependentChangeProcedure.set(null);
+
+        const employee = this.employee();
+        if (!employee) return;
+
+        try {
+            const procedure = await this.procedureService.getOpenDependentChangeProcedureByEmployeeId(employee.id);
+            this.openDependentChangeProcedure.set(procedure);
+        } catch (error) {
+            console.error('扶養変更手続きの取得に失敗しました', error);
+            this.errorMessage.set('扶養変更手続きの取得に失敗しました');
+        }
+    }
+
+    // 扶養変更手続きの追加
     async createDependentProcedure(): Promise<void> {
         const employee = this.employee();
         if (!employee) return;
+
+        const existing = this.openDependentChangeProcedure();
+        if (existing) {
+            this.router.navigate(['/procedures', existing.id]);
+            return;
+        }
 
         try {
             const procedure = await this.procedureService.createProcedure({
@@ -273,10 +296,10 @@ export class EmployeeDetailPageComponent {
                 targetYearMonth: null,
                 memo: '',
                 lossReason: null,
+                dependentChanges: null,
             });
-            if(!procedure) return;
-            this.dependentProcedureId.set(procedure.id);
-            console.log('procedure', procedure);
+            if (!procedure) return;
+            this.openDependentChangeProcedure.set(procedure);
             this.router.navigate(['/procedures', procedure.id]);
         } catch (error) {
             console.error('扶養家族手続きの追加に失敗しました', error);

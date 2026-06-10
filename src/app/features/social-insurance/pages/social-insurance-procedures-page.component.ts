@@ -80,6 +80,7 @@ export class SocialInsuranceProceduresPageComponent {
             targetYearMonth: null,
             memo: '',
             lossReason: null,
+            dependentChanges: null,
         }
         try {
             await this.procedureService.createProcedure(procedureInput);

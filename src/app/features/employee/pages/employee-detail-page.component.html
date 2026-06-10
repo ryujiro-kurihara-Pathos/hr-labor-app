@@ -158,7 +158,20 @@
                     <div class="detail-row">
                         <dt>扶養家族</dt>
                         <dd>{{ dependents().length }}人</dd>
-                        <dd><a class="btn sub-btn" (click)="createDependentProcedure()">扶養家族を追加する</a></dd>
+                        <dd>
+                            @if (openDependentChangeProcedure()) {
+                                <a
+                                    [routerLink]="['/procedures', openDependentChangeProcedure()!.id]"
+                                    class="btn sub-btn"
+                                >
+                                    扶養変更届へ
+                                </a>
+                            } @else {
+                                <button type="button" class="btn sub-btn" (click)="createDependentProcedure()">
+                                    扶養家族を変更する
+                                </button>
+                            }
+                        </dd>
                     </div>
                     <div class="detail-row">
                         <dt>在籍状態</dt>

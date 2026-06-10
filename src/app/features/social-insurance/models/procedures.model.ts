@@ -56,6 +56,9 @@ export type Procedure = {
     /** 資格喪失手続き（loss）のときのみ使用 */
     lossReason: LossReason | null;
 
+    /** 扶養変更手続き（dependentChange）のときのみ使用 */
+    dependentChanges: 'add' | 'delete' | 'change' | null;
+
     createdAt: Timestamp;
     updatedAt: Timestamp;
 };
