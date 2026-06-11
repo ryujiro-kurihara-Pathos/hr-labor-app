@@ -244,7 +244,11 @@
                             </div>
                         }
                     } @else {
-                        <p class="section-note">この従業員は退職済みです。誤って退職処理した場合のみ在籍に戻せます。</p>
+                        @if (isPastRetiredDate()) {
+                            <p class="section-note">この従業員は退職済みです。</p>
+                        } @else {
+                            <p class="section-note">この従業員は{{ formatRetiredDate(employee()!.retiredDate) }}に退職予定です。</p>
+                        }
                         @if (errorMessage()) {
                             <p class="error-message">{{ errorMessage() }}</p>
                         }
@@ -258,6 +262,21 @@
                                 処理中...
                             } @else {
                                 在籍に戻す
+                            }
+                        </button>
+                        
+                        <button
+                            type="button"
+                            class="btn sub-btn"
+                            (click)="openLossProcedure()"
+                            [disabled]="isCreatingLossProcedure()"
+                        >
+                            @if (isCreatingLossProcedure()) {
+                                作成中...
+                            } @else if (lossProcedureExists()) {
+                                資格喪失手続きを開く
+                            } @else {
+                                資格喪失手続きを行う
                             }
                         </button>
                     }
@@ -441,6 +460,12 @@
                 </div>
             </div>
 
+            @if (needsQualificationProcedurePrompt()) {
+                <p class="insurance-judgment-note" role="note">
+                    健康保険の加入対象ですが、まだ資格取得手続きが完了していません。手続きをしてください。
+                </p>
+            }
+
             <section class="qualification-procedure-section">
                 <h2 class="section-title">手続き一覧</h2>
 
@@ -448,7 +473,13 @@
                     @if (isHealthInsuranceEligible()) {
                         @if (qualificationProcedureExists()) {
                             <div class="qualification-procedure-header">
-                                <p class="qualification-procedure-message">資格取得手続きが作成されています。</p>
+                                @if (needsQualificationProcedurePrompt()) {
+                                    <p class="qualification-procedure-message">
+                                        健康保険の加入対象ですが、まだ手続きが完了していません。手続きをしてください。
+                                    </p>
+                                } @else {
+                                    <p class="qualification-procedure-message">資格取得手続きが完了しています。</p>
+                                }
                                 <span
                                     class="procedure-status-badge"
                                     [class.not-started]="qualificationProcedureStatus() === 'notStarted'"
@@ -459,7 +490,7 @@
                                 </span>
                             </div>
                         } @else {
-                            <p class="section-note">健康保険・厚生年金の加入対象のため、資格取得届の手続きを行えます。</p>
+                            <p class="section-note">健康保険・厚生年金の加入対象ですが、まだ手続きをしていません。手続きをしてください。</p>
                         }
                         @if (errorMessage()) {
                             <p class="error-message">{{ errorMessage() }}</p>
@@ -472,6 +503,8 @@
                         >
                             @if (isCreatingQualificationProcedure()) {
                                 作成中...
+                            } @else if (qualificationProcedureExists()) {
+                                資格取得手続きを開く
                             } @else {
                                 資格取得手続きを行う
                             }
@@ -480,6 +513,55 @@
                         <p class="section-note">健康保険・厚生年金の加入対象外のため、資格取得手続きを作成できません。</p>
                     }
                 </div>
+
+                @if (hasRetiredDate()) {
+                    @if (needsLossProcedurePrompt()) {
+                        <p class="insurance-judgment-note" role="note">
+                            退職日が設定されています。資格喪失届の手続きをしてください。
+                        </p>
+                    }
+
+                    <div class="qualification-procedure-box">
+                        <h3 class="subsection-title">資格喪失届</h3>
+                        @if (lossProcedureExists()) {
+                            <div class="qualification-procedure-header">
+                                @if (needsLossProcedurePrompt()) {
+                                    <p class="qualification-procedure-message">
+                                        退職日が設定されていますが、まだ手続きが完了していません。手続きをしてください。
+                                    </p>
+                                } @else {
+                                    <p class="qualification-procedure-message">資格喪失手続きが完了しています。</p>
+                                }
+                                <span
+                                    class="procedure-status-badge"
+                                    [class.not-started]="lossProcedureStatus() === 'notStarted'"
+                                    [class.in-progress]="lossProcedureStatus() === 'inProgress'"
+                                    [class.completed]="lossProcedureStatus() === 'completed'"
+                                >
+                                    {{ qualificationProcedureStatusLabel(lossProcedureStatus()) }}
+                                </span>
+                            </div>
+                        } @else {
+                            <p class="section-note">
+                                退職日（{{ formatRetiredDate(employee()!.retiredDate) }}）が設定されています。資格喪失届の手続きをしてください。
+                            </p>
+                        }
+                        <button
+                            type="button"
+                            class="btn primary-btn qualification-procedure-create-btn"
+                            (click)="openLossProcedure()"
+                            [disabled]="isCreatingLossProcedure()"
+                        >
+                            @if (isCreatingLossProcedure()) {
+                                作成中...
+                            } @else if (lossProcedureExists()) {
+                                資格喪失手続きを開く
+                            } @else {
+                                資格喪失手続きを行う
+                            }
+                        </button>
+                    </div>
+                }
             </section>
 
             @if (isEditing()) {
@@ -605,6 +687,15 @@
         background: #f9fafb;
         border: 1px solid #e5e7eb;
         border-radius: 10px;
+    }
+
+    .qualification-procedure-box + .qualification-procedure-box,
+    .qualification-procedure-box + .insurance-judgment-note + .qualification-procedure-box {
+        margin-top: 12px;
+    }
+
+    .qualification-procedure-box .subsection-title {
+        margin: 0 0 12px;
     }
 
     .qualification-procedure-header {

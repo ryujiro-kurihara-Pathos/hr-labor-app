@@ -2,10 +2,12 @@ import { BonusReward } from '../../bonus/models/bonus-reward.model';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 import {
     bonusesForStandardBonusPremium,
-    countBonusPaymentsInCalendarYear,
+    countBonusPaymentsInTargetPeriod,
     effectiveMonthlyRewardFromBase,
     effectiveMonthlyRewardTotal,
+    monthlyBonusRemunerationAddition,
     shouldTreatBonusAsMonthlyRemuneration,
+    sumBonusAmountInTargetPeriod,
 } from './effective-monthly-reward.util';
 
 function makeBonus(targetYearMonth: string, amount: number): BonusReward {
@@ -51,17 +53,17 @@ function makeReward(overrides: Partial<StandardMonthlyReward> = {}): StandardMon
 
 describe('effective-monthly-reward.util', () => {
     describe('shouldTreatBonusAsMonthlyRemuneration', () => {
-        it('暦年3回以下は月次報酬に算入しない', () => {
+        it('対象期間3回以下は月次報酬に算入しない', () => {
             const bonuses = [
                 makeBonus('2026-01', 50_000),
                 makeBonus('2026-04', 50_000),
                 makeBonus('2026-07', 50_000),
             ];
-            expect(countBonusPaymentsInCalendarYear(bonuses, 2026)).toBe(3);
+            expect(countBonusPaymentsInTargetPeriod(bonuses, '2026-07')).toBe(3);
             expect(shouldTreatBonusAsMonthlyRemuneration(bonuses, '2026-07')).toBeFalse();
         });
 
-        it('暦年4回以上は支給額に関係なく月次報酬に算入する', () => {
+        it('対象期間4回目以降は支給額に関係なく月次報酬に算入する', () => {
             const bonuses = [
                 makeBonus('2026-01', 50_000),
                 makeBonus('2026-04', 80_000),
@@ -72,8 +74,29 @@ describe('effective-monthly-reward.util', () => {
         });
     });
 
+    describe('monthlyBonusRemunerationAddition', () => {
+        it('4回以上の場合、対象期間内の賞与合計を12で除した額を返す', () => {
+            const bonuses = [
+                makeBonus('2026-01', 10_000),
+                makeBonus('2026-04', 20_000),
+                makeBonus('2026-07', 30_000),
+                makeBonus('2026-10', 40_000),
+            ];
+            expect(sumBonusAmountInTargetPeriod(bonuses, '2026-04')).toBe(100_000);
+            expect(monthlyBonusRemunerationAddition(bonuses, '2026-04')).toBe(8333);
+        });
+
+        it('4回未満の場合は0', () => {
+            const bonuses = [
+                makeBonus('2026-01', 10_000),
+                makeBonus('2026-06', 200_000),
+            ];
+            expect(monthlyBonusRemunerationAddition(bonuses, '2026-06')).toBe(0);
+        });
+    });
+
     describe('effectiveMonthlyRewardTotal', () => {
-        it('年4回以上の場合、対象月の賞与を加算する', () => {
+        it('4回以上の場合、対象期間の賞与合計÷12を毎月加算する', () => {
             const reward = makeReward();
             const bonuses = [
                 makeBonus('2026-01', 10_000),
@@ -81,10 +104,11 @@ describe('effective-monthly-reward.util', () => {
                 makeBonus('2026-07', 30_000),
                 makeBonus('2026-10', 40_000),
             ];
-            expect(effectiveMonthlyRewardTotal(reward, '2026-04', bonuses)).toBe(320_000);
+            expect(effectiveMonthlyRewardTotal(reward, '2026-04', bonuses)).toBe(308_333);
+            expect(effectiveMonthlyRewardTotal(reward, '2026-08', bonuses)).toBe(308_333);
         });
 
-        it('年3回以下の場合、賞与を加算しない', () => {
+        it('3回以下の場合、賞与を加算しない', () => {
             const reward = makeReward();
             const bonuses = [
                 makeBonus('2026-01', 10_000),
@@ -96,19 +120,19 @@ describe('effective-monthly-reward.util', () => {
     });
 
     describe('effectiveMonthlyRewardFromBase', () => {
-        it('年4回以上の場合、ベース報酬に賞与を加算する', () => {
+        it('4回以上の場合、ベース報酬に賞与合計÷12を加算する', () => {
             const bonuses = [
                 makeBonus('2026-01', 10_000),
                 makeBonus('2026-02', 10_000),
                 makeBonus('2026-03', 10_000),
                 makeBonus('2026-04', 25_000),
             ];
-            expect(effectiveMonthlyRewardFromBase(280_000, '2026-04', bonuses)).toBe(305_000);
+            expect(effectiveMonthlyRewardFromBase(280_000, '2026-04', bonuses)).toBe(284_583);
         });
     });
 
     describe('bonusesForStandardBonusPremium', () => {
-        it('年4回以上の場合、標準賞与額の対象から除外する', () => {
+        it('4回以上の場合、標準賞与額・賞与支払届の対象から除外する', () => {
             const monthBonuses = [makeBonus('2026-04', 20_000)];
             const allBonuses = [
                 makeBonus('2026-01', 10_000),
@@ -119,7 +143,7 @@ describe('effective-monthly-reward.util', () => {
             expect(bonusesForStandardBonusPremium(monthBonuses, '2026-04', allBonuses)).toEqual([]);
         });
 
-        it('年3回以下の場合、標準賞与額の対象とする', () => {
+        it('3回以下の場合、標準賞与額の対象とする', () => {
             const monthBonuses = [makeBonus('2026-06', 200_000)];
             const allBonuses = [
                 makeBonus('2026-06', 200_000),

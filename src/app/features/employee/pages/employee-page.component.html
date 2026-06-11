@@ -1,71 +1,312 @@
-<h1>Employee Page</h1>
-
-<select
-    [ngModel]="selectedOfficeId()"
-    (ngModelChange)="selectedOfficeId.set($event)"
->
-    <option value="">すべての事業所</option>
-    @for (office of officeNameById() | keyvalue; track office.key) {
-        <option [value]="office.key">{{ office.value }}</option>
-    }
-</select>
-
-<select
-    [ngModel]="selectedStatus()"
-    (ngModelChange)="selectedStatus.set($event)"
->
-    <option value="">すべての在籍状態</option>
-    <option value="active">在籍</option>
-    <option value="retired">退職</option>
-</select>
-
-<input
-    type="text"
-    [ngModel]="keyword()"
-    (ngModelChange)="keyword.set($event)"
-    placeholder="検索キーワード"
->
-
-<button class="add-employee-btn" routerLink="/employees/new">従業員を追加</button>
-
-@for (employee of filteredEmployees(); track employee.id) {
-    <div class="employee-card" [routerLink]="['/employees', employee.id]">
-        <div class="employee-card-header">
-            <p class="employee-name">{{ employee.lastName }} {{ employee.firstName }}</p>
-            <span
-                class="status-badge"
-                [class.retired]="isRetiredBadge(employee)"
-                [class.retiring-soon]="isPendingRetirement(employee)"
-            >
-                {{ statusBadgeLabel(employee) }}
-            </span>
+<div class="employees-page">
+    <header class="page-header">
+        <div class="page-header-main">
+            <h1>従業員管理</h1>
+            <p class="page-note">従業員の一覧・検索・詳細確認ができます。カードをクリックして詳細へ進めます。</p>
         </div>
-        <p>{{ officeNameById()[employee.officeId] ?? employee.officeId }}</p>
-        <p>入社日: {{ employee.joinedDate }}</p>
-    </div>
-}
+        <a routerLink="/employees/new" class="btn primary-btn">従業員を追加</a>
+    </header>
+
+    <section class="filter-section">
+        <div class="filter-grid">
+            <div class="form-field">
+                <label for="office-filter">事業所</label>
+                <select
+                    id="office-filter"
+                    [ngModel]="selectedOfficeId()"
+                    (ngModelChange)="selectedOfficeId.set($event)"
+                >
+                    <option value="">すべての事業所</option>
+                    @for (office of officeOptions(); track office.id) {
+                        <option [value]="office.id">{{ office.name }}</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label for="status-filter">在籍状態</label>
+                <select
+                    id="status-filter"
+                    [ngModel]="selectedStatus()"
+                    (ngModelChange)="selectedStatus.set($event)"
+                >
+                    <option value="">すべて</option>
+                    <option value="active">在籍</option>
+                    <option value="retired">退職</option>
+                </select>
+            </div>
+            <div class="form-field form-field-search">
+                <label for="keyword-filter">検索</label>
+                <input
+                    id="keyword-filter"
+                    type="text"
+                    [ngModel]="keyword()"
+                    (ngModelChange)="keyword.set($event)"
+                    placeholder="氏名・社員番号"
+                />
+            </div>
+        </div>
+    </section>
+
+    <section class="list-section">
+        <div class="list-header">
+            <h2 class="section-title">従業員一覧</h2>
+            <p class="section-note">
+                @if (isLoading()) {
+                    読み込み中...
+                } @else {
+                    {{ filteredEmployees().length }}件
+                    @if (hasActiveFilters()) {
+                        <span class="filter-hint">（絞り込み中）</span>
+                    }
+                }
+            </p>
+        </div>
+
+        @if (isLoading()) {
+            <p class="loading">従業員を読み込み中...</p>
+        } @else if (errorMessage()) {
+            <p class="error">{{ errorMessage() }}</p>
+        } @else if (employees().length === 0) {
+            <div class="empty-state">
+                <p class="empty-title">従業員がまだ登録されていません</p>
+                <p class="empty-note">「従業員を追加」から最初の従業員を登録してください。</p>
+            </div>
+        } @else if (filteredEmployees().length === 0) {
+            <div class="empty-state">
+                <p class="empty-title">条件に一致する従業員がいません</p>
+                <p class="empty-note">検索キーワードや絞り込み条件を変更してください。</p>
+            </div>
+        } @else {
+            <div class="employee-list">
+                @for (employee of filteredEmployees(); track employee.id) {
+                    <a class="employee-card" [routerLink]="['/employees', employee.id]">
+                        <div class="employee-card-header">
+                            <div class="employee-name-block">
+                                <p class="employee-name">{{ employee.lastName }} {{ employee.firstName }}</p>
+                                @if (employee.lastNameKana || employee.firstNameKana) {
+                                    <p class="employee-kana">
+                                        {{ employee.lastNameKana }} {{ employee.firstNameKana }}
+                                    </p>
+                                }
+                            </div>
+                            <span
+                                class="status-badge"
+                                [class.retired]="isRetiredBadge(employee)"
+                                [class.retiring-soon]="isPendingRetirement(employee)"
+                            >
+                                {{ statusBadgeLabel(employee) }}
+                            </span>
+                        </div>
+                        <dl class="employee-meta">
+                            <div class="meta-row">
+                                <dt>社員番号</dt>
+                                <dd>{{ employee.employeeNumber || '—' }}</dd>
+                            </div>
+                            <div class="meta-row">
+                                <dt>事業所</dt>
+                                <dd>{{ officeNameById()[employee.officeId] ?? '—' }}</dd>
+                            </div>
+                            <div class="meta-row">
+                                <dt>入社日</dt>
+                                <dd>{{ formatDate(employee.joinedDate) }}</dd>
+                            </div>
+                            @if (employee.department || employee.position) {
+                                <div class="meta-row">
+                                    <dt>所属</dt>
+                                    <dd>
+                                        {{ employee.department || '—' }}
+                                        @if (employee.position) {
+                                            <span class="position">／ {{ employee.position }}</span>
+                                        }
+                                    </dd>
+                                </div>
+                            }
+                            @if (employee.employmentType) {
+                                <div class="meta-row">
+                                    <dt>雇用区分</dt>
+                                    <dd>{{ employmentTypeLabel(employee.employmentType) }}</dd>
+                                </div>
+                            }
+                        </dl>
+                    </a>
+                }
+            </div>
+        }
+    </section>
+</div>
 
 <style>
-    .employee-card {
+    .employees-page {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 24px 16px 40px;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+    }
+
+    .page-header h1 {
+        margin: 0 0 8px;
+        font-size: 22px;
+    }
+
+    .page-note {
+        margin: 0;
+        color: #6b7280;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    .filter-section {
+        margin-top: 24px;
         padding: 16px;
-        margin-bottom: 12px;
-        background-color: #fff;
+        background: #fff;
+        border: 1px solid #e5e7eb;
         border-radius: 8px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    }
+
+    .filter-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px 16px;
+    }
+
+    .form-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .form-field label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .form-field input,
+    .form-field select {
+        height: 40px;
+        padding: 0 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 14px;
+        background: #fff;
+    }
+
+    .form-field select {
         cursor: pointer;
+    }
+
+    .list-section {
+        margin-top: 24px;
+    }
+
+    .list-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .section-title {
+        margin: 0;
+        font-size: 17px;
+    }
+
+    .section-note {
+        margin: 0;
+        color: #6b7280;
+        font-size: 13px;
+    }
+
+    .filter-hint {
+        color: #2563eb;
+    }
+
+    .loading,
+    .empty-note {
+        color: #6b7280;
+        font-size: 14px;
+    }
+
+    .error {
+        color: #b91c1c;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .empty-state {
+        padding: 32px 20px;
+        text-align: center;
+        background: #f9fafb;
+        border: 1px dashed #d1d5db;
+        border-radius: 8px;
+    }
+
+    .empty-title {
+        margin: 0 0 6px;
+        font-size: 15px;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .empty-note {
+        margin: 0;
+    }
+
+    .employee-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .employee-card {
+        display: block;
+        padding: 16px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+        text-decoration: none;
+        color: inherit;
+        cursor: pointer;
+        transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .employee-card:hover {
+        border-color: #93c5fd;
+        box-shadow: 0 4px 10px rgba(59, 130, 246, 0.12);
     }
 
     .employee-card-header {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         justify-content: space-between;
-        gap: 8px;
-        margin-bottom: 4px;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .employee-name-block {
+        min-width: 0;
     }
 
     .employee-name {
         margin: 0;
+        font-size: 16px;
         font-weight: 600;
+        color: #111827;
+    }
+
+    .employee-kana {
+        margin: 4px 0 0;
+        font-size: 12px;
+        color: #6b7280;
     }
 
     .status-badge {
@@ -86,5 +327,76 @@
     .status-badge.retiring-soon {
         background: #fef3c7;
         color: #92400e;
+    }
+
+    .employee-meta {
+        margin: 0;
+        display: grid;
+        gap: 6px;
+    }
+
+    .meta-row {
+        display: flex;
+        gap: 12px;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .meta-row dt {
+        flex-shrink: 0;
+        width: 72px;
+        margin: 0;
+        color: #6b7280;
+        font-weight: 500;
+    }
+
+    .meta-row dd {
+        margin: 0;
+        color: #111827;
+        word-break: break-all;
+    }
+
+    .position {
+        color: #6b7280;
+    }
+
+    .btn {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 40px;
+        padding: 0 16px;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+
+    .primary-btn {
+        background: #2563eb;
+        color: #fff;
+    }
+
+    .primary-btn:hover {
+        background: #1d4ed8;
+    }
+
+    @media (max-width: 768px) {
+        .page-header {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .filter-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .primary-btn {
+            width: 100%;
+        }
     }
 </style>

@@ -12,7 +12,7 @@ import {
     where,
 } from 'firebase/firestore';
 import { db } from '../../../core/firebase';
-import { Dependent, Employee, EmployeeInput } from '../models/employee.models';
+import { Dependent, DependentInput, Employee, EmployeeInput } from '../models/employee.models';
 
 @Injectable({
     providedIn: 'root',
@@ -110,17 +110,110 @@ export class EmployeeService {
         });
     }
 
+    private toDependent(id: string, data: Record<string, unknown>): Dependent {
+        const gender = data['gender'];
+        const income = data['income'];
+
+        return {
+            id,
+            lastName: String(data['lastName'] ?? ''),
+            firstName: String(data['firstName'] ?? ''),
+            birthDate: String(data['birthDate'] ?? ''),
+            relationship: (data['relationship'] as Dependent['relationship']) ?? 'other',
+            dependencyStartDate: String(data['dependencyStartDate'] ?? ''),
+            dependencyEndDate: (data['dependencyEndDate'] as string | null) ?? null,
+            status: (data['status'] as Dependent['status']) ?? 'active',
+            memo: String(data['memo'] ?? ''),
+            ...(gender === 'male' || gender === 'female' ? { gender } : {}),
+            ...(data['myNumber'] ? { myNumber: String(data['myNumber']) } : {}),
+            ...(data['address'] ? { address: String(data['address']) } : {}),
+            ...(data['occupation'] ? { occupation: String(data['occupation']) } : {}),
+            ...(typeof income === 'number' ? { income } : {}),
+        };
+    }
+
+    private dependentToFirestore(input: DependentInput): Record<string, unknown> {
+        const data: Record<string, unknown> = {
+            lastName: input.lastName,
+            firstName: input.firstName,
+            birthDate: input.birthDate,
+            relationship: input.relationship,
+            dependencyStartDate: input.dependencyStartDate,
+            dependencyEndDate: input.dependencyEndDate,
+            status: input.status,
+            memo: input.memo ?? '',
+        };
+
+        if (input.gender) data['gender'] = input.gender;
+        if (input.myNumber) data['myNumber'] = input.myNumber;
+        if (input.address) data['address'] = input.address;
+        if (input.occupation) data['occupation'] = input.occupation;
+        if (input.income != null) data['income'] = input.income;
+
+        return data;
+    }
+
     // employeeIdから扶養家族を取得
     async getDependentsByEmployeeId(employeeId: string): Promise<Dependent[]> {
         const docRef = collection(db, 'employees', employeeId, 'dependents');
         const snap = await getDocs(docRef);
-        if(snap.empty) return [];
+        if (snap.empty) return [];
 
         const dependents: Dependent[] = [];
         snap.forEach((docSnap) => {
-            dependents.push({...docSnap.data() as Dependent});
+            dependents.push(this.toDependent(docSnap.id, docSnap.data() as Record<string, unknown>));
         });
-        
+
         return dependents;
+    }
+
+    async createDependent(employeeId: string, input: DependentInput): Promise<Dependent> {
+        const docRef = doc(collection(db, 'employees', employeeId, 'dependents'));
+        const dependent: Dependent = {
+            id: docRef.id,
+            ...input,
+            memo: input.memo ?? '',
+        };
+
+        await setDoc(docRef, this.dependentToFirestore(input));
+        return dependent;
+    }
+
+    async updateDependent(
+        employeeId: string,
+        dependentId: string,
+        input: Partial<DependentInput>,
+    ): Promise<void> {
+        const docRef = doc(db, 'employees', employeeId, 'dependents', dependentId);
+        const updates: Record<string, unknown> = {};
+
+        if (input.lastName !== undefined) updates['lastName'] = input.lastName;
+        if (input.firstName !== undefined) updates['firstName'] = input.firstName;
+        if (input.birthDate !== undefined) updates['birthDate'] = input.birthDate;
+        if (input.relationship !== undefined) updates['relationship'] = input.relationship;
+        if (input.dependencyStartDate !== undefined) updates['dependencyStartDate'] = input.dependencyStartDate;
+        if (input.dependencyEndDate !== undefined) updates['dependencyEndDate'] = input.dependencyEndDate;
+        if (input.status !== undefined) updates['status'] = input.status;
+        if (input.memo !== undefined) updates['memo'] = input.memo;
+        if (input.gender !== undefined) updates['gender'] = input.gender;
+        if (input.myNumber !== undefined) updates['myNumber'] = input.myNumber;
+        if (input.address !== undefined) updates['address'] = input.address;
+        if (input.occupation !== undefined) updates['occupation'] = input.occupation;
+        if (input.income !== undefined) updates['income'] = input.income;
+
+        await updateDoc(docRef, updates);
+    }
+
+    async endDependent(
+        employeeId: string,
+        dependentId: string,
+        dependencyEndDate: string,
+        memo?: string,
+    ): Promise<void> {
+        await this.updateDependent(employeeId, dependentId, {
+            status: 'ended',
+            dependencyEndDate,
+            ...(memo ? { memo } : {}),
+        });
     }
 }

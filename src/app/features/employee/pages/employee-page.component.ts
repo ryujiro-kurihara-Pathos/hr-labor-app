@@ -1,18 +1,17 @@
 import { Component, signal, inject, computed } from '@angular/core';
-import { KeyValuePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
-import { Employee, EmployeeStatus } from '../models/employee.models';
+import { Employee, EmployeeStatus, EmploymentType } from '../models/employee.models';
 import { EmployeeService } from '../services/employee.service';
 import { AuthService } from '../../auth/services/auth.service';
 import { UserService } from '../../users/services/user.service';
 import { OfficeService } from '../../company/services/office.service';
 
 @Component({
-    selector: 'app-employee-paeg',
+    selector: 'app-employee-page',
     standalone: true,
-    imports: [RouterLink, FormsModule, KeyValuePipe],
+    imports: [RouterLink, FormsModule],
     templateUrl: './employee-page.component.html',
 })
 
@@ -22,41 +21,48 @@ export class EmployeePageComponent {
     private readonly authService = inject(AuthService);
     private readonly userService = inject(UserService);
 
-    // ローディング
     isLoading = signal<boolean>(false);
+    errorMessage = signal<string>('');
 
-    // 会社ID
     companyId = signal<string>('');
-    // 事業所名
     officeNameById = signal<Record<string, string>>({});
 
-    // 初期処理
+    employees = signal<Employee[]>([]);
+    keyword = signal<string>('');
+    selectedOfficeId = signal<string>('');
+    selectedStatus = signal<'' | EmployeeStatus>('');
+
+    officeOptions = computed(() => {
+        const map = this.officeNameById();
+        return Object.entries(map)
+            .map(([id, name]) => ({ id, name }))
+            .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+    });
+
+    filteredEmployees = computed(() => this.searchEmployees());
+
+    hasActiveFilters = computed(
+        () => Boolean(this.keyword().trim() || this.selectedOfficeId() || this.selectedStatus()),
+    );
+
     async ngOnInit() {
-        // 会社IDを取得
         const authUser = this.authService.getCurrentAuthUser();
-        if(!authUser) return;
+        if (!authUser) return;
         const appUser = await this.userService.getUserByUid(authUser.uid);
-        if(!appUser) return;
+        if (!appUser) return;
 
-        // 会社IDを設定
         this.companyId.set(appUser.companyId);
-
-        // 従業員のロード
         await this.loadEmployees();
     }
 
-    // 従業員一覧
-    employees = signal<Employee[]>([]);
-
-    // 従業員のロード
     async loadEmployees(): Promise<void> {
         const companyId = this.companyId();
-        if(!companyId) return;
+        if (!companyId) return;
 
         this.isLoading.set(true);
-        
+        this.errorMessage.set('');
+
         try {
-            // const cid = companyId;
             const [employees, offices] = await Promise.all([
                 this.employeeService.getEmployeesByCompanyId(companyId),
                 this.officeService.getOfficesByCompanyId(companyId),
@@ -71,26 +77,25 @@ export class EmployeePageComponent {
         } catch (error) {
             this.employees.set([]);
             this.officeNameById.set({});
+            this.errorMessage.set('従業員の取得に失敗しました');
             console.error('従業員の取得に失敗しました', error);
         } finally {
             this.isLoading.set(false);
         }
     }
 
-    // 検索キーワード
-    keyword = signal<string>('');
-
-    // 事業所絞り込み（空文字はすべて）
-    selectedOfficeId = signal<string>('');
-
-    // 在籍状態絞り込み（空文字はすべて）
-    selectedStatus = signal<'' | EmployeeStatus>('');
-
-    // 検索結果
-    filteredEmployees = computed(() => this.searchEmployees());
-
     statusLabel(status: EmployeeStatus): string {
         return status === 'active' ? '在籍' : '退職';
+    }
+
+    employmentTypeLabel(type: EmploymentType): string {
+        if (type === 'full-time') return '正社員';
+        if (type === 'part-time') return 'パート・アルバイト';
+        return '—';
+    }
+
+    formatDate(value: string): string {
+        return value.trim() || '—';
     }
 
     isPendingRetirement(employee: Employee): boolean {
@@ -115,7 +120,6 @@ export class EmployeePageComponent {
         return employee.status === 'retired' && !this.isPendingRetirement(employee);
     }
 
-    // 従業員を検索（keyword / selectedOfficeId / employees が変わるたび呼ばれる）
     searchEmployees(): Employee[] {
         const keyword = this.keyword().trim().toLowerCase();
         const officeId = this.selectedOfficeId();
@@ -129,9 +133,11 @@ export class EmployeePageComponent {
             list = list.filter((employee) => employee.status === status);
         }
         if (!keyword) return list;
+
         return list.filter(
             (employee) =>
                 `${employee.lastName}${employee.firstName}`.toLowerCase().includes(keyword) ||
+                `${employee.lastNameKana}${employee.firstNameKana}`.toLowerCase().includes(keyword) ||
                 employee.employeeNumber.toLowerCase().includes(keyword),
         );
     }

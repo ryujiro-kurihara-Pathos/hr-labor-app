@@ -12,6 +12,8 @@ import { Office } from '../../company/models/office.model';
 import { Dependent, Employee, EmployeeInput, EmployeeStatus, EmploymentType, toEmployeeInput } from '../models/employee.models';
 import { insuranceJoinStatus, SocialInsuranceStatus, SocialInsuranceStatusInput } from '../../social-insurance/models/social-insurance-status.model';
 import { Procedure, ProcedureStatus } from '../../social-insurance/models/procedures.model';
+import { getQualificationDate } from '../../insurance/utils/standard-remuneration-determination.util';
+import { qualificationProcedureDueDate } from '../../social-insurance/utils/qualification-procedure-data.util';
 
 type SocialInsuranceDraft = {
     weeklyScheduledWorkHours: string | number;
@@ -130,6 +132,7 @@ export class EmployeeDetailPageComponent {
             this.syncFormFromSocialInsuranceStatus(socialInsuranceStatus);
 
             await this.loadQualificationProcedure();
+            await this.loadLossProcedure();
             await this.loadOpenDependentChangeProcedure();
         } catch (error) {
             console.error('従業員の取得に失敗しました', error);
@@ -167,6 +170,14 @@ export class EmployeeDetailPageComponent {
         const status = this.qualificationProcedure()?.status;
         if(!status) return 'notStarted';
         return status;
+    });
+
+    // 健康保険の対象だが資格取得手続きが未完了
+    needsQualificationProcedurePrompt = computed((): boolean => {
+        if (!this.isHealthInsuranceEligible()) return false;
+
+        const procedure = this.qualificationProcedure();
+        return procedure === null || procedure.status !== 'completed';
     });
 
     // 扶養家族
@@ -212,28 +223,40 @@ export class EmployeeDetailPageComponent {
         return labels[status];
     }
 
+    // 資格取得手続きの追加
     async openQualificationProcedure(): Promise<void> {
         const employee = this.employee();
         if (!employee || !this.isHealthInsuranceEligible()) return;
 
+        // 既存の資格取得手続きがある場合はそれを開く
         const existing = this.qualificationProcedure();
         if (existing) {
             this.router.navigate(['/procedures', existing.id]);
             return;
         }
 
+        // 資格取得手続きの作成
         this.isCreatingQualificationProcedure.set(true);
         this.errorMessage.set('');
 
         try {
+            const qualificationDate = getQualificationDate(
+                employee,
+                this.socialInsuranceStatus()?.healthInsuranceStartDate ?? null,
+            );
+            const occurredDate = qualificationDate ?? employee.joinedDate;
+            const dueDate = qualificationDate
+                ? qualificationProcedureDueDate(qualificationDate)
+                : '';
+
             const procedure = await this.procedureService.createProcedure({
                 companyId: employee.companyId,
                 officeId: employee.officeId,
                 employeeId: employee.id,
                 procedureType: 'qualification',
                 status: 'notStarted',
-                occurredDate: employee.joinedDate,
-                dueDate: '',
+                occurredDate,
+                dueDate,
                 completedDate: null,
                 submittedDate: null,
                 targetYearMonth: null,
@@ -249,11 +272,6 @@ export class EmployeeDetailPageComponent {
         } finally {
             this.isCreatingQualificationProcedure.set(false);
         }
-    }
-
-    // 資格喪失手続きの追加
-    async createLossProcedure(): Promise<void> {
-
     }
 
     // 扶養変更手続き
@@ -309,6 +327,104 @@ export class EmployeeDetailPageComponent {
             console.error('扶養家族手続きの追加に失敗しました', error);
             this.errorMessage.set('扶養家族手続きの追加に失敗しました');
         }
+    }
+
+    // 資格喪失届
+    lossProcedure = signal<Procedure | null>(null);
+    isCreatingLossProcedure = signal<boolean>(false);
+
+    async loadLossProcedure(): Promise<void> {
+        this.lossProcedure.set(null);
+
+        const employee = this.employee();
+        if (!employee) return;
+
+        try {
+            const procedure = await this.procedureService.getLossProcedureByEmployeeId(
+                employee.id,
+                employee.companyId,
+            );
+            this.lossProcedure.set(procedure);
+        } catch (error) {
+            console.error('資格喪失手続きの取得に失敗しました', error);
+            this.errorMessage.set('資格喪失手続きの取得に失敗しました');
+        }
+    }
+
+    lossProcedureExists = computed((): boolean => this.lossProcedure() !== null);
+
+    lossProcedureStatus = computed((): ProcedureStatus => {
+        const status = this.lossProcedure()?.status;
+        if (!status) return 'notStarted';
+        return status;
+    });
+
+    hasRetiredDate = computed((): boolean => Boolean(this.employee()?.retiredDate));
+
+    needsLossProcedurePrompt = computed((): boolean => {
+        if (!this.hasRetiredDate()) return false;
+
+        const procedure = this.lossProcedure();
+        return procedure === null || procedure.status !== 'completed';
+    });
+
+    // 退職日を過ぎたかどうかの判定
+    isPastRetiredDate(): boolean {
+        const employee = this.employee();
+        if (!employee?.retiredDate) return false;
+
+        const retiredDate = employee.retiredDate.toDate();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        retiredDate.setHours(0, 0, 0, 0);
+        return retiredDate < today;
+    }
+
+    async openLossProcedure(): Promise<void> {
+        const employee = this.employee();
+        if (!employee?.retiredDate) return;
+
+        const existing = this.lossProcedure();
+        if (existing) {
+            this.router.navigate(['/procedures', existing.id]);
+            return;
+        }
+
+        this.isCreatingLossProcedure.set(true);
+        this.errorMessage.set('');
+
+        try {
+            const procedure = await this.procedureService.createProcedure({
+                companyId: employee.companyId,
+                officeId: employee.officeId,
+                employeeId: employee.id,
+                procedureType: 'loss',
+                status: 'notStarted',
+                occurredDate: this.retiredDateString(employee.retiredDate),
+                dueDate: '',
+                completedDate: null,
+                submittedDate: null,
+                targetYearMonth: null,
+                memo: '',
+                lossReason: 'retirement',
+                dependentChanges: null,
+            });
+            this.lossProcedure.set(procedure);
+            this.router.navigate(['/procedures', procedure.id]);
+        } catch (error) {
+            console.error('資格喪失手続きの作成に失敗しました', error);
+            this.errorMessage.set('資格喪失手続きの作成に失敗しました');
+        } finally {
+            this.isCreatingLossProcedure.set(false);
+        }
+    }
+
+    private retiredDateString(retiredDate: Timestamp): string {
+        const date = retiredDate.toDate();
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
     }
 
     startEdit(): void {
@@ -441,7 +557,7 @@ export class EmployeeDetailPageComponent {
         const y = date.getFullYear();
         const m = String(date.getMonth() + 1).padStart(2, '0');
         const d = String(date.getDate()).padStart(2, '0');
-        return `${y}-${m}-${d}`;
+        return `${y}/${m}/${d}`;
     }
 
     openRetireForm(): void {
@@ -482,11 +598,13 @@ export class EmployeeDetailPageComponent {
 
         try {
             await this.employeeService.updateEmployee(employee.id, input);
-            this.employee.set({ ...employee, ...input });
+            const updatedEmployee = { ...employee, ...input };
+            this.employee.set(updatedEmployee);
             this.closeRetireForm();
             if (this.isEditing()) {
-                this.syncFormFromEmployee({ ...employee, ...input });
+                this.syncFormFromEmployee(updatedEmployee);
             }
+            await this.loadLossProcedure();
         } catch (error) {
             console.error('退職処理に失敗しました', error);
             this.errorMessage.set('退職処理に失敗しました');

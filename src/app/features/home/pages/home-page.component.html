@@ -1,22 +1,439 @@
-<div class="home">
-    <!-- ページヘッダー -->
-     <div class="home-header">
-        <h1>ホーム</h1>
-        <p class="today">2026年5月20日</p>
-     </div>
+<div class="home-page">
+    @if (isLoading()) {
+        <p class="loading">読み込み中...</p>
+    } @else if (errorMessage()) {
+        <p class="error">{{ errorMessage() }}</p>
+    } @else {
+        <section class="welcome-card">
+            <div class="welcome-text">
+                <p class="welcome-kicker">{{ todayLabel() }}</p>
+                <h1>{{ greetingName() }}さん、お疲れさまです</h1>
+                @if (companyName()) {
+                    <p class="welcome-sub">{{ companyName() }}</p>
+                }
+            </div>
+            <div class="welcome-badge" aria-hidden="true">社保</div>
+        </section>
 
-     <!-- 要対応状況 -->
-      <section class="home-section">
-        <h2 class="section-title">要対応状況</h2>
-      </section>
+        <section class="stats-grid" aria-label="サマリー">
+            <article class="stat-card">
+                <p class="stat-label">在籍従業員</p>
+                <p class="stat-value">{{ activeEmployeeCount() }}<span class="stat-unit">人</span></p>
+                <p class="stat-note">全 {{ employeeCount() }} 名</p>
+            </article>
+            <article class="stat-card">
+                <p class="stat-label">未完了の手続き</p>
+                <p class="stat-value">{{ pendingProcedureCount() }}<span class="stat-unit">件</span></p>
+                <p class="stat-note">対応が必要</p>
+            </article>
+            <article class="stat-card" [class.alert]="overdueProcedureCount() > 0">
+                <p class="stat-label">期限超過</p>
+                <p class="stat-value">{{ overdueProcedureCount() }}<span class="stat-unit">件</span></p>
+                <p class="stat-note">至急確認</p>
+            </article>
+            <article class="stat-card">
+                <p class="stat-label">事業所</p>
+                <p class="stat-value">{{ officeCount() }}<span class="stat-unit">拠点</span></p>
+                <p class="stat-note">登録済み</p>
+            </article>
+        </section>
 
-      <!-- クイックメニュー -->
-      <section class="home-section">
-        <h2 class="section-title">クイックメニュー</h2>
-      </section>
+        <section class="home-section">
+            <div class="section-header">
+                <h2 class="section-title">クイックメニュー</h2>
+                <p class="section-note">よく使う機能へすぐ移動</p>
+            </div>
+            <div class="app-grid">
+                @for (item of quickMenuItems; track item.route) {
+                    <a class="app-tile tone-{{ item.tone }}" [routerLink]="item.route">
+                        <span class="app-icon">{{ item.icon }}</span>
+                        <span class="app-label">{{ item.label }}</span>
+                        <span class="app-desc">{{ item.description }}</span>
+                    </a>
+                }
+            </div>
+        </section>
 
-      <!-- 最新の通知 -->
-       <section class="home-section">
-        <h2 class="section-title">最新の通知</h2>
-       </section>
+        <section class="home-section">
+            <div class="section-header section-header-row">
+                <div>
+                    <h2 class="section-title">要対応の手続き</h2>
+                    <p class="section-note">未完了の手続きを優先度順に表示</p>
+                </div>
+                <a routerLink="/procedures" class="text-link">すべて見る</a>
+            </div>
+
+            @if (actionProcedures().length === 0) {
+                <div class="empty-card">
+                    <p class="empty-title">対応が必要な手続きはありません</p>
+                    <p class="empty-note">すべて完了しています。</p>
+                </div>
+            } @else {
+                <div class="action-list">
+                    @for (procedure of actionProcedures(); track procedure.id) {
+                        <a class="action-card" [routerLink]="['/procedures', procedure.id]">
+                            <div class="action-main">
+                                <p class="action-type">{{ procedureTypeLabel(procedure.procedureType) }}</p>
+                                <p class="action-employee">{{ employeeName(procedure.employeeId) }}</p>
+                            </div>
+                            <div class="action-side">
+                                <span
+                                    class="status-badge"
+                                    [class.not-started]="procedure.status === 'notStarted'"
+                                    [class.in-progress]="procedure.status === 'inProgress'"
+                                >
+                                    {{ procedureStatusLabel(procedure.status) }}
+                                </span>
+                                <p class="action-due" [class.overdue]="isOverdue(procedure)">
+                                    期限 {{ formatDueDate(procedure.dueDate) }}
+                                </p>
+                            </div>
+                        </a>
+                    }
+                </div>
+            }
+        </section>
+    }
 </div>
+
+<style>
+    .home-page {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 8px 0 40px;
+    }
+
+    .loading {
+        color: #6b7280;
+        font-size: 14px;
+    }
+
+    .error {
+        color: #b91c1c;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .welcome-card {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 20px;
+        padding: 24px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 55%, #3b82f6 100%);
+        color: #fff;
+        box-shadow: 0 10px 30px rgba(37, 99, 235, 0.25);
+    }
+
+    .welcome-kicker {
+        margin: 0 0 8px;
+        font-size: 13px;
+        opacity: 0.9;
+    }
+
+    .welcome-card h1 {
+        margin: 0;
+        font-size: 24px;
+        line-height: 1.35;
+    }
+
+    .welcome-sub {
+        margin: 8px 0 0;
+        font-size: 14px;
+        opacity: 0.92;
+    }
+
+    .welcome-badge {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 72px;
+        height: 72px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.16);
+        font-size: 22px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 20px;
+    }
+
+    .stat-card {
+        padding: 16px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    }
+
+    .stat-card.alert {
+        border-color: #fecaca;
+        background: #fff7f7;
+    }
+
+    .stat-label {
+        margin: 0;
+        font-size: 12px;
+        color: #6b7280;
+        font-weight: 600;
+    }
+
+    .stat-value {
+        margin: 8px 0 4px;
+        font-size: 28px;
+        font-weight: 700;
+        color: #111827;
+        line-height: 1;
+    }
+
+    .stat-card.alert .stat-value {
+        color: #b91c1c;
+    }
+
+    .stat-unit {
+        margin-left: 4px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #6b7280;
+    }
+
+    .stat-note {
+        margin: 0;
+        font-size: 12px;
+        color: #9ca3af;
+    }
+
+    .home-section {
+        margin-top: 28px;
+    }
+
+    .section-header {
+        margin-bottom: 12px;
+    }
+
+    .section-header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .section-title {
+        margin: 0 0 4px;
+        font-size: 17px;
+    }
+
+    .section-note {
+        margin: 0;
+        font-size: 13px;
+        color: #6b7280;
+    }
+
+    .text-link {
+        flex-shrink: 0;
+        color: #2563eb;
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .text-link:hover {
+        text-decoration: underline;
+    }
+
+    .app-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .app-tile {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+        min-height: 112px;
+        padding: 16px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        text-decoration: none;
+        color: inherit;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+        transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+    }
+
+    .app-tile:hover {
+        transform: translateY(-2px);
+        border-color: #bfdbfe;
+        box-shadow: 0 8px 20px rgba(59, 130, 246, 0.12);
+    }
+
+    .app-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 800;
+        color: #fff;
+    }
+
+    .tone-blue .app-icon { background: #2563eb; }
+    .tone-green .app-icon { background: #059669; }
+    .tone-amber .app-icon { background: #d97706; }
+    .tone-violet .app-icon { background: #7c3aed; }
+    .tone-slate .app-icon { background: #475569; }
+    .tone-rose .app-icon { background: #e11d48; }
+
+    .app-label {
+        font-size: 15px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .app-desc {
+        font-size: 12px;
+        color: #6b7280;
+    }
+
+    .empty-card {
+        padding: 28px 20px;
+        text-align: center;
+        background: #f9fafb;
+        border: 1px dashed #d1d5db;
+        border-radius: 12px;
+    }
+
+    .empty-title {
+        margin: 0 0 6px;
+        font-size: 15px;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .empty-note {
+        margin: 0;
+        font-size: 13px;
+        color: #6b7280;
+    }
+
+    .action-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .action-card {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        padding: 14px 16px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        text-decoration: none;
+        color: inherit;
+        transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .action-card:hover {
+        border-color: #93c5fd;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+    }
+
+    .action-type {
+        margin: 0 0 4px;
+        font-size: 14px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .action-employee {
+        margin: 0;
+        font-size: 13px;
+        color: #6b7280;
+    }
+
+    .action-side {
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 6px;
+    }
+
+    .status-badge {
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .status-badge.not-started {
+        background: #f3f4f6;
+        color: #4b5563;
+    }
+
+    .status-badge.in-progress {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .action-due {
+        margin: 0;
+        font-size: 12px;
+        color: #6b7280;
+    }
+
+    .action-due.overdue {
+        color: #b91c1c;
+        font-weight: 700;
+    }
+
+    @media (max-width: 900px) {
+        .stats-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .app-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 640px) {
+        .welcome-card {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .welcome-badge {
+            width: 56px;
+            height: 56px;
+            font-size: 18px;
+        }
+
+        .welcome-card h1 {
+            font-size: 20px;
+        }
+
+        .action-card {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .action-side {
+            align-items: flex-start;
+        }
+    }
+</style>

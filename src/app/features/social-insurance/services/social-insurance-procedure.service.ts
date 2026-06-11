@@ -1,112 +1,415 @@
 import { Injectable } from '@angular/core';
 
+
+
 import { db } from '../../../core/firebase';
+
 import {
+
     collection,
+
     doc,
+
     setDoc,
+
     serverTimestamp,
+
     Timestamp,
+
     getDoc,
+
     getDocs,
+
     query,
+
     where,
+
     updateDoc,
+
 } from 'firebase/firestore';
 
-import { Procedure, ProcedureInput } from '../models/procedures.model';
+
+
+import {
+    EMPTY_DEPENDENT_PROCEDURE_DATA,
+    EMPTY_QUALIFICATION_PROCEDURE_DATA,
+    DependentProcedureData,
+    Procedure,
+    ProcedureInput,
+    QualificationProcedureData,
+} from '../models/procedures.model';
+import { hasSavedQualificationData } from '../utils/qualification-procedure-data.util';
+import { todayDateString } from '../utils/procedure-display.util';
+
+
 
 @Injectable({
+
     providedIn: 'root',
+
 })
 
+
+
 export class SocialInsuranceProcedureService {
+
     private readonly collectionName = 'socialInsuranceProcedures';
 
-    private toProcedure(id: string, data: Record<string, unknown>): Procedure {
+    private readFlatQualificationProcedureData(data: Record<string, unknown>): QualificationProcedureData {
         return {
-            id,
-            companyId: String(data['companyId'] ?? ''),
-            officeId: String(data['officeId'] ?? ''),
-            employeeId: (data['employeeId'] as string | null) ?? null,
-            procedureType: (data['procedureType'] as Procedure['procedureType']) ?? 'qualification',
-            status: (data['status'] as Procedure['status']) ?? 'notStarted',
-            occurredDate: String(data['occurredDate'] ?? ''),
-            dueDate: String(data['dueDate'] ?? ''),
-            completedDate: (data['completedDate'] as string | null) ?? null,
-            submittedDate: (data['submittedDate'] as string | null) ?? null,
-            targetYearMonth: (data['targetYearMonth'] as string | null) ?? null,
-            memo: String(data['memo'] ?? ''),
-            lossReason: (data['lossReason'] as Procedure['lossReason']) ?? null,
-            dependentChanges: (data['dependentChanges'] as Procedure['dependentChanges']) ?? null,
-            createdAt: data['createdAt'] as Procedure['createdAt'],
-            updatedAt: data['updatedAt'] as Procedure['updatedAt'],
+            officeSymbol: String(data['officeSymbol'] ?? ''),
+            officeNumber: String(data['officeNumber'] ?? ''),
+            companyName: String(data['companyName'] ?? ''),
+            officeName: String(data['officeName'] ?? ''),
+            officeAddress: String(data['officeAddress'] ?? ''),
+            representativeName: String(data['representativeName'] ?? ''),
+            phoneNumber: String(data['phoneNumber'] ?? ''),
+            employeeLastName: String(data['employeeLastName'] ?? ''),
+            employeeFirstName: String(data['employeeFirstName'] ?? ''),
+            employeeLastNameKana: String(data['employeeLastNameKana'] ?? ''),
+            employeeFirstNameKana: String(data['employeeFirstNameKana'] ?? ''),
+            birthDate: String(data['birthDate'] ?? ''),
+            myNumber: String(data['myNumber'] ?? ''),
+            employeeAddress: String(data['employeeAddress'] ?? ''),
+            qualificationDate: String(data['qualificationDate'] ?? ''),
+            rewardTargetYearMonth: (data['rewardTargetYearMonth'] as string | null) ?? null,
+            rewardCashAmount: (data['rewardCashAmount'] as number | null) ?? null,
+            rewardInKindAmount: (data['rewardInKindAmount'] as number | null) ?? null,
+            rewardTotalAmount: (data['rewardTotalAmount'] as number | null) ?? null,
+            rewardIsMidMonthJoin: Boolean(data['rewardIsMidMonthJoin']),
+            hasDependents: Boolean(data['hasDependents']),
         };
+    }
+    private readQualificationProcedureData(data: Record<string, unknown>): QualificationProcedureData {
+        const flat = this.readFlatQualificationProcedureData(data);
+        const legacy = data['completedSnapshot'] as QualificationProcedureData | null | undefined;
+        const flatProcedure = {
+            ...EMPTY_QUALIFICATION_PROCEDURE_DATA,
+            ...flat,
+        } as Procedure;
+
+        if (legacy && !hasSavedQualificationData(flatProcedure)) {
+            return legacy;
+        }
+
+        return flat;
+    }
+
+    private readDependentProcedureData(data: Record<string, unknown>): DependentProcedureData {
+        return {
+            dependentId: (data['dependentId'] as string | null) ?? null,
+            dependentLastName: String(data['dependentLastName'] ?? ''),
+            dependentFirstName: String(data['dependentFirstName'] ?? ''),
+            dependentBirthDate: String(data['dependentBirthDate'] ?? ''),
+            dependentGender: String(data['dependentGender'] ?? ''),
+            dependentRelationship: String(data['dependentRelationship'] ?? ''),
+            dependentMyNumber: String(data['dependentMyNumber'] ?? ''),
+            dependentAddress: String(data['dependentAddress'] ?? ''),
+            dependentOccupation: String(data['dependentOccupation'] ?? ''),
+            dependentIncome: (data['dependentIncome'] as number | null) ?? null,
+            dependencyStartDate: String(data['dependencyStartDate'] ?? ''),
+            dependentAddReason: (data['dependentAddReason'] as DependentProcedureData['dependentAddReason']) ?? '',
+            dependencyEndDate: String(data['dependencyEndDate'] ?? ''),
+            dependentDeleteReason:
+                (data['dependentDeleteReason'] as DependentProcedureData['dependentDeleteReason']) ?? '',
+        };
+    }
+
+    private toProcedure(id: string, data: Record<string, unknown>): Procedure {
+
+        return {
+
+            id,
+
+            companyId: String(data['companyId'] ?? ''),
+
+            officeId: String(data['officeId'] ?? ''),
+
+            employeeId: (data['employeeId'] as string | null) ?? null,
+
+            procedureType: (data['procedureType'] as Procedure['procedureType']) ?? 'qualification',
+
+            status: (data['status'] as Procedure['status']) ?? 'notStarted',
+
+            occurredDate: String(data['occurredDate'] ?? ''),
+
+            dueDate: String(data['dueDate'] ?? ''),
+
+            completedDate: (data['completedDate'] as string | null) ?? null,
+
+            submittedDate: (data['submittedDate'] as string | null) ?? null,
+
+            targetYearMonth: (data['targetYearMonth'] as string | null) ?? null,
+
+            memo: String(data['memo'] ?? ''),
+
+            lossReason: (data['lossReason'] as Procedure['lossReason']) ?? null,
+
+            dependentChanges: (data['dependentChanges'] as Procedure['dependentChanges']) ?? null,
+
+            ...this.readQualificationProcedureData(data),
+
+            ...this.readDependentProcedureData(data),
+
+            createdAt: data['createdAt'] as Procedure['createdAt'],
+
+            updatedAt: data['updatedAt'] as Procedure['updatedAt'],
+
+        };
+
     }
 
     // Firestoreに手続きを登録
     async createProcedure(input: ProcedureInput): Promise<Procedure> {
+
         const docRef = doc(collection(db, this.collectionName));
+
         const createdAt = serverTimestamp() as Timestamp;
+
         const procedure: Procedure = {
+
             id: docRef.id,
+
+            ...EMPTY_QUALIFICATION_PROCEDURE_DATA,
+
+            ...EMPTY_DEPENDENT_PROCEDURE_DATA,
+
             ...input,
+
             createdAt: createdAt,
+
             updatedAt: createdAt,
+
         };
+
         await setDoc(docRef, procedure);
+
         return procedure;
+
     }
 
     // 手続き一覧を取得
     async getProcedures(): Promise<Procedure[]> {
+
         const docRef = collection(db, this.collectionName);
+
         const snapshot = await getDocs(docRef);
+
         return snapshot.docs.map((doc) => this.toProcedure(doc.id, doc.data() as Record<string, unknown>));
+
     }
 
     // 手続きを1件取得
     async getProcedureById(procedureId: string): Promise<Procedure | null> {
+
         const docRef = doc(db, this.collectionName, procedureId);
+
         const snapshot = await getDoc(docRef);
+
+
 
         if (!snapshot.exists()) return null;
 
+
+
         return this.toProcedure(procedureId, snapshot.data() as Record<string, unknown>);
+
     }
 
     async getOpenDependentChangeProcedureByEmployeeId(employeeId: string): Promise<Procedure | null> {
+
         const docRef = collection(db, this.collectionName);
+
         const q = query(
+
             docRef,
+
             where('employeeId', '==', employeeId),
+
             where('procedureType', '==', 'dependentChange'),
+
         );
+
         const snapshot = await getDocs(q);
+
         const open = snapshot.docs
+
             .map((item) => this.toProcedure(item.id, item.data() as Record<string, unknown>))
+
             .find((procedure) => procedure.status !== 'completed');
 
+
+
         return open ?? null;
+
     }
 
     // employeeIdから資格取得手続きを取得
     async getQualificationProcedureByEmployeeId(employeeId: string, companyId: string): Promise<Procedure | null> {
+
         const docRef = collection(db, this.collectionName);
+
         const q = query(docRef, where('employeeId', '==', employeeId), where('companyId', '==', companyId), where('procedureType', '==', 'qualification'));
+
         const snapshot = await getDocs(q);
+
         if(snapshot.empty) return null;
+
+
+
+        return this.toProcedure(snapshot.docs[0].id, snapshot.docs[0].data() as Record<string, unknown>);
+
+    }
+
+    // employeeIdから資格喪失手続きを取得
+    async getLossProcedureByEmployeeId(employeeId: string, companyId: string): Promise<Procedure | null> {
+        const docRef = collection(db, this.collectionName);
+        const q = query(
+            docRef,
+            where('employeeId', '==', employeeId),
+            where('companyId', '==', companyId),
+            where('procedureType', '==', 'loss'),
+        );
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) return null;
+
+        return this.toProcedure(snapshot.docs[0].id, snapshot.docs[0].data() as Record<string, unknown>);
+    }
+
+    // employeeIdと対象年月から算定基礎届を取得
+    async getRegularDecisionProcedureByEmployeeIdAndTargetYearMonth(
+        employeeId: string,
+        companyId: string,
+        targetYearMonth: string,
+    ): Promise<Procedure | null> {
+        const docRef = collection(db, this.collectionName);
+        const q = query(
+            docRef,
+            where('employeeId', '==', employeeId),
+            where('companyId', '==', companyId),
+            where('procedureType', '==', 'regularDecision'),
+            where('targetYearMonth', '==', targetYearMonth),
+        );
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) return null;
+
+        return this.toProcedure(snapshot.docs[0].id, snapshot.docs[0].data() as Record<string, unknown>);
+    }
+
+    // employeeIdと改定年月（適用開始月）から月額変更届を取得
+    async getRevisionProcedureByEmployeeIdAndTargetYearMonth(
+        employeeId: string,
+        companyId: string,
+        targetYearMonth: string,
+    ): Promise<Procedure | null> {
+        const docRef = collection(db, this.collectionName);
+        const q = query(
+            docRef,
+            where('employeeId', '==', employeeId),
+            where('companyId', '==', companyId),
+            where('procedureType', '==', 'revision'),
+            where('targetYearMonth', '==', targetYearMonth),
+        );
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) return null;
+
+        return this.toProcedure(snapshot.docs[0].id, snapshot.docs[0].data() as Record<string, unknown>);
+    }
+
+    // employeeIdと対象年月から賞与支払届を取得
+    async getBonusPaymentProcedureByEmployeeIdAndTargetYearMonth(
+        employeeId: string,
+        companyId: string,
+        targetYearMonth: string,
+    ): Promise<Procedure | null> {
+        const docRef = collection(db, this.collectionName);
+        const q = query(
+            docRef,
+            where('employeeId', '==', employeeId),
+            where('companyId', '==', companyId),
+            where('procedureType', '==', 'bonusPayment'),
+            where('targetYearMonth', '==', targetYearMonth),
+        );
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) return null;
 
         return this.toProcedure(snapshot.docs[0].id, snapshot.docs[0].data() as Record<string, unknown>);
     }
 
     // 手続きを更新
     async updateProcedure(procedure: Procedure): Promise<void> {
-        const id = procedure.id;
-        const docRef = doc(db, this.collectionName, id);
-        const updatedAt = serverTimestamp() as Timestamp;
-        
-        await updateDoc(docRef, procedure);
+
+        const docRef = doc(db, this.collectionName, procedure.id);
+
+        await updateDoc(docRef, {
+
+            status: procedure.status,
+
+            occurredDate: procedure.occurredDate,
+
+            dueDate: procedure.dueDate,
+
+            completedDate: procedure.completedDate,
+
+            submittedDate: procedure.submittedDate,
+
+            targetYearMonth: procedure.targetYearMonth,
+
+            memo: procedure.memo,
+
+            lossReason: procedure.lossReason,
+
+            dependentChanges: procedure.dependentChanges,
+
+            ...this.readQualificationProcedureData(procedure as unknown as Record<string, unknown>),
+
+            ...this.readDependentProcedureData(procedure as unknown as Record<string, unknown>),
+
+            updatedAt: serverTimestamp(),
+
+        });
+
     }
 
+    async markProcedureAsSubmitted(procedure: Procedure): Promise<Procedure> {
+        const submittedDate = todayDateString();
+        const updated: Procedure = {
+            ...procedure,
+            status: 'completed',
+            completedDate: procedure.completedDate ?? submittedDate,
+            submittedDate,
+        };
+
+        await this.updateProcedure(updated);
+        return updated;
+    }
+
+    // 資格取得届を完了し、表示データを procedures に直接保存する
+    async completeQualificationProcedure(
+
+        procedureId: string,
+
+        procedureData: QualificationProcedureData,
+
+        completedDate: string,
+
+    ): Promise<void> {
+
+        const docRef = doc(db, this.collectionName, procedureId);
+
+        await updateDoc(docRef, {
+
+            status: 'completed',
+
+            completedDate,
+
+            submittedDate: completedDate,
+
+            ...procedureData,
+
+            updatedAt: serverTimestamp(),
+
+        });
+
+    }
 }

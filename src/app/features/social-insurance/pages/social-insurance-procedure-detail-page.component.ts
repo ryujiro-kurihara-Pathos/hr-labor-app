@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { SocialInsuranceProcedureService } from '../services/social-insurance-procedure.service';
@@ -12,9 +12,10 @@ import { yearMonthFromDateString } from '../../insurance/utils/reward-target-mon
 
 import { BonusReward } from '../../bonus/models/bonus-reward.model';
 import { Procedure } from '../models/procedures.model';
+import { hasSavedQualificationData } from '../utils/qualification-procedure-data.util';
 import { SocialInsuranceStatus } from '../models/social-insurance-status.model';
 import { StandardMonthlyReward } from '../../insurance/models/standard-monthly-reward.model';
-import { Employee } from '../../employee/models/employee.models';
+import { Dependent, Employee } from '../../employee/models/employee.models';
 import { Office } from '../../company/models/office.model';
 import { Company } from '../../company/models/company.model';
 
@@ -43,6 +44,7 @@ export class SocialInsuranceProcedureDetailPageComponent {
     procedure = signal<Procedure | null>(null);
     socialInsuranceStatus = signal<SocialInsuranceStatus | null>(null);
     hasActiveDependents = signal(false);
+    dependents = signal<Dependent[]>([]);
     joinMonthReward = signal<StandardMonthlyReward | null>(null);
     employeeBonuses = signal<BonusReward[]>([]);
     employee = signal<Employee | null>(null);
@@ -51,6 +53,17 @@ export class SocialInsuranceProcedureDetailPageComponent {
 
     isLoading = signal<boolean>(false);
     errorMessage = signal<string>('');
+
+    canShowProcedure = computed((): boolean => {
+        const item = this.procedure();
+        if (!item) return false;
+
+        if (item.procedureType === 'qualification' && item.status === 'completed' && hasSavedQualificationData(item)) {
+            return true;
+        }
+
+        return Boolean(this.employee() && this.office() && this.company());
+    });
 
     async ngOnInit(): Promise<void> {
         this.isLoading.set(true);
@@ -128,12 +141,17 @@ export class SocialInsuranceProcedureDetailPageComponent {
 
     private async loadDependents(): Promise<void> {
         this.hasActiveDependents.set(false);
+        this.dependents.set([]);
 
         const employeeId = this.procedure()?.employeeId;
-        if (!employeeId || this.procedure()?.procedureType !== 'qualification') return;
+        const procedureType = this.procedure()?.procedureType;
+        if (!employeeId || (procedureType !== 'qualification' && procedureType !== 'dependentChange')) {
+            return;
+        }
 
         try {
             const dependents = await this.employeeService.getDependentsByEmployeeId(employeeId);
+            this.dependents.set(dependents);
             this.hasActiveDependents.set(dependents.some((d) => d.status === 'active'));
         } catch (error) {
             console.error('扶養家族の取得に失敗しました', error);
@@ -179,7 +197,7 @@ export class SocialInsuranceProcedureDetailPageComponent {
 
         const procedure = this.procedure();
         const employee = this.employee();
-        const officeId = procedure?.officeId || employee?.officeId;
+        const officeId = employee?.officeId || procedure?.officeId;
         if (!officeId) return;
 
         try {
@@ -191,10 +209,18 @@ export class SocialInsuranceProcedureDetailPageComponent {
         }
     }
 
+    onProcedureUpdated(procedure: Procedure): void {
+        this.procedure.set(procedure);
+    }
+
+    async onDependentsUpdated(): Promise<void> {
+        await this.loadDependents();
+    }
+
     private async loadCompany(): Promise<void> {
         this.company.set(null);
 
-        const companyId = this.employee()?.companyId;
+        const companyId = this.employee()?.companyId || this.procedure()?.companyId;
         if (!companyId) return;
 
         try {

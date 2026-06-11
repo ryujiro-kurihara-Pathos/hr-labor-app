@@ -13,14 +13,13 @@
                 {{ statusLabel(item.status) }}
             </span>
         </div>
-        <button type="button" class="btn edit-btn">編集</button>
+        <app-procedure-action-bar
+            [procedure]="item"
+            [isSubmitting]="isSubmitting()"
+            [actionErrorMessage]="submitErrorMessage()"
+            (submitClick)="submitProcedure()"
+        />
     </div>
-
-    <app-procedure-common-info
-        [procedure]="item"
-        [employee]="employee()"
-        [office]="office()"
-    />
 
     <div class="title">
         <div class="title-sub">
@@ -97,20 +96,60 @@
         @switch (variant()) {
             @case ('regularDecision') {
                 <div class="meta-row">
-                    <dt>対象年月</dt>
-                    <dd>{{ yearMonthLabel(item.targetYearMonth) }}（4〜6月）</dd>
+                    <dt>従前の標準報酬月額</dt>
+                    <dd>{{ formatYen(previousStandardRemuneration()) }}</dd>
+                </div>
+                <div class="meta-row">
+                    <dt>従前改定月</dt>
+                    <dd>{{ yearMonthLabel(previousRevisionMonth()) }}</dd>
+                </div>
+                @for (month of regularDecisionMonths(); track month.yearMonth) {
+                    <div class="meta-row">
+                        <dt>{{ monthLabel(month.yearMonth) }}</dt>
+                        <dd>
+                            基礎日数：{{ formatDays(month.paymentBaseDays) }} 日 /
+                            通貨：{{ formatYen(month.cashAmount) }} /
+                            現物：{{ formatYen(month.inKindAmount) }} /
+                            合計：{{ formatYen(month.totalAmount) }}
+                        </dd>
+                    </div>
+                }
+                <div class="meta-row">
+                    <dt>合計</dt>
+                    <dd>
+                        総計：{{ formatYen(rewardTotalSum()) }} /
+                        平均：{{ formatYen(averageMonthlyReward()) }}
+                    </dd>
+                </div>
+                <div class="meta-row">
+                    <dt>適用年月</dt>
+                    <dd>{{ yearMonthLabel(applicationYearMonth()) }}</dd>
                 </div>
                 <div class="meta-row">
                     <dt>4〜6月報酬月額</dt>
-                    <dd>— 円</dd>
+                    <dd>{{ formatYen(averageMonthlyReward()) }}</dd>
+                    @if (missingMonthlyRewardMonths().length > 0) {
+                        <p class="note">
+                            （
+                            @for (yearMonth of missingMonthlyRewardMonths(); track yearMonth; let last = $last) {
+                                <a
+                                    [routerLink]="['/premium', employee().id]"
+                                    [queryParams]="{ ym: yearMonth }"
+                                >{{ monthLabel(yearMonth) }}</a>@if (!last) {、}
+                            }
+                            の報酬月額が未入力です）
+                        </p>
+                    }
                 </div>
                 <div class="meta-row">
                     <dt>標準報酬月額</dt>
-                    <dd>— 円</dd>
-                </div>
-                <div class="meta-row">
-                    <dt>改定年月</dt>
-                    <dd>—</dd>
+                    <dd>
+                        @if (standardRemuneration(); as std) {
+                            健康保険 {{ std.health | number }}円 / 厚生年金 {{ std.pension | number }}円
+                        } @else {
+                            — 円
+                        }
+                    </dd>
                 </div>
             }
             @case ('revision') {
@@ -120,15 +159,15 @@
                 </div>
                 <div class="meta-row">
                     <dt>改定前報酬月額</dt>
-                    <dd>— 円</dd>
+                    <dd>{{ formatYen(revisionPreviousMonthlyReward()) }}</dd>
                 </div>
                 <div class="meta-row">
                     <dt>改定後報酬月額</dt>
-                    <dd>— 円</dd>
+                    <dd>{{ formatYen(revisionRevisedMonthlyReward()) }}</dd>
                 </div>
                 <div class="meta-row">
                     <dt>改定理由</dt>
-                    <dd>—</dd>
+                    <dd>{{ revisionReason() || '—' }}</dd>
                 </div>
             }
             @case ('bonusPayment') {
@@ -138,7 +177,7 @@
                 </div>
                 <div class="meta-row">
                     <dt>賞与額</dt>
-                    <dd>— 円</dd>
+                    <dd>{{ formatYen(bonusPaymentAmount()) }}</dd>
                 </div>
                 <div class="meta-row">
                     <dt>対象年月</dt>
@@ -153,7 +192,6 @@
         <p class="memo-text">{{ item.memo }}</p>
     }
 
-    <button type="button" class="btn export-btn">エクスポート</button>
 </section>
 
 <style>
@@ -207,9 +245,6 @@
         font-weight: 600;
         cursor: pointer;
     }
-
-    .edit-btn { background: #e5e7eb; color: #333; }
-    .export-btn { margin-top: 20px; background: #2563eb; color: #fff; }
 
     .title {
         display: flex;

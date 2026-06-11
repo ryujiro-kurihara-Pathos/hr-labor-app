@@ -4,9 +4,18 @@ import { Employee } from '../../employee/models/employee.models';
 import {
     LOSS_REASON_LABELS,
     LossReason,
+    Procedure,
     ProcedureStatus,
     ProcedureType,
 } from '../models/procedures.model';
+
+export type ProcedureTypeTone = 'blue' | 'rose' | 'violet' | 'amber' | 'orange' | 'green' | 'slate';
+
+export type ProcedureTypeMeta = {
+    icon: string;
+    tone: ProcedureTypeTone;
+    shortLabel: string;
+};
 
 export function procedureStatusLabel(status: ProcedureStatus): string {
     const labels: Record<ProcedureStatus, string> = {
@@ -20,14 +29,85 @@ export function procedureStatusLabel(status: ProcedureStatus): string {
 export function procedureTypeLabel(type: ProcedureType): string {
     const labels: Record<ProcedureType, string> = {
         qualification: '被保険者資格取得届',
-        loss: '資格喪失',
-        dependentChange: '扶養変更',
+        loss: '資格喪失届',
+        dependentChange: '被扶養者異動届',
         regularDecision: '算定基礎届',
         revision: '月額変更届',
         bonusPayment: '賞与支払届',
         premiumPayment: '保険料納付',
     };
     return labels[type];
+}
+
+export function procedureTypeMeta(type: ProcedureType): ProcedureTypeMeta {
+    const meta: Record<ProcedureType, ProcedureTypeMeta> = {
+        qualification: { icon: '取', tone: 'blue', shortLabel: '資格取得' },
+        loss: { icon: '喪', tone: 'rose', shortLabel: '資格喪失' },
+        dependentChange: { icon: '扶', tone: 'violet', shortLabel: '扶養変更' },
+        regularDecision: { icon: '算', tone: 'amber', shortLabel: '算定基礎' },
+        revision: { icon: '改', tone: 'orange', shortLabel: '月額変更' },
+        bonusPayment: { icon: '賞', tone: 'green', shortLabel: '賞与支払' },
+        premiumPayment: { icon: '納', tone: 'slate', shortLabel: '保険料納付' },
+    };
+    return meta[type];
+}
+
+export function todayDateString(date = new Date()): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+export function isProcedureOverdue(
+    procedure: Pick<Procedure, 'status' | 'dueDate'>,
+    today = todayDateString(),
+): boolean {
+    return Boolean(
+        procedure.status !== 'completed' && procedure.dueDate && procedure.dueDate < today,
+    );
+}
+
+export function resolveProcedureSubjectName(
+    procedure: Pick<Procedure, 'employeeId' | 'employeeLastName' | 'employeeFirstName' | 'targetYearMonth' | 'procedureType'>,
+    employeeNameById: Record<string, string> = {},
+): string {
+    if (procedure.employeeId) {
+        const name = employeeNameById[procedure.employeeId];
+        if (name) return name;
+    }
+
+    const savedName = `${procedure.employeeLastName ?? ''} ${procedure.employeeFirstName ?? ''}`.trim();
+    if (savedName) return savedName;
+
+    if (procedure.targetYearMonth) {
+        return `対象 ${procedure.targetYearMonth}`;
+    }
+
+    if (
+        procedure.procedureType === 'regularDecision' ||
+        procedure.procedureType === 'premiumPayment'
+    ) {
+        return '会社全体';
+    }
+
+    return procedure.employeeId ? '従業員' : '—';
+}
+
+export function compareProceduresForList(a: Procedure, b: Procedure, today = todayDateString()): number {
+    const aCompleted = a.status === 'completed' ? 1 : 0;
+    const bCompleted = b.status === 'completed' ? 1 : 0;
+    if (aCompleted !== bCompleted) return aCompleted - bCompleted;
+
+    const aOverdue = isProcedureOverdue(a, today) ? 0 : 1;
+    const bOverdue = isProcedureOverdue(b, today) ? 0 : 1;
+    if (aOverdue !== bOverdue) return aOverdue - bOverdue;
+
+    if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
+    if (a.dueDate) return -1;
+    if (b.dueDate) return 1;
+
+    return b.occurredDate.localeCompare(a.occurredDate);
 }
 
 export function genderLabel(gender: string | null | undefined): string {

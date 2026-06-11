@@ -5,18 +5,19 @@
         <p class="loading">読み込み中...</p>
     } @else if (!procedure()) {
         <p class="error">{{ errorMessage() || '手続きが見つかりませんでした' }}</p>
-    } @else if (employee() && office() && company()) {
+    } @else if (canShowProcedure()) {
         @switch (procedure()!.procedureType) {
             @case ('qualification') {
                 <app-qualification-procedure
                     [procedure]="procedure()!"
-                    [employee]="employee()!"
-                    [office]="office()!"
-                    [company]="company()!"
+                    [employee]="employee()"
+                    [office]="office()"
+                    [company]="company()"
                     [socialInsuranceStatus]="socialInsuranceStatus()"
                     [hasDependents]="hasActiveDependents()"
                     [joinMonthReward]="joinMonthReward()"
                     [employeeBonuses]="employeeBonuses()"
+                    (procedureUpdated)="onProcedureUpdated($event)"
                 />
             }
             @case ('loss') {
@@ -26,6 +27,7 @@
                     [office]="office()!"
                     [company]="company()!"
                     [socialInsuranceStatus]="socialInsuranceStatus()"
+                    (procedureUpdated)="onProcedureUpdated($event)"
                 />
             }
             @case ('dependentChange') {
@@ -34,6 +36,9 @@
                     [employee]="employee()!"
                     [office]="office()!"
                     [company]="company()!"
+                    [dependents]="dependents()"
+                    (procedureUpdated)="onProcedureUpdated($event)"
+                    (dependentsUpdated)="onDependentsUpdated()"
                 />
             }
             @case ('regularDecision') {
@@ -44,6 +49,7 @@
                     [company]="company()!"
                     formTitle="算定基礎届"
                     variant="regularDecision"
+                    (procedureUpdated)="onProcedureUpdated($event)"
                 />
             }
             @case ('revision') {
@@ -54,6 +60,7 @@
                     [company]="company()!"
                     formTitle="報酬月額変更届"
                     variant="revision"
+                    (procedureUpdated)="onProcedureUpdated($event)"
                 />
             }
             @case ('bonusPayment') {
@@ -64,6 +71,7 @@
                     [company]="company()!"
                     formTitle="賞与支払届"
                     variant="bonusPayment"
+                    (procedureUpdated)="onProcedureUpdated($event)"
                 />
             }
             @default {

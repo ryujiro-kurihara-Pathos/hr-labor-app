@@ -9,6 +9,20 @@ export function calendarYearFromYearMonth(yearMonth: string): number {
     return Number(yearMonth.split('-')[0]);
 }
 
+/** 賞与算入の対象期間（暦年） */
+export function getBonusRemunerationTargetYear(referenceYearMonth: string): number {
+    return calendarYearFromYearMonth(referenceYearMonth);
+}
+
+/** 対象期間（暦年）における賞与支給回数 */
+export function countBonusPaymentsInTargetPeriod(
+    bonuses: BonusReward[],
+    referenceYearMonth: string,
+): number {
+    const year = getBonusRemunerationTargetYear(referenceYearMonth);
+    return countBonusPaymentsInCalendarYear(bonuses, year);
+}
+
 /** 暦年における賞与支給回数 */
 export function countBonusPaymentsInCalendarYear(
     bonuses: BonusReward[],
@@ -20,18 +34,43 @@ export function countBonusPaymentsInCalendarYear(
 }
 
 /**
- * 対象月の暦年で賞与が年4回以上支給される場合、賞与を報酬月額に算入する。
+ * 対象期間内で4回目以降の賞与支給がある場合、賞与を報酬月額に算入する。
  * 支給額の一定性は判定しない。
  */
 export function shouldTreatBonusAsMonthlyRemuneration(
     bonuses: BonusReward[],
     referenceYearMonth: string,
 ): boolean {
-    const year = calendarYearFromYearMonth(referenceYearMonth);
     return (
-        countBonusPaymentsInCalendarYear(bonuses, year) >=
+        countBonusPaymentsInTargetPeriod(bonuses, referenceYearMonth) >=
         MONTHLY_REMUNERATION_BONUS_MIN_PAYMENTS_PER_YEAR
     );
+}
+
+/** 対象期間内の賞与支給額の合計 */
+export function sumBonusAmountInTargetPeriod(
+    bonuses: BonusReward[],
+    referenceYearMonth: string,
+): number {
+    const year = getBonusRemunerationTargetYear(referenceYearMonth);
+    return bonuses
+        .filter((bonus) => calendarYearFromYearMonth(bonus.targetYearMonth) === year)
+        .reduce((sum, bonus) => sum + bonus.bonusAmount, 0);
+}
+
+/**
+ * 標準報酬月額の算定に加える賞与分（対象期間内の賞与合計 ÷ 12）。
+ * 4回未満の場合は 0。
+ */
+export function monthlyBonusRemunerationAddition(
+    bonuses: BonusReward[],
+    referenceYearMonth: string,
+): number {
+    if (!shouldTreatBonusAsMonthlyRemuneration(bonuses, referenceYearMonth)) {
+        return 0;
+    }
+    const total = sumBonusAmountInTargetPeriod(bonuses, referenceYearMonth);
+    return Math.round(total / 12);
 }
 
 /** 対象年月に支給された賞与額の合計 */
@@ -51,10 +90,7 @@ export function effectiveMonthlyRewardTotal(
     allBonuses: BonusReward[],
 ): number {
     const base = monthlyRewardTotal(reward);
-    if (!shouldTreatBonusAsMonthlyRemuneration(allBonuses, yearMonth)) {
-        return base;
-    }
-    return base + sumBonusAmountInMonth(allBonuses, yearMonth);
+    return base + monthlyBonusRemunerationAddition(allBonuses, yearMonth);
 }
 
 /** 報酬月額（数値）に、算入対象の賞与を加えた報酬月額 */
@@ -63,13 +99,10 @@ export function effectiveMonthlyRewardFromBase(
     yearMonth: string,
     allBonuses: BonusReward[],
 ): number {
-    if (!shouldTreatBonusAsMonthlyRemuneration(allBonuses, yearMonth)) {
-        return baseMonthlyReward;
-    }
-    return baseMonthlyReward + sumBonusAmountInMonth(allBonuses, yearMonth);
+    return baseMonthlyReward + monthlyBonusRemunerationAddition(allBonuses, yearMonth);
 }
 
-/** 標準賞与額・賞与保険料の対象となる賞与（年4回以上の場合は空） */
+/** 標準賞与額・賞与保険料・賞与支払届の対象となる賞与（年4回以上の場合は空） */
 export function bonusesForStandardBonusPremium(
     monthBonuses: BonusReward[],
     yearMonth: string,

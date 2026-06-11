@@ -16,12 +16,17 @@ import { InsurancePremiumPageComponent } from './features/insurance/pages/insura
 import { InsurancePremiumDetailPageComponent } from './features/insurance/pages/insurance-premium-detail-page.component';
 import { SocialInsuranceProceduresPageComponent } from './features/social-insurance/pages/social-insurance-procedures-page.component';
 import { SocialInsuranceProcedureDetailPageComponent } from './features/social-insurance/pages/social-insurance-procedure-detail-page.component';
+import { ProfilePageComponent } from './features/users/pages/profile-page.component';
 
 export const routes: Routes = [
     {
         path: '',
         redirectTo: 'home',
         pathMatch: 'full',
+    },
+    {
+        path: 'profile',
+        component: ProfilePageComponent,
     },
     {
         path: '',

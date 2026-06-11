@@ -1,61 +1,122 @@
 <div class="procedures-page">
     <header class="page-header">
-        <h1>手続き</h1>
-        <p class="page-note">社会保険に関する手続きの一覧です。カードをクリックして詳細を確認できます。</p>
+        <div>
+            <h1>手続き</h1>
+            <p class="page-note">社会保険の届出・対応状況を確認できます。期限が近いものから優先して表示します。</p>
+        </div>
     </header>
 
-    <button (click)="createProcedure('qualification')">資格取得手続きの作成</button>
-    <button (click)="createProcedure('loss')">資格喪失手続きの作成</button>
-    <button (click)="createProcedure('regularDecision')">算定基礎届の作成</button>
-    <button (click)="createProcedure('revision')">月額変更届の作成</button>
-    <button (click)="createProcedure('bonusPayment')">賞与支払届の作成</button>
+    @if (!isLoading() && !errorMessage() && procedures().length > 0) {
+        <section class="summary-grid" aria-label="手続きサマリー">
+            <article class="summary-card">
+                <p class="summary-label">要対応</p>
+                <p class="summary-value">{{ actionCount() }}<span class="summary-unit">件</span></p>
+            </article>
+            <article class="summary-card alert" [class.has-alert]="overdueCount() > 0">
+                <p class="summary-label">期限超過</p>
+                <p class="summary-value">{{ overdueCount() }}<span class="summary-unit">件</span></p>
+            </article>
+            <article class="summary-card">
+                <p class="summary-label">すべて</p>
+                <p class="summary-value">{{ procedures().length }}<span class="summary-unit">件</span></p>
+            </article>
+        </section>
+    }
 
     <section class="list-section">
-        <h2 class="section-title">手続き一覧</h2>
+        <div class="toolbar">
+            <div class="status-tabs" role="tablist" aria-label="対応状況で絞り込み">
+                @for (tab of statusTabs; track tab.id) {
+                    <button
+                        type="button"
+                        class="status-tab"
+                        [class.active]="statusFilter() === tab.id"
+                        (click)="setStatusFilter(tab.id)"
+                    >
+                        {{ tab.label }}
+                        <span class="tab-count">{{ tabCount(tab.id) }}</span>
+                    </button>
+                }
+            </div>
+
+            <div class="form-field">
+                <label class="sr-only" for="type-filter">手続き種別</label>
+                <select
+                    id="type-filter"
+                    [ngModel]="typeFilter()"
+                    (ngModelChange)="typeFilter.set($event)"
+                >
+                    @for (option of typeFilterOptions; track option.value) {
+                        <option [value]="option.value">{{ option.label }}</option>
+                    }
+                </select>
+            </div>
+        </div>
 
         @if (isLoading()) {
             <p class="loading">読み込み中...</p>
         } @else if (errorMessage()) {
             <p class="error">{{ errorMessage() }}</p>
-        } @else if (procedures().length === 0) {
-            <p class="empty">手続きはまだありません。</p>
+        } @else if (filteredProcedures().length === 0) {
+            <div class="empty-state">
+                <p class="empty-title">{{ emptyMessage() }}</p>
+                <p class="empty-note">
+                    @if (statusFilter() !== 'all') {
+                        タブを切り替えるか、種別フィルターを変更してください。
+                    } @else {
+                        従業員の入退社や報酬変更に応じて手続きが自動で作成されます。
+                    }
+                </p>
+            </div>
         } @else {
             <div class="procedures-list">
-                @for (procedure of procedures(); track procedure.id) {
-                    <a class="procedure-card" [routerLink]="['/procedures', procedure.id]">
-                        <div class="procedure-card-header">
-                            <p class="procedure-type">{{ procedureTypeLabel(procedure.procedureType) }}</p>
-                            <span
-                                class="status-badge"
-                                [class.not-started]="procedure.status === 'notStarted'"
-                                [class.in-progress]="procedure.status === 'inProgress'"
-                                [class.completed]="procedure.status === 'completed'"
-                            >
-                                {{ statusLabel(procedure.status) }}
-                            </span>
+                @for (procedure of filteredProcedures(); track procedure.id) {
+                    @let meta = procedureTypeMeta(procedure.procedureType);
+                    <a
+                        class="procedure-card"
+                        [class.overdue]="isOverdue(procedure)"
+                        [class.completed]="procedure.status === 'completed'"
+                        [routerLink]="['/procedures', procedure.id]"
+                    >
+                        <span class="type-icon tone-{{ meta.tone }}">{{ meta.icon }}</span>
+
+                        <div class="procedure-body">
+                            <div class="procedure-top">
+                                <div class="procedure-titles">
+                                    <p class="procedure-type">{{ procedureTypeLabel(procedure.procedureType) }}</p>
+                                    <p class="procedure-subject">{{ subjectName(procedure) }}</p>
+                                    <p class="procedure-subtitle">{{ procedureSubtitle(procedure) }}</p>
+                                </div>
+                                <div class="procedure-badges">
+                                    <span
+                                        class="status-badge"
+                                        [class.not-started]="procedure.status === 'notStarted'"
+                                        [class.in-progress]="procedure.status === 'inProgress'"
+                                        [class.completed]="procedure.status === 'completed'"
+                                    >
+                                        {{ procedureStatusLabel(procedure.status) }}
+                                    </span>
+                                    @if (isOverdue(procedure)) {
+                                        <span class="overdue-badge">期限超過</span>
+                                    }
+                                </div>
+                            </div>
+
+                            <dl class="procedure-meta">
+                                <div class="meta-item">
+                                    <dt>対応期限</dt>
+                                    <dd [class.overdue-text]="isOverdue(procedure)">{{ dueDateLabel(procedure) }}</dd>
+                                </div>
+                                @if (procedure.completedDate) {
+                                    <div class="meta-item">
+                                        <dt>完了日</dt>
+                                        <dd>{{ dateLabel(procedure.completedDate) }}</dd>
+                                    </div>
+                                }
+                            </dl>
                         </div>
-                        <dl class="procedure-meta">
-                            <div class="meta-row">
-                                <dt>発生日</dt>
-                                <dd>{{ procedure.occurredDate }}</dd>
-                            </div>
-                            <div class="meta-row">
-                                <dt>対応期限</dt>
-                                <dd>{{ procedure.dueDate }}</dd>
-                            </div>
-                            @if (procedure.completedDate) {
-                                <div class="meta-row">
-                                    <dt>完了日</dt>
-                                    <dd>{{ procedure.completedDate }}</dd>
-                                </div>
-                            }
-                            @if (procedure.targetYearMonth) {
-                                <div class="meta-row">
-                                    <dt>対象年月</dt>
-                                    <dd>{{ procedure.targetYearMonth }}</dd>
-                                </div>
-                            }
-                        </dl>
+
+                        <span class="card-chevron" aria-hidden="true">›</span>
                     </a>
                 }
             </div>
@@ -79,19 +140,144 @@
         margin: 0;
         color: #6b7280;
         font-size: 14px;
+        line-height: 1.5;
+    }
+
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 20px;
+    }
+
+    .summary-card {
+        padding: 14px 16px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    }
+
+    .summary-card.alert.has-alert {
+        border-color: #fecaca;
+        background: #fff7f7;
+    }
+
+    .summary-card.alert.has-alert .summary-value {
+        color: #b91c1c;
+    }
+
+    .summary-label {
+        margin: 0;
+        font-size: 12px;
+        color: #6b7280;
+        font-weight: 600;
+    }
+
+    .summary-value {
+        margin: 6px 0 0;
+        font-size: 24px;
+        font-weight: 700;
+        color: #111827;
+        line-height: 1;
+    }
+
+    .summary-unit {
+        margin-left: 4px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #6b7280;
     }
 
     .list-section {
         margin-top: 24px;
     }
 
-    .section-title {
-        margin: 0 0 12px;
-        font-size: 17px;
+    .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .status-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .status-tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 36px;
+        padding: 0 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 999px;
+        background: #fff;
+        color: #4b5563;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    .status-tab:hover {
+        border-color: #bfdbfe;
+        color: #1d4ed8;
+    }
+
+    .status-tab.active {
+        border-color: #2563eb;
+        background: #eff6ff;
+        color: #1d4ed8;
+    }
+
+    .tab-count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 20px;
+        height: 20px;
+        padding: 0 6px;
+        border-radius: 999px;
+        background: #f3f4f6;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .status-tab.active .tab-count {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .form-field select {
+        height: 36px;
+        padding: 0 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        background: #fff;
+        font-size: 13px;
+        color: #374151;
+        cursor: pointer;
+    }
+
+    .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
     }
 
     .loading,
-    .empty {
+    .empty-note {
         color: #6b7280;
         font-size: 14px;
     }
@@ -102,50 +288,130 @@
         font-weight: 600;
     }
 
+    .empty-state {
+        padding: 32px 20px;
+        text-align: center;
+        background: #f9fafb;
+        border: 1px dashed #d1d5db;
+        border-radius: 12px;
+    }
+
+    .empty-title {
+        margin: 0 0 6px;
+        font-size: 15px;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .empty-note {
+        margin: 0;
+    }
+
     .procedures-list {
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: 10px;
     }
 
     .procedure-card {
-        display: block;
-        padding: 16px;
-        background-color: #fff;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 16px;
+        background: #fff;
         border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+        border-radius: 12px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
         text-decoration: none;
         color: inherit;
-        cursor: pointer;
         transition: border-color 0.15s, box-shadow 0.15s;
     }
 
     .procedure-card:hover {
         border-color: #93c5fd;
-        box-shadow: 0 4px 10px rgba(59, 130, 246, 0.12);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
     }
 
-    .procedure-card-header {
-        display: flex;
+    .procedure-card.overdue {
+        border-color: #fecaca;
+        background: #fffbfb;
+    }
+
+    .procedure-card.completed {
+        opacity: 0.88;
+    }
+
+    .type-icon {
+        flex-shrink: 0;
+        display: inline-flex;
         align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 800;
+        color: #fff;
+    }
+
+    .tone-blue { background: #2563eb; }
+    .tone-rose { background: #e11d48; }
+    .tone-violet { background: #7c3aed; }
+    .tone-amber { background: #d97706; }
+    .tone-orange { background: #ea580c; }
+    .tone-green { background: #059669; }
+    .tone-slate { background: #475569; }
+
+    .procedure-body {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .procedure-top {
+        display: flex;
         justify-content: space-between;
-        gap: 8px;
-        margin-bottom: 12px;
+        align-items: flex-start;
+        gap: 12px;
     }
 
     .procedure-type {
-        margin: 0;
-        font-size: 16px;
-        font-weight: 600;
+        margin: 0 0 4px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #6b7280;
+        letter-spacing: 0.02em;
     }
 
-    .status-badge {
+    .procedure-subject {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 700;
+        color: #111827;
+        line-height: 1.3;
+    }
+
+    .procedure-subtitle {
+        margin: 4px 0 0;
+        font-size: 12px;
+        color: #6b7280;
+        line-height: 1.4;
+    }
+
+    .procedure-badges {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 6px;
         flex-shrink: 0;
+    }
+
+    .status-badge,
+    .overdue-badge {
         padding: 2px 8px;
         border-radius: 999px;
         font-size: 11px;
         font-weight: 700;
+        white-space: nowrap;
     }
 
     .status-badge.not-started {
@@ -163,28 +429,72 @@
         color: #166534;
     }
 
+    .overdue-badge {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
     .procedure-meta {
-        margin: 0;
-        display: grid;
-        gap: 6px;
-    }
-
-    .meta-row {
         display: flex;
-        gap: 12px;
-        font-size: 13px;
+        flex-wrap: wrap;
+        gap: 8px 16px;
+        margin: 10px 0 0;
     }
 
-    .meta-row dt {
+    .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+    }
+
+    .meta-item dt {
+        margin: 0;
+        color: #9ca3af;
+        font-weight: 600;
+    }
+
+    .meta-item dd {
+        margin: 0;
+        color: #374151;
+        font-weight: 600;
+    }
+
+    .meta-item dd.overdue-text {
+        color: #b91c1c;
+    }
+
+    .card-chevron {
         flex-shrink: 0;
-        width: 72px;
-        margin: 0;
-        color: #6b7280;
-        font-weight: 500;
+        color: #d1d5db;
+        font-size: 22px;
+        line-height: 1;
     }
 
-    .meta-row dd {
-        margin: 0;
-        color: #111827;
+    .procedure-card:hover .card-chevron {
+        color: #93c5fd;
+    }
+
+    @media (max-width: 768px) {
+        .summary-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .procedure-card {
+            align-items: flex-start;
+        }
+
+        .procedure-top {
+            flex-direction: column;
+        }
+
+        .procedure-badges {
+            flex-direction: row;
+            align-items: center;
+        }
+
+        .card-chevron {
+            display: none;
+        }
     }
 </style>

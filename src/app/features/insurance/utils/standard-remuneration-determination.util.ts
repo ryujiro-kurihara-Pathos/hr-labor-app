@@ -51,6 +51,14 @@ export function getRegularDeterminationBaseYear(targetYearMonth: string): number
     return m >= 9 ? y : y - 1;
 }
 
+/**
+ * 算定基礎届手続きの targetYearMonth（YYYY-06）から算定対象年を返す。
+ * 保険料画面の月次キーとは異なり、年部分がそのまま4〜6月の年になる。
+ */
+export function getRegularDecisionProcedureBaseYear(targetYearMonth: string): number {
+    return Number(targetYearMonth.slice(0, 4));
+}
+
 export function getAprJunYearMonths(baseYear: number): string[] {
     return [`${baseYear}-04`, `${baseYear}-05`, `${baseYear}-06`];
 }

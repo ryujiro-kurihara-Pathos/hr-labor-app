@@ -1,5 +1,5 @@
 import { Component, signal, inject } from '@angular/core';
-import { RouterLink, RouterLinkActive, Router } from '@angular/router';
+import { RouterLink, Router } from '@angular/router';
 
 import { Company } from '../models/company.model';
 import { AuthService } from '../../auth/services/auth.service';
@@ -8,13 +8,13 @@ import { CompanyService } from '../services/company.service';
 
 import { OfficeCreateModalComponent, OfficeFormData } from '../components/office-create-modal.component';
 import { OfficeService } from '../services/office.service';
-import { Office, OfficeCreateInput } from '../models/office.model';
+import { HealthInsuranceType, Office, OfficeCreateInput } from '../models/office.model';
 import { formatOfficeAddress } from '../utils/office-format.util';
 
 @Component({
     selector: 'app-company-page',
     standalone: true,
-    imports: [RouterLink, RouterLinkActive, OfficeCreateModalComponent],
+    imports: [RouterLink, OfficeCreateModalComponent],
     templateUrl: './company-page.component.html',
 })
 
@@ -77,6 +77,10 @@ export class CompanyPageComponent {
 
     formatOfficeAddress(office: Office): string {
         return formatOfficeAddress(office);
+    }
+
+    healthInsuranceLabel(type: HealthInsuranceType): string {
+        return type === 'kyokai' ? '協会けんぽ' : '組合健保';
     }
 
     //// 事業所

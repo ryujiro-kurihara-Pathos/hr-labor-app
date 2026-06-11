@@ -8,10 +8,10 @@
             <a routerLink="/premium" class="back-link">← 一覧に戻る</a>
             <h1>保険料計算</h1>
             <p class="employee-meta">
-                {{ employee()!.lastName }} {{ employee()!.firstName }}
+                <a [routerLink]="['/employees', employee()!.id]">{{ employee()!.lastName }} {{ employee()!.firstName }}</a>
                 @if (office()?.prefecture) {
                     <span class="meta-separator">·</span>
-                    事業所：{{ office()!.prefecture }}
+                    <a [routerLink]="['/company/offices', office()!.id]">事業所：{{ office()!.prefecture }}</a>
                 }
             </p>
         </header>
@@ -59,6 +59,92 @@
             <p class="month-loading">報酬情報を読み込み中...</p>
         }
 
+        @if (standardReward()?.fixedWageChanged && changedFixedWageFieldLabels().length > 0) {
+            <p class="alert alert-warning">
+                前月から固定的賃金に変更があります（{{ changedFixedWageFieldLabels().join('・') }}）。月額変更の届出が必要な場合があります。
+            </p>
+        }
+
+        @if (showRevisionProcedureSection()) {
+            @if (revisionProcedureContext(); as revisionCtx) {
+                <section class="regular-decision-procedure-section">
+                    <h2 class="regular-decision-section-title">月額変更届（{{ revisionCtx.windowLabel }}）</h2>
+                    <div class="regular-decision-procedure-box">
+                        @if (revisionProcedureExists()) {
+                            <div class="regular-decision-procedure-header">
+                                <p class="regular-decision-procedure-message">月額変更届が作成されています。</p>
+                                <span
+                                    class="procedure-status-badge"
+                                    [class.not-started]="revisionProcedureStatus() === 'notStarted'"
+                                    [class.in-progress]="revisionProcedureStatus() === 'inProgress'"
+                                    [class.completed]="revisionProcedureStatus() === 'completed'"
+                                >
+                                    {{ revisionProcedureStatusLabel(revisionProcedureStatus()) }}
+                                </span>
+                            </div>
+                        } @else {
+                            <p class="regular-decision-procedure-note">
+                                {{ revisionCtx.windowLabel }}の報酬をもとに、{{ revisionCtx.applyFromLabel }}からの月額変更届を作成できます。
+                            </p>
+                        }
+                        <button
+                            type="button"
+                            class="btn primary-btn regular-decision-procedure-btn"
+                            (click)="openRevisionProcedure()"
+                            [disabled]="isCreatingRevisionProcedure()"
+                        >
+                            @if (isCreatingRevisionProcedure()) {
+                                作成中...
+                            } @else if (revisionProcedureExists()) {
+                                月額変更届を開く
+                            } @else {
+                                月額変更届を作成
+                            }
+                        </button>
+                    </div>
+                </section>
+            }
+        }
+
+        @if (showRegularDecisionProcedureSection()) {
+            <section class="regular-decision-procedure-section">
+                <h2 class="regular-decision-section-title">算定基礎届（{{ regularDecisionYearLabel() }}4〜6月）</h2>
+                <div class="regular-decision-procedure-box">
+                    @if (regularDecisionProcedureExists()) {
+                        <div class="regular-decision-procedure-header">
+                            <p class="regular-decision-procedure-message">算定基礎届が作成されています。</p>
+                            <span
+                                class="procedure-status-badge"
+                                [class.not-started]="regularDecisionProcedureStatus() === 'notStarted'"
+                                [class.in-progress]="regularDecisionProcedureStatus() === 'inProgress'"
+                                [class.completed]="regularDecisionProcedureStatus() === 'completed'"
+                            >
+                                {{ regularDecisionProcedureStatusLabel(regularDecisionProcedureStatus()) }}
+                            </span>
+                        </div>
+                    } @else {
+                        <p class="regular-decision-procedure-note">
+                            {{ regularDecisionYearLabel() }}4〜6月の報酬をもとに、定時決定の算定基礎届を作成できます。
+                        </p>
+                    }
+                    <button
+                        type="button"
+                        class="btn primary-btn regular-decision-procedure-btn"
+                        (click)="openRegularDecisionProcedure()"
+                        [disabled]="isCreatingRegularDecisionProcedure()"
+                    >
+                        @if (isCreatingRegularDecisionProcedure()) {
+                            作成中...
+                        } @else if (regularDecisionProcedureExists()) {
+                            算定基礎届を開く
+                        } @else {
+                            算定基礎届を作成
+                        }
+                    </button>
+                </div>
+            </section>
+        }
+
         @if (canCopyFromLatestRegistered()) {
             <button
                 type="button"
@@ -68,12 +154,6 @@
             >
                 直近の登録済み（{{ latestRegisteredYearMonthLabel() }}）をコピー
             </button>
-        }
-
-        @if (standardReward()?.fixedWageChanged && changedFixedWageFieldLabels().length > 0) {
-            <p class="alert alert-warning">
-                前月から固定的賃金に変更があります（{{ changedFixedWageFieldLabels().join('・') }}）。月額変更の届出が必要な場合があります。
-            </p>
         }
 
         <div class="main-grid">
@@ -307,7 +387,7 @@
                                 {{ monthlyReward | number }}円
                                 @if (includedBonusInMonth() > 0) {
                                     <span class="included-bonus-note">
-                                        （うち賞与算入 {{ includedBonusInMonth() | number }}円）
+                                        （うち賞与算入 {{ includedBonusInMonth() | number }}円＝年間賞与合計÷12）
                                     </span>
                                 }
                             } @else {
@@ -361,7 +441,7 @@
             <h2 class="section-title">賞与入力（{{ targetYearMonthLabel() }}）</h2>
             <p class="bonus-section-note">
                 @if (treatBonusAsMonthlyRemuneration()) {
-                    この従業員は{{ targetYearMonthLabel() }}の暦年に賞与が年4回以上支給されているため、賞与は報酬月額に算入します。標準賞与額・賞与保険料は計算しません。
+                    対象期間（{{ targetYearMonthLabel() }}の暦年）内で4回目以降の賞与支給があるため、当該賞与は賞与支払届の対象外です。標準報酬月額には対象期間内の賞与合計（{{ bonusTotalInTargetPeriod() | number }}円）を12で除した額（{{ includedBonusInMonth() | number }}円）を毎月加算します。標準賞与額・賞与保険料は計算しません。
                 } @else {
                     月次報酬とは別に、賞与支給時の金額を登録します。標準賞与額は1,000円未満を切り捨てて計算されます（年3回以下の賞与は賞与支払届の対象です）。
                 }
@@ -483,6 +563,45 @@
                         </button>
                     </div>
                 </div>
+            }
+
+            @if (showBonusPaymentProcedureSection()) {
+                <section class="regular-decision-procedure-section bonus-payment-procedure-section">
+                    <h2 class="regular-decision-section-title">賞与支払届（{{ targetYearMonthLabel() }}）</h2>
+                    <div class="regular-decision-procedure-box">
+                        @if (bonusPaymentProcedureExists()) {
+                            <div class="regular-decision-procedure-header">
+                                <p class="regular-decision-procedure-message">賞与支払届が作成されています。</p>
+                                <span
+                                    class="procedure-status-badge"
+                                    [class.not-started]="bonusPaymentProcedureStatus() === 'notStarted'"
+                                    [class.in-progress]="bonusPaymentProcedureStatus() === 'inProgress'"
+                                    [class.completed]="bonusPaymentProcedureStatus() === 'completed'"
+                                >
+                                    {{ bonusPaymentProcedureStatusLabel(bonusPaymentProcedureStatus()) }}
+                                </span>
+                            </div>
+                        } @else {
+                            <p class="regular-decision-procedure-note">
+                                {{ targetYearMonthLabel() }}の賞与をもとに、賞与支払届を作成できます。
+                            </p>
+                        }
+                        <button
+                            type="button"
+                            class="btn primary-btn regular-decision-procedure-btn"
+                            (click)="openBonusPaymentProcedure()"
+                            [disabled]="isCreatingBonusPaymentProcedure()"
+                        >
+                            @if (isCreatingBonusPaymentProcedure()) {
+                                作成中...
+                            } @else if (bonusPaymentProcedureExists()) {
+                                賞与支払届を開く
+                            } @else {
+                                賞与支払届を作成
+                            }
+                        </button>
+                    </div>
+                </section>
             }
         </section>
 
@@ -753,7 +872,7 @@
                     }
                 } @else if (treatBonusAsMonthlyRemuneration() && monthBonuses().length > 0) {
                     <p class="premium-note muted">
-                        年4回以上の賞与支給のため、賞与は報酬月額に算入済みです。賞与に対する保険料は計算しません。
+                        対象期間内で4回目以降の賞与があるため、賞与合計÷12（{{ includedBonusInMonth() | number }}円）を報酬月額に算入済みです。賞与に対する保険料は計算しません。
                     </p>
                 } @else {
                     <p class="premium-note muted">この月の賞与は未登録のため、賞与に対する保険料を計算できません。</p>
@@ -843,6 +962,72 @@
         background: #fffbeb;
         border: 1px solid #fde68a;
         color: #92400e;
+    }
+
+    .regular-decision-procedure-section {
+        margin-bottom: 16px;
+    }
+
+    .regular-decision-section-title {
+        margin: 0 0 10px;
+        font-size: 17px;
+    }
+
+    .regular-decision-procedure-box {
+        padding: 14px 16px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+    }
+
+    .regular-decision-procedure-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .regular-decision-procedure-message,
+    .regular-decision-procedure-note {
+        margin: 0 0 12px;
+        font-size: 14px;
+        line-height: 1.5;
+        color: #374151;
+    }
+
+    .regular-decision-procedure-header .regular-decision-procedure-message {
+        margin-bottom: 0;
+    }
+
+    .procedure-status-badge {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .procedure-status-badge.not-started {
+        background: #f3f4f6;
+        color: #4b5563;
+    }
+
+    .procedure-status-badge.in-progress {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .procedure-status-badge.completed {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .regular-decision-procedure-btn {
+        display: block;
+        width: 100%;
     }
 
     .month-toolbar {

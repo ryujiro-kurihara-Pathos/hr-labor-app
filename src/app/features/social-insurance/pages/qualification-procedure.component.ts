@@ -1,4 +1,5 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 import { Procedure } from '../models/procedures.model';
 import { SocialInsuranceStatus } from '../models/social-insurance-status.model';
@@ -7,7 +8,8 @@ import { StandardMonthlyReward } from '../../insurance/models/standard-monthly-r
 import { Employee } from '../../employee/models/employee.models';
 import { Office } from '../../company/models/office.model';
 import { Company } from '../../company/models/company.model';
-import { ProcedureCommonInfoComponent } from './procedure-common-info.component';
+import { SocialInsuranceProcedureService } from '../services/social-insurance-procedure.service';
+import { ProcedureActionBarComponent } from '../components/procedure-action-bar.component';
 import { splitOfficeSymbol } from '../../company/utils/office-format.util';
 import {
     dateLabel,
@@ -16,54 +18,240 @@ import {
 } from '../utils/procedure-display.util';
 import {
     formatYen,
+    QualificationMonthlyReward,
     resolveQualificationMonthlyReward,
 } from '../utils/qualification-reward.util';
+import {
+    buildQualificationProcedureData,
+    hasSavedQualificationData,
+    monthlyRewardFromProcedure,
+    todayDateString,
+} from '../utils/qualification-procedure-data.util';
 
 @Component({
     selector: 'app-qualification-procedure',
     standalone: true,
-    imports: [ProcedureCommonInfoComponent],
+    imports: [ProcedureActionBarComponent, RouterLink],
     templateUrl: './qualification-procedure.component.html',
 })
 export class QualificationProcedureComponent {
+    private readonly procedureService = inject(SocialInsuranceProcedureService);
+
     procedure = input.required<Procedure>();
-    employee = input.required<Employee>();
-    office = input.required<Office>();
-    company = input.required<Company>();
+    employee = input<Employee | null>(null);
+    office = input<Office | null>(null);
+    company = input<Company | null>(null);
     socialInsuranceStatus = input<SocialInsuranceStatus | null>(null);
     hasDependents = input(false);
     joinMonthReward = input<StandardMonthlyReward | null>(null);
     employeeBonuses = input<BonusReward[]>([]);
 
-    qualificationDate = computed(() => {
+    procedureUpdated = output<Procedure>();
+
+    isSubmitting = signal(false);
+    submitErrorMessage = signal('');
+
+    isCompleted = computed(() => this.procedure().status === 'completed');
+
+    useSavedData = computed(() => {
+        const item = this.procedure();
+        return item.status === 'completed' && hasSavedQualificationData(item);
+    });
+
+    liveQualificationDate = computed(() => {
         const status = this.socialInsuranceStatus();
         const item = this.procedure();
+        const employee = this.employee();
         return (
             status?.healthInsuranceStartDate ||
             item.occurredDate ||
-            this.employee().joinedDate ||
+            employee?.joinedDate ||
             null
         );
     });
 
-    monthlyReward = computed(() =>
-        resolveQualificationMonthlyReward(
-            this.employee().joinedDate,
+    liveMonthlyReward = computed(() => {
+        const employee = this.employee();
+        if (!employee) return null;
+        return resolveQualificationMonthlyReward(
+            employee.joinedDate,
             this.joinMonthReward(),
             this.employeeBonuses(),
-        ),
-    );
+        );
+    });
+
+    displayQualificationDate = computed((): string | null => {
+        const item = this.procedure();
+        if (this.useSavedData() && item.qualificationDate) return item.qualificationDate;
+        return this.liveQualificationDate();
+    });
+
+    displayMonthlyReward = computed((): QualificationMonthlyReward | null => {
+        if (this.useSavedData()) return monthlyRewardFromProcedure(this.procedure());
+        return this.liveMonthlyReward();
+    });
+
+    displayOfficeSymbol = computed((): string => {
+        const item = this.procedure();
+        if (this.useSavedData()) return item.officeSymbol;
+        return this.office()?.officeSymbol ?? '';
+    });
+
+    displayOfficeNumber = computed((): string => {
+        const item = this.procedure();
+        if (this.useSavedData()) return item.officeNumber;
+        return this.office()?.officeNumber ?? '';
+    });
+
+    displayCompanyName = computed((): string => {
+        const item = this.procedure();
+        if (this.useSavedData()) return item.companyName;
+        return this.company()?.name ?? '';
+    });
+
+    displayOfficeName = computed((): string => {
+        const item = this.procedure();
+        if (this.useSavedData()) return item.officeName;
+        return this.office()?.name ?? '';
+    });
+
+    displayOfficeAddress = computed((): string => {
+        const item = this.procedure();
+        if (this.useSavedData()) return item.officeAddress;
+        const office = this.office();
+        if (!office) return '—';
+        const parts = [
+            office.postalCode ? `〒${office.postalCode}` : '',
+            office.prefecture,
+            office.city,
+            office.streetAddress,
+            office.buildingName,
+        ].filter((part) => part.trim());
+        return parts.length > 0 ? parts.join(' ') : '—';
+    });
+
+    displayRepresentativeName = computed((): string => {
+        const item = this.procedure();
+        if (this.useSavedData()) return item.representativeName;
+        return this.company()?.representativeName ?? '';
+    });
+
+    displayPhoneNumber = computed((): string => {
+        const item = this.procedure();
+        if (this.useSavedData()) return item.phoneNumber;
+        return this.office()?.phoneNumber ?? '';
+    });
+
+    displayEmployeeLastName = computed((): string => {
+        const item = this.procedure();
+        if (this.useSavedData()) return item.employeeLastName;
+        return this.employee()?.lastName ?? '';
+    });
+
+    displayEmployeeFirstName = computed((): string => {
+        const item = this.procedure();
+        if (this.useSavedData()) return item.employeeFirstName;
+        return this.employee()?.firstName ?? '';
+    });
+
+    displayEmployeeLastNameKana = computed((): string => {
+        const item = this.procedure();
+        if (this.useSavedData()) return item.employeeLastNameKana;
+        return this.employee()?.lastNameKana ?? '';
+    });
+
+    displayEmployeeFirstNameKana = computed((): string => {
+        const item = this.procedure();
+        if (this.useSavedData()) return item.employeeFirstNameKana;
+        return this.employee()?.firstNameKana ?? '';
+    });
+
+    displayBirthDate = computed((): string => {
+        const item = this.procedure();
+        if (this.useSavedData()) return item.birthDate;
+        return this.employee()?.birthDate ?? '';
+    });
+
+    displayMyNumber = computed((): string => {
+        const item = this.procedure();
+        if (this.useSavedData()) return item.myNumber;
+        return this.employee()?.myNumber ?? '';
+    });
+
+    displayEmployeeAddress = computed((): string => {
+        const item = this.procedure();
+        if (this.useSavedData()) return item.employeeAddress;
+        const employee = this.employee();
+        return employee ? employeeAddressLabel(employee) : '—';
+    });
+
+    displayHasDependents = computed((): boolean => {
+        const item = this.procedure();
+        if (this.useSavedData()) return item.hasDependents;
+        return this.hasDependents();
+    });
 
     readonly statusLabel = procedureStatusLabel;
     readonly dateLabel = dateLabel;
-    readonly employeeAddressLabel = employeeAddressLabel;
     readonly formatYen = formatYen;
 
     officeSymbolPrefixChars(): string[] {
-        return splitOfficeSymbol(this.office().officeSymbol).prefix;
+        return splitOfficeSymbol(this.displayOfficeSymbol()).prefix;
     }
 
     officeSymbolSuffixChars(): string[] {
-        return splitOfficeSymbol(this.office().officeSymbol).suffix;
+        return splitOfficeSymbol(this.displayOfficeSymbol()).suffix;
+    }
+
+    convertJoinedDateToYearMonth(date: string): string {
+        const [year, month] = date.split('-');
+        return `${year}-${month}`;
+    }
+
+    async submitProcedure(): Promise<void> {
+        if (this.isCompleted() || this.isSubmitting()) return;
+
+        const employee = this.employee();
+        const office = this.office();
+        const company = this.company();
+        if (!employee || !office || !company) {
+            this.submitErrorMessage.set('関連情報の取得に失敗したため、提出済みにできません');
+            return;
+        }
+
+        const item = this.procedure();
+        this.isSubmitting.set(true);
+        this.submitErrorMessage.set('');
+
+        try {
+            const submittedDate = todayDateString();
+            const procedureData = buildQualificationProcedureData({
+                employee,
+                office,
+                company,
+                qualificationDate: this.liveQualificationDate(),
+                monthlyReward: this.liveMonthlyReward(),
+                hasDependents: this.hasDependents(),
+            });
+
+            await this.procedureService.completeQualificationProcedure(
+                item.id,
+                procedureData,
+                submittedDate,
+            );
+
+            this.procedureUpdated.emit({
+                ...item,
+                ...procedureData,
+                status: 'completed',
+                completedDate: submittedDate,
+                submittedDate,
+            });
+        } catch (error) {
+            console.error('手続きの提出済み処理に失敗しました', error);
+            this.submitErrorMessage.set('提出済みにする処理に失敗しました');
+        } finally {
+            this.isSubmitting.set(false);
+        }
     }
 }

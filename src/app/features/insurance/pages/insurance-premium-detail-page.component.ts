@@ -50,10 +50,14 @@ import { BonusRewardService } from '../../bonus/services/bonus-reward.service';
 import {
     bonusesForStandardBonusPremium,
     effectiveMonthlyRewardFromBase,
+    monthlyBonusRemunerationAddition,
     shouldTreatBonusAsMonthlyRemuneration,
-    sumBonusAmountInMonth,
+    sumBonusAmountInTargetPeriod,
 } from '../utils/effective-monthly-reward.util';
 import { roundInsurancePremium } from '../utils/insurance-premium-rounding.util';
+import { SocialInsuranceProcedureService } from '../../social-insurance/services/social-insurance-procedure.service';
+import { Procedure, ProcedureStatus } from '../../social-insurance/models/procedures.model';
+import { procedureStatusLabel } from '../../social-insurance/utils/procedure-display.util';
 
 type MonthRewardStatus = 'loading' | 'registered' | 'unregistered' | 'excluded';
 
@@ -73,6 +77,7 @@ export class InsurancePremiumDetailPageComponent {
     private readonly socialInsuranceStatusService = inject(SocialInsuranceStatusService);
     private readonly officeService = inject(OfficeService);
     private readonly bonusRewardService = inject(BonusRewardService);
+    private readonly procedureService = inject(SocialInsuranceProcedureService);
 
     standardReward = signal<StandardMonthlyReward | null>(null); // 標準報酬月額
     employeeRewards = signal<Record<string, StandardMonthlyReward>>({}); // 従業員の報酬月額
@@ -127,6 +132,88 @@ export class InsurancePremiumDetailPageComponent {
     targetYearMonth = signal<string>('');
     targetYearMonthLabel = computed(() => formatYearMonthLabel(this.targetYearMonth()));
 
+    regularDecisionProcedure = signal<Procedure | null>(null);
+    isCreatingRegularDecisionProcedure = signal(false);
+
+    isRegularDecisionBaseMonth = computed((): boolean => {
+        const yearMonth = this.targetYearMonth();
+        if (!/^\d{4}-\d{2}$/.test(yearMonth)) return false;
+        const month = Number(yearMonth.slice(5, 7));
+        return month >= 4 && month <= 6;
+    });
+
+    regularDecisionYearLabel = computed((): string => {
+        const yearMonth = this.targetYearMonth();
+        if (!yearMonth) return '';
+        return `${yearMonth.slice(0, 4)}年`;
+    });
+
+    /** 算定基礎届の対象年月キー（YYYY-06） */
+    regularDecisionTargetYearMonth = computed((): string | null => {
+        const yearMonth = this.targetYearMonth();
+        if (!this.isRegularDecisionBaseMonth()) return null;
+        return `${yearMonth.slice(0, 4)}-06`;
+    });
+
+    regularDecisionProcedureExists = computed(() => this.regularDecisionProcedure() !== null);
+
+    regularDecisionProcedureStatus = computed((): ProcedureStatus => {
+        return this.regularDecisionProcedure()?.status ?? 'notStarted';
+    });
+
+    /** 表示中の月が属する随時改定の算定3か月（固定的賃金変更月から） */
+    revisionProcedureContext = computed(() => {
+        const yearMonth = this.targetYearMonth();
+        const employee = this.employee();
+        if (!yearMonth || !employee || !isRewardTargetMonth(employee, yearMonth)) return null;
+
+        const rewards = this.employeeRewards();
+
+        for (let offset = 0; offset <= 2; offset++) {
+            const originMonth = addMonthsToYearMonth(yearMonth, -offset);
+            const originReward = rewards[originMonth];
+            if (!originReward?.fixedWageChanged) continue;
+
+            const calculationMonths = [
+                originMonth,
+                addMonthsToYearMonth(originMonth, 1),
+                addMonthsToYearMonth(originMonth, 2),
+            ];
+            if (!calculationMonths.includes(yearMonth)) continue;
+
+            const applyFromMonth = addMonthsToYearMonth(originMonth, 3);
+            const lastCalculationMonth = calculationMonths[2]!;
+
+            return {
+                originMonth,
+                applyFromMonth,
+                calculationMonths,
+                lastCalculationMonth,
+                windowLabel: `${formatYearMonthLabel(calculationMonths[0]!)}〜${formatYearMonthLabel(lastCalculationMonth)}`,
+                applyFromLabel: formatYearMonthLabel(applyFromMonth),
+                description: `${formatYearMonthLabel(calculationMonths[0]!)}〜${formatYearMonthLabel(lastCalculationMonth)}の報酬をもとに、${formatYearMonthLabel(applyFromMonth)}から随時改定の対象になるか判定します。`,
+            };
+        }
+
+        return null;
+    });
+
+    showRevisionProcedureSection = computed(() => this.revisionProcedureContext() !== null);
+
+    /** 算定基礎届と重なる月は月額変更届を優先 */
+    showRegularDecisionProcedureSection = computed(
+        () => this.isRegularDecisionBaseMonth() && !this.showRevisionProcedureSection(),
+    );
+
+    revisionProcedure = signal<Procedure | null>(null);
+    isCreatingRevisionProcedure = signal(false);
+
+    revisionProcedureExists = computed(() => this.revisionProcedure() !== null);
+
+    revisionProcedureStatus = computed((): ProcedureStatus => {
+        return this.revisionProcedure()?.status ?? 'notStarted';
+    });
+
     /** 未入力月を開いたとき、初期表示に使った直近登録済み月（YYYY-MM） */
     prefilledFromYearMonth = signal<string | null>(null);
     /** 未保存のフォーム合計を computed に反映するためのトリガ */
@@ -164,12 +251,19 @@ export class InsurancePremiumDetailPageComponent {
         );
     });
 
-    /** 報酬月額に算入した賞与額（対象月） */
+    /** 報酬月額に算入した賞与額（対象期間の賞与合計 ÷ 12） */
     includedBonusInMonth = computed(() => {
         if (!this.treatBonusAsMonthlyRemuneration()) return 0;
         const yearMonth = this.targetYearMonth();
         if (!yearMonth) return 0;
-        return sumBonusAmountInMonth(this.employeeBonuses(), yearMonth);
+        return monthlyBonusRemunerationAddition(this.employeeBonuses(), yearMonth);
+    });
+
+    /** 対象期間内の賞与支給額合計（算入表示用） */
+    bonusTotalInTargetPeriod = computed(() => {
+        const yearMonth = this.targetYearMonth();
+        if (!yearMonth) return 0;
+        return sumBonusAmountInTargetPeriod(this.employeeBonuses(), yearMonth);
     });
 
     // 月次報酬のステータス
@@ -253,24 +347,15 @@ export class InsurancePremiumDetailPageComponent {
 
     // 随時改定の判定
     revisionPreview = computed(() => {
-        const ym = this.targetYearMonth();
-        const employee = this.employee();
-        if (!ym || !employee || !isRewardTargetMonth(employee, ym)) return null;
-
-        const originMonth = addMonthsToYearMonth(ym, -2);
-        const applyFromMonth = addMonthsToYearMonth(ym, 1);
-        const calculationMonths = [
-            originMonth,
-            addMonthsToYearMonth(originMonth, 1),
-            addMonthsToYearMonth(originMonth, 2),
-        ];
+        const context = this.revisionProcedureContext();
+        if (!context) return null;
 
         return {
-            windowLabel: `${formatYearMonthLabel(originMonth)}〜${formatYearMonthLabel(ym)}`,
-            applyFromLabel: formatYearMonthLabel(applyFromMonth),
-            description: `${formatYearMonthLabel(originMonth)}〜${formatYearMonthLabel(ym)}の報酬をもとに、${formatYearMonthLabel(applyFromMonth)}から随時改定の対象になるか判定します。`,
-            calculationMonths,
-            originMonth,
+            windowLabel: context.windowLabel,
+            applyFromLabel: context.applyFromLabel,
+            description: context.description,
+            calculationMonths: context.calculationMonths,
+            originMonth: context.originMonth,
         };
     });
 
@@ -336,6 +421,21 @@ export class InsurancePremiumDetailPageComponent {
             employee.retiredDate,
         );
         return days > 0 ? days : null;
+    });
+
+    // 賞与支払届
+    bonusPaymentProcedure = signal<Procedure | null>(null);
+    isCreatingBonusPaymentProcedure = signal(false);
+
+    /** 年4回以上の賞与算入時は賞与支払届の対象外 */
+    showBonusPaymentProcedureSection = computed(
+        () => this.monthBonuses().length > 0 && !this.treatBonusAsMonthlyRemuneration(),
+    );
+
+    bonusPaymentProcedureExists = computed(() => this.bonusPaymentProcedure() !== null);
+
+    bonusPaymentProcedureStatus = computed((): ProcedureStatus => {
+        return this.bonusPaymentProcedure()?.status ?? 'notStarted';
     });
 
     isTargetMonth(): boolean {
@@ -425,6 +525,11 @@ export class InsurancePremiumDetailPageComponent {
                 await this.loadStandardReward();
                 await this.loadMonthBonuses();
                 await this.loadOffice();
+                await Promise.all([
+                    this.loadRegularDecisionProcedure(),
+                    this.loadRevisionProcedure(),
+                    this.loadBonusPaymentProcedure(),
+                ]);
             }
         } finally {
             this.isLoading.set(false);
@@ -514,9 +619,75 @@ export class InsurancePremiumDetailPageComponent {
 
         this.isLoadingMonth.set(true);
         try {
-            await Promise.all([this.loadStandardReward(), this.loadMonthBonuses()]);
+            await Promise.all([
+                this.loadStandardReward(),
+                this.loadMonthBonuses(),
+                this.loadRegularDecisionProcedure(),
+                this.loadRevisionProcedure(),
+                this.loadBonusPaymentProcedure(),
+            ]);
         } finally {
             this.isLoadingMonth.set(false);
+        }
+    }
+
+    async loadRegularDecisionProcedure(): Promise<void> {
+        this.regularDecisionProcedure.set(null);
+
+        const employee = this.employee();
+        const targetYearMonth = this.regularDecisionTargetYearMonth();
+        if (!employee || !targetYearMonth || !this.showRegularDecisionProcedureSection()) return;
+
+        try {
+            const procedure = await this.procedureService.getRegularDecisionProcedureByEmployeeIdAndTargetYearMonth(
+                employee.id,
+                employee.companyId,
+                targetYearMonth,
+            );
+            this.regularDecisionProcedure.set(procedure);
+        } catch (error) {
+            console.error('算定基礎届の取得に失敗しました', error);
+            this.errorMessage.set('算定基礎届の取得に失敗しました');
+        }
+    }
+
+    async loadRevisionProcedure(): Promise<void> {
+        this.revisionProcedure.set(null);
+
+        const employee = this.employee();
+        const context = this.revisionProcedureContext();
+        if (!employee || !context) return;
+
+        try {
+            const procedure = await this.procedureService.getRevisionProcedureByEmployeeIdAndTargetYearMonth(
+                employee.id,
+                employee.companyId,
+                context.applyFromMonth,
+            );
+            this.revisionProcedure.set(procedure);
+        } catch (error) {
+            console.error('月額変更届の取得に失敗しました', error);
+            this.errorMessage.set('月額変更届の取得に失敗しました');
+        }
+    }
+
+    async loadBonusPaymentProcedure(): Promise<void> {
+        this.bonusPaymentProcedure.set(null);
+
+        const employee = this.employee();
+        const targetYearMonth = this.targetYearMonth();
+        if (!employee || !targetYearMonth || !this.showBonusPaymentProcedureSection()) return;
+
+        try {
+            const procedure = await this.procedureService.getBonusPaymentProcedureByEmployeeIdAndTargetYearMonth(
+                employee.id,
+                employee.companyId,
+                targetYearMonth,
+            );
+            this.bonusPaymentProcedure.set(procedure);
+        } catch (error) {
+            console.error('賞与支払届の取得に失敗しました', error);
+            this.errorMessage.set('賞与支払届の取得に失敗しました');
         }
     }
 
@@ -819,6 +990,10 @@ export class InsurancePremiumDetailPageComponent {
                 ...current,
                 [saved.targetYearMonth]: saved,
             }));
+            await Promise.all([
+                this.loadRegularDecisionProcedure(),
+                this.loadRevisionProcedure(),
+            ]);
             this.message.set(`${saved.targetYearMonth} の報酬情報を保存しました`);
         } catch (error) {
             console.error('保存に失敗しました', error);
@@ -1022,6 +1197,7 @@ export class InsurancePremiumDetailPageComponent {
                 bonusAmount,
             });
             await this.loadMonthBonuses();
+            await this.loadBonusPaymentProcedure();
             this.bonusMessage.set('賞与を保存しました');
             this.resetBonusForm();
             this.isBonusFormVisible.set(this.monthBonuses().length === 0);
@@ -1130,5 +1306,135 @@ export class InsurancePremiumDetailPageComponent {
 
     private bumpFormRewardRevision(): void {
         this.formRewardRevision.update((v) => v + 1);
+    }
+
+    readonly regularDecisionProcedureStatusLabel = procedureStatusLabel;
+    readonly revisionProcedureStatusLabel = procedureStatusLabel;
+    readonly bonusPaymentProcedureStatusLabel = procedureStatusLabel;
+
+    async openBonusPaymentProcedure(): Promise<void> {
+        const employee = this.employee();
+        const targetYearMonth = this.targetYearMonth();
+        const bonus = this.monthBonuses()[0];
+        if (!employee || !targetYearMonth || !bonus || this.isCreatingBonusPaymentProcedure()) return;
+        if (this.treatBonusAsMonthlyRemuneration()) return;
+
+        const existing = this.bonusPaymentProcedure();
+        if (existing) {
+            this.router.navigate(['/procedures', existing.id]);
+            return;
+        }
+
+        this.isCreatingBonusPaymentProcedure.set(true);
+        this.errorMessage.set('');
+
+        try {
+            const procedure = await this.procedureService.createProcedure({
+                companyId: employee.companyId,
+                officeId: employee.officeId,
+                employeeId: employee.id,
+                procedureType: 'bonusPayment',
+                status: 'notStarted',
+                occurredDate: bonus.paymentDate,
+                dueDate: '',
+                completedDate: null,
+                submittedDate: null,
+                targetYearMonth,
+                memo: '',
+                lossReason: null,
+                dependentChanges: null,
+            });
+            this.bonusPaymentProcedure.set(procedure);
+            this.router.navigate(['/procedures', procedure.id]);
+        } catch (error) {
+            console.error('賞与支払届の作成に失敗しました', error);
+            this.errorMessage.set('賞与支払届の作成に失敗しました');
+        } finally {
+            this.isCreatingBonusPaymentProcedure.set(false);
+        }
+    }
+
+    async openRevisionProcedure(): Promise<void> {
+        const employee = this.employee();
+        const context = this.revisionProcedureContext();
+        if (!employee || !context || this.isCreatingRevisionProcedure()) return;
+
+        const existing = this.revisionProcedure();
+        if (existing) {
+            this.router.navigate(['/procedures', existing.id]);
+            return;
+        }
+
+        this.isCreatingRevisionProcedure.set(true);
+        this.errorMessage.set('');
+
+        try {
+            const [lastYear, lastMonth] = context.lastCalculationMonth.split('-').map(Number);
+            const lastDay = new Date(lastYear, lastMonth, 0).getDate();
+            const occurredDate = `${lastYear}-${String(lastMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+            const procedure = await this.procedureService.createProcedure({
+                companyId: employee.companyId,
+                officeId: employee.officeId,
+                employeeId: employee.id,
+                procedureType: 'revision',
+                status: 'notStarted',
+                occurredDate,
+                dueDate: '',
+                completedDate: null,
+                submittedDate: null,
+                targetYearMonth: context.applyFromMonth,
+                memo: '',
+                lossReason: null,
+                dependentChanges: null,
+            });
+            this.revisionProcedure.set(procedure);
+            this.router.navigate(['/procedures', procedure.id]);
+        } catch (error) {
+            console.error('月額変更届の作成に失敗しました', error);
+            this.errorMessage.set('月額変更届の作成に失敗しました');
+        } finally {
+            this.isCreatingRevisionProcedure.set(false);
+        }
+    }
+
+    async openRegularDecisionProcedure(): Promise<void> {
+        const employee = this.employee();
+        const targetYearMonth = this.regularDecisionTargetYearMonth();
+        if (!employee || !targetYearMonth || this.isCreatingRegularDecisionProcedure()) return;
+
+        const existing = this.regularDecisionProcedure();
+        if (existing) {
+            this.router.navigate(['/procedures', existing.id]);
+            return;
+        }
+
+        this.isCreatingRegularDecisionProcedure.set(true);
+        this.errorMessage.set('');
+
+        try {
+            const procedure = await this.procedureService.createProcedure({
+                companyId: employee.companyId,
+                officeId: employee.officeId,
+                employeeId: employee.id,
+                procedureType: 'regularDecision',
+                status: 'notStarted',
+                occurredDate: `${targetYearMonth.slice(0, 4)}-06-30`,
+                dueDate: '',
+                completedDate: null,
+                submittedDate: null,
+                targetYearMonth,
+                memo: '',
+                lossReason: null,
+                dependentChanges: null,
+            });
+            this.regularDecisionProcedure.set(procedure);
+            this.router.navigate(['/procedures', procedure.id]);
+        } catch (error) {
+            console.error('算定基礎届の作成に失敗しました', error);
+            this.errorMessage.set('算定基礎届の作成に失敗しました');
+        } finally {
+            this.isCreatingRegularDecisionProcedure.set(false);
+        }
     }
 }

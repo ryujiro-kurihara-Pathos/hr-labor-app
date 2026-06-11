@@ -25,7 +25,29 @@ export type Dependent = {
 
     status: 'active' | 'ended';     // 扶養状態
 
+    gender?: 'male' | 'female';     // 性別
+    myNumber?: string;              // 個人番号
+    address?: string;               // 住所
+    occupation?: string;            // 職業
+    income?: number | null;         // 収入
+
     memo: string;                   // メモ
+};
+
+export type DependentInput = {
+    lastName: string;
+    firstName: string;
+    birthDate: string;
+    relationship: Dependent['relationship'];
+    dependencyStartDate: string;
+    dependencyEndDate: string | null;
+    status: Dependent['status'];
+    gender?: 'male' | 'female';
+    myNumber?: string;
+    address?: string;
+    occupation?: string;
+    income?: number | null;
+    memo?: string;
 };
 
 

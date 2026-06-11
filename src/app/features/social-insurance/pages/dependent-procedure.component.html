@@ -1,4 +1,5 @@
 @let item = procedure()!;
+@let f = form();
 
 <section class="detail-card">
     <div class="page-header">
@@ -13,7 +14,13 @@
                 {{ statusLabel(item.status) }}
             </span>
         </div>
-        <button type="button" class="btn edit-btn">編集</button>
+        <app-procedure-action-bar
+            [procedure]="item"
+            [isSubmitting]="isSaving()"
+            [submitDisabled]="!changeType()"
+            [actionErrorMessage]="saveErrorMessage()"
+            (submitClick)="saveProcedure()"
+        />
     </div>
 
     <div class="title">
@@ -21,7 +28,6 @@
             <span>健康保険</span>
             <span>厚生年金保険</span>
         </div>
-
         <div class="title-main">被扶養者（異動）届</div>
     </div>
 
@@ -88,72 +94,285 @@
             <dt>個人番号</dt>
             <dd>{{ employee().myNumber || '—' }}</dd>
         </div>
-        <div class="meta-row">
-            <dt>被保険者番号</dt>
-            <dd>—</dd>
-        </div>
     </dl>
 
     <h2 class="section-title">被扶養者情報</h2>
 
-    <article class="dependent-block">
-        <h3 class="dependent-heading">被扶養者 1</h3>
-        <dl class="detail-meta">
-            <div class="meta-row">
-                <dt>異動の別</dt>
-                <dd>
-                    <span class="change-type-options">
-                        <span class="change-type-option">追加</span>
-                        <span class="change-type-option">削除</span>
-                        <span class="change-type-option">変更</span>
-                    </span>
-                </dd>
+    @if (saveMessage()) {
+        <p class="alert alert-success">{{ saveMessage() }}</p>
+    }
+    @if (saveErrorMessage()) {
+        <p class="alert alert-error">{{ saveErrorMessage() }}</p>
+    }
+
+    @if (useSavedData() && isCompleted()) {
+        <article class="dependent-block">
+            <dl class="detail-meta">
+                <div class="meta-row">
+                    <dt>異動の別</dt>
+                    <dd>{{ dependentChangeTypeLabel(item.dependentChanges) }}</dd>
+                </div>
+                <div class="meta-row">
+                    <dt>氏名</dt>
+                    <dd>{{ dependentDisplayName(displayData()) }}</dd>
+                </div>
+                <div class="meta-row">
+                    <dt>生年月日</dt>
+                    <dd>{{ dateLabel(displayData().dependentBirthDate) }}</dd>
+                </div>
+                <div class="meta-row">
+                    <dt>性別</dt>
+                    <dd>{{ genderLabel(displayData().dependentGender) }}</dd>
+                </div>
+                <div class="meta-row">
+                    <dt>続柄</dt>
+                    <dd>{{ dependentRelationshipLabel(displayData().dependentRelationship) }}</dd>
+                </div>
+                <div class="meta-row">
+                    <dt>個人番号</dt>
+                    <dd>{{ displayData().dependentMyNumber || '—' }}</dd>
+                </div>
+                <div class="meta-row">
+                    <dt>住所</dt>
+                    <dd>{{ displayData().dependentAddress || '—' }}</dd>
+                </div>
+                @if (item.dependentChanges === 'add' || item.dependentChanges === 'change') {
+                    <div class="meta-row">
+                        <dt>被扶養者になった日</dt>
+                        <dd>{{ dateLabel(displayData().dependencyStartDate) }}</dd>
+                    </div>
+                    <div class="meta-row">
+                        <dt>職業</dt>
+                        <dd>{{ displayData().dependentOccupation || '—' }}</dd>
+                    </div>
+                    <div class="meta-row">
+                        <dt>収入</dt>
+                        <dd>
+                            @if (displayData().dependentIncome !== null) {
+                                {{ displayData().dependentIncome | number }} 円
+                            } @else {
+                                —
+                            }
+                        </dd>
+                    </div>
+                }
+                @if (item.dependentChanges === 'add') {
+                    <div class="meta-row">
+                        <dt>理由</dt>
+                        <dd>{{ dependentAddReasonLabel(displayData().dependentAddReason) }}</dd>
+                    </div>
+                }
+                @if (item.dependentChanges === 'delete') {
+                    <div class="meta-row">
+                        <dt>被扶養者でなくなった日</dt>
+                        <dd>{{ dateLabel(displayData().dependencyEndDate) }}</dd>
+                    </div>
+                    <div class="meta-row">
+                        <dt>理由</dt>
+                        <dd>{{ dependentDeleteReasonLabel(displayData().dependentDeleteReason) }}</dd>
+                    </div>
+                }
+            </dl>
+        </article>
+    } @else {
+        <article class="dependent-block">
+            <h3 class="dependent-heading">異動の別</h3>
+            <div class="change-type-options">
+                <button
+                    type="button"
+                    class="change-type-option"
+                    [class.selected]="changeType() === 'add'"
+                    (click)="selectChangeType('add')"
+                >追加</button>
+                <button
+                    type="button"
+                    class="change-type-option"
+                    [class.selected]="changeType() === 'change'"
+                    (click)="selectChangeType('change')"
+                >変更</button>
+                <button
+                    type="button"
+                    class="change-type-option"
+                    [class.selected]="changeType() === 'delete'"
+                    (click)="selectChangeType('delete')"
+                >削除</button>
             </div>
-            <div class="meta-row">
-                <dt>異動年月日</dt>
-                <dd>—</dd>
-            </div>
-            <div class="meta-row">
-                <dt>氏名</dt>
-                <dd>—</dd>
-            </div>
-            <div class="meta-row">
-                <dt>氏名（カナ）</dt>
-                <dd>—</dd>
-            </div>
-            <div class="meta-row">
-                <dt>生年月日</dt>
-                <dd>—</dd>
-            </div>
-            <div class="meta-row">
-                <dt>性別</dt>
-                <dd>—</dd>
-            </div>
-            <div class="meta-row">
-                <dt>続柄</dt>
-                <dd>—</dd>
-            </div>
-            <div class="meta-row">
-                <dt>個人番号</dt>
-                <dd>—</dd>
-            </div>
-            <div class="meta-row">
-                <dt>被扶養者になった理由</dt>
-                <dd>—</dd>
-            </div>
-            <div class="meta-row">
-                <dt>被扶養者でなくなった理由</dt>
-                <dd>—</dd>
-            </div>
-        </dl>
-    </article>
+
+            @if (changeType() === 'change' || changeType() === 'delete') {
+                <div class="form-field">
+                    <label for="dependent-select">被扶養者を選択</label>
+                    <select
+                        id="dependent-select"
+                        [ngModel]="f.dependentId"
+                        (ngModelChange)="onDependentSelected($event)"
+                    >
+                        <option value="">選択してください</option>
+                        @for (dependent of activeDependents(); track dependent.id) {
+                            <option [value]="dependent.id">
+                                {{ dependent.lastName }} {{ dependent.firstName }}（{{ dependentRelationshipLabel(dependent.relationship) }}）
+                            </option>
+                        }
+                    </select>
+                    @if (activeDependents().length === 0) {
+                        <p class="field-note">登録済みの被扶養者がありません。</p>
+                    }
+                </div>
+            }
+
+            @if (changeType() === 'add' || changeType() === 'change') {
+                <div class="dependent-form-grid">
+                    <div class="form-field">
+                        <label for="dep-last-name">氏（姓）</label>
+                        <input
+                            id="dep-last-name"
+                            type="text"
+                            [ngModel]="f.lastName"
+                            (ngModelChange)="updateForm('lastName', $event)"
+                        />
+                    </div>
+                    <div class="form-field">
+                        <label for="dep-first-name">名</label>
+                        <input
+                            id="dep-first-name"
+                            type="text"
+                            [ngModel]="f.firstName"
+                            (ngModelChange)="updateForm('firstName', $event)"
+                        />
+                    </div>
+                    <div class="form-field">
+                        <label for="dep-birth-date">生年月日</label>
+                        <input
+                            id="dep-birth-date"
+                            type="date"
+                            [ngModel]="f.birthDate"
+                            (ngModelChange)="updateForm('birthDate', $event)"
+                        />
+                    </div>
+                    <div class="form-field">
+                        <label for="dep-gender">性別</label>
+                        <select
+                            id="dep-gender"
+                            [ngModel]="f.gender"
+                            (ngModelChange)="updateForm('gender', $event)"
+                        >
+                            <option value="">選択してください</option>
+                            <option value="male">男性</option>
+                            <option value="female">女性</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label for="dep-relationship">続柄</label>
+                        <select
+                            id="dep-relationship"
+                            [ngModel]="f.relationship"
+                            (ngModelChange)="updateForm('relationship', $event)"
+                        >
+                            <option value="">選択してください</option>
+                            <option value="spouse">配偶者</option>
+                            <option value="child">子</option>
+                            <option value="parent">父母</option>
+                            <option value="other">その他</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label for="dep-my-number">個人番号</label>
+                        <input
+                            id="dep-my-number"
+                            type="text"
+                            [ngModel]="f.myNumber"
+                            (ngModelChange)="updateForm('myNumber', $event)"
+                        />
+                    </div>
+                    <div class="form-field form-field-full">
+                        <label for="dep-address">住所</label>
+                        <input
+                            id="dep-address"
+                            type="text"
+                            [ngModel]="f.address"
+                            (ngModelChange)="updateForm('address', $event)"
+                        />
+                    </div>
+                    @if (changeType() === 'add') {
+                        <div class="form-field">
+                            <label for="dep-start-date">被扶養者になった日</label>
+                            <input
+                                id="dep-start-date"
+                                type="date"
+                                [ngModel]="f.dependencyStartDate"
+                                (ngModelChange)="updateForm('dependencyStartDate', $event)"
+                            />
+                        </div>
+                        <div class="form-field">
+                            <label for="dep-add-reason">理由</label>
+                            <select
+                                id="dep-add-reason"
+                                [ngModel]="f.addReason"
+                                (ngModelChange)="updateForm('addReason', $event)"
+                            >
+                                <option value="">選択してください</option>
+                                @for (option of addReasonOptions; track option[0]) {
+                                    <option [value]="option[0]">{{ option[1] }}</option>
+                                }
+                            </select>
+                        </div>
+                    }
+                    <div class="form-field">
+                        <label for="dep-occupation">職業</label>
+                        <input
+                            id="dep-occupation"
+                            type="text"
+                            [ngModel]="f.occupation"
+                            (ngModelChange)="updateForm('occupation', $event)"
+                        />
+                    </div>
+                    <div class="form-field">
+                        <label for="dep-income">収入（円）</label>
+                        <input
+                            id="dep-income"
+                            type="number"
+                            min="0"
+                            [ngModel]="f.income"
+                            (ngModelChange)="updateForm('income', $event)"
+                        />
+                    </div>
+                </div>
+            }
+
+            @if (changeType() === 'delete') {
+                <div class="dependent-form-grid">
+                    <div class="form-field">
+                        <label for="dep-end-date">被扶養者でなくなった日</label>
+                        <input
+                            id="dep-end-date"
+                            type="date"
+                            [ngModel]="f.dependencyEndDate"
+                            (ngModelChange)="updateForm('dependencyEndDate', $event)"
+                        />
+                    </div>
+                    <div class="form-field">
+                        <label for="dep-delete-reason">理由</label>
+                        <select
+                            id="dep-delete-reason"
+                            [ngModel]="f.deleteReason"
+                            (ngModelChange)="updateForm('deleteReason', $event)"
+                        >
+                            <option value="">選択してください</option>
+                            @for (option of deleteReasonOptions; track option[0]) {
+                                <option [value]="option[0]">{{ option[1] }}</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            }
+
+        </article>
+    }
 
     @if (item.memo) {
         <h2 class="section-title">メモ</h2>
         <p class="memo-text">{{ item.memo }}</p>
     }
 
-    <button type="button" class="btn export-btn">エクスポート</button>
 </section>
 
 <style>
@@ -194,20 +413,9 @@
         font-weight: 700;
     }
 
-    .status-badge.not-started {
-        background: #f3f4f6;
-        color: #4b5563;
-    }
-
-    .status-badge.in-progress {
-        background: #fef3c7;
-        color: #92400e;
-    }
-
-    .status-badge.completed {
-        background: #dcfce7;
-        color: #166534;
-    }
+    .status-badge.not-started { background: #f3f4f6; color: #4b5563; }
+    .status-badge.in-progress { background: #fef3c7; color: #92400e; }
+    .status-badge.completed { background: #dcfce7; color: #166534; }
 
     .btn {
         flex-shrink: 0;
@@ -220,16 +428,8 @@
         cursor: pointer;
     }
 
-    .edit-btn {
-        background: #e5e7eb;
-        color: #333;
-    }
-
-    .export-btn {
-        margin-top: 24px;
-        background: #2563eb;
-        color: #fff;
-    }
+    .delete-btn { background: #e5e7eb; color: #333; }
+    .save-btn { background: #2563eb; color: #fff; }
 
     .title {
         display: flex;
@@ -263,10 +463,6 @@
         font-size: 17px;
     }
 
-    .section-title:first-of-type {
-        margin-top: 0;
-    }
-
     .office-code-panel {
         display: flex;
         flex-wrap: wrap;
@@ -288,7 +484,6 @@
         font-size: 13px;
         font-weight: 600;
         color: #374151;
-        white-space: nowrap;
     }
 
     .office-code-boxes {
@@ -308,22 +503,10 @@
         background: #fff;
         font-size: 18px;
         font-weight: 600;
-        color: #111827;
-        line-height: 1;
     }
 
-    .code-box-kana {
-        width: 32px;
-        font-size: 16px;
-    }
-
-    .code-separator {
-        margin: 0 2px;
-        font-size: 20px;
-        font-weight: 700;
-        color: #6b7280;
-        line-height: 1;
-    }
+    .code-box-kana { width: 32px; font-size: 16px; }
+    .code-separator { margin: 0 2px; font-size: 20px; font-weight: 700; color: #6b7280; }
 
     .detail-meta {
         margin: 0;
@@ -331,9 +514,7 @@
         gap: 10px;
     }
 
-    .office-meta {
-        margin-top: 12px;
-    }
+    .office-meta { margin-top: 12px; }
 
     .meta-row {
         display: flex;
@@ -347,7 +528,6 @@
         margin: 0;
         color: #6b7280;
         font-weight: 500;
-        white-space: nowrap;
     }
 
     .meta-row dd {
@@ -363,10 +543,6 @@
         border-radius: 8px;
     }
 
-    .dependent-block + .dependent-block {
-        margin-top: 12px;
-    }
-
     .dependent-heading {
         margin: 0 0 12px;
         font-size: 15px;
@@ -375,20 +551,89 @@
     }
 
     .change-type-options {
-        display: inline-flex;
+        display: flex;
         flex-wrap: wrap;
         gap: 8px;
+        margin-bottom: 16px;
     }
 
     .change-type-option {
         display: inline-flex;
         align-items: center;
-        padding: 4px 10px;
+        padding: 8px 14px;
         border: 1px solid #d1d5db;
         border-radius: 6px;
         background: #fff;
+        font-size: 14px;
+        color: #374151;
+        cursor: pointer;
+    }
+
+    .change-type-option.selected {
+        border-color: #2563eb;
+        background: #eff6ff;
+        color: #1d4ed8;
+        font-weight: 600;
+    }
+
+    .dependent-form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px 16px;
+        margin-top: 12px;
+    }
+
+    .form-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .form-field-full {
+        grid-column: 1 / -1;
+    }
+
+    .form-field label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .form-field input,
+    .form-field select {
+        height: 40px;
+        padding: 0 10px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 14px;
+    }
+
+    .field-note {
+        margin: 4px 0 0;
         font-size: 13px;
         color: #6b7280;
+    }
+
+    .form-actions {
+        margin-top: 16px;
+    }
+
+    .alert {
+        padding: 10px 12px;
+        border-radius: 8px;
+        font-size: 14px;
+    }
+
+    .alert-success {
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+        color: #065f46;
+    }
+
+    .alert-error {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #991b1b;
     }
 
     .memo-text {
@@ -399,8 +644,12 @@
         border-radius: 8px;
         font-size: 14px;
         line-height: 1.6;
-        color: #111827;
         white-space: pre-wrap;
-        word-break: break-word;
+    }
+
+    @media (max-width: 640px) {
+        .dependent-form-grid {
+            grid-template-columns: 1fr;
+        }
     }
 </style>

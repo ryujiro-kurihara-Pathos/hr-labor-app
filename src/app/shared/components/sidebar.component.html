@@ -1,22 +1,41 @@
 <aside class="sidebar">
-    <div>
-        <h1 class="app-title">社会保険管理システム</h1>
+    <div class="sidebar-top">
+        <a routerLink="/home" class="brand" aria-label="ホームへ">
+            <span class="brand-icon">社保</span>
+            <span class="brand-text">
+                <span class="brand-title">社会保険管理</span>
+                <span class="brand-sub">Labor &amp; Insurance</span>
+            </span>
+        </a>
 
-        <nav class="nav">
-            <a routerLink="/home" routerLinkActive="active">ホーム</a>
-            <a routerLink="/company" routerLinkActive="active">会社・事業所情報</a>
-            <a routerLink="/employees" routerLinkActive="active">従業員管理</a>
-            <a routerLink="/premium" routerLinkActive="active">保険料計算</a>
-            <a routerLink="/procedures" routerLinkActive="active">手続き</a>
-            <a routerLink="/notifications" routerLinkActive="active">通知</a>
-            <a routerLink="/settings" routerLinkActive="active">設定</a>
+        <nav class="nav" aria-label="メインメニュー">
+            @for (item of navItems; track item.route) {
+                <a
+                    class="nav-link"
+                    [routerLink]="item.route"
+                    routerLinkActive="active"
+                    [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
+                >
+                    <span class="nav-icon">{{ item.icon }}</span>
+                    <span class="nav-label">{{ item.label }}</span>
+                </a>
+            }
         </nav>
     </div>
 
     <div class="sidebar-bottom">
-        <p>管理者</p>
-        <p>{{ currentUser?.lastName }} {{ currentUser?.firstName }}</p>
-        <button class="logout-btn" (click)="onLogout()">ログアウト</button>
+        <a routerLink="/profile" class="user-card" routerLinkActive="active">
+            <span class="user-avatar">{{ userInitial() }}</span>
+            <span class="user-info">
+                <span class="user-name">{{ userDisplayName() }}</span>
+                <span class="user-role">{{ roleLabel(currentUser?.role) }}</span>
+            </span>
+            <span class="user-chevron" aria-hidden="true">›</span>
+        </a>
+
+        <button type="button" class="logout-btn" (click)="onLogout()">
+            ログアウト
+        </button>
     </div>
 </aside>
 
@@ -25,27 +44,212 @@
         width: 260px;
         height: 100%;
         flex-shrink: 0;
-        overflow: hidden;
-
         display: flex;
         flex-direction: column;
         justify-content: space-between;
+        padding: 16px 12px;
+        background: #fff;
+        border-right: 1px solid #e5e7eb;
+        box-shadow: 2px 0 12px rgba(15, 23, 42, 0.04);
+    }
+
+    .sidebar-top {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        min-height: 0;
+    }
+
+    .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 10px;
+        border-radius: 12px;
+        text-decoration: none;
+        color: inherit;
+        transition: background 0.15s;
+    }
+
+    .brand:hover {
+        background: #f8fafc;
+    }
+
+    .brand-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%);
+        color: #fff;
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        flex-shrink: 0;
+    }
+
+    .brand-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    .brand-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: #111827;
+        line-height: 1.2;
+    }
+
+    .brand-sub {
+        font-size: 10px;
+        color: #9ca3af;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
     }
 
     .nav {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 4px;
+        padding: 0 4px;
     }
 
-    /* サイドバー下部 */
+    .nav-link {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        text-decoration: none;
+        color: #4b5563;
+        font-size: 14px;
+        font-weight: 600;
+        transition: background 0.15s, color 0.15s;
+    }
+
+    .nav-link:hover {
+        background: #f3f4f6;
+        color: #111827;
+    }
+
+    .nav-link.active {
+        background: #eff6ff;
+        color: #1d4ed8;
+    }
+
+    .nav-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        background: #f3f4f6;
+        font-size: 12px;
+        font-weight: 800;
+        color: #6b7280;
+        flex-shrink: 0;
+        transition: background 0.15s, color 0.15s;
+    }
+
+    .nav-link.active .nav-icon {
+        background: #2563eb;
+        color: #fff;
+    }
+
+    .nav-label {
+        line-height: 1.2;
+    }
+
     .sidebar-bottom {
         display: flex;
         flex-direction: column;
-        gap: 12px;
-        align-items: center;
+        gap: 10px;
+        padding-top: 12px;
+        border-top: 1px solid #f3f4f6;
     }
+
+    .user-card {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        background: #f9fafb;
+        text-decoration: none;
+        color: inherit;
+        transition: border-color 0.15s, background 0.15s;
+    }
+
+    .user-card:hover,
+    .user-card.active {
+        border-color: #bfdbfe;
+        background: #eff6ff;
+    }
+
+    .user-avatar {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
+        background: #dbeafe;
+        color: #1d4ed8;
+        font-size: 14px;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+
+    .user-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+        flex: 1;
+    }
+
+    .user-name {
+        font-size: 13px;
+        font-weight: 700;
+        color: #111827;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .user-role {
+        font-size: 11px;
+        color: #6b7280;
+    }
+
+    .user-chevron {
+        color: #9ca3af;
+        font-size: 18px;
+        line-height: 1;
+    }
+
     .logout-btn {
+        width: 100%;
+        height: 38px;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        background: #fff;
+        color: #4b5563;
+        font-size: 13px;
+        font-weight: 600;
         cursor: pointer;
+        transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    .logout-btn:hover {
+        background: #fef2f2;
+        border-color: #fecaca;
+        color: #b91c1c;
     }
 </style>

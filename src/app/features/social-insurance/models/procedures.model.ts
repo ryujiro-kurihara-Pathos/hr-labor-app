@@ -30,7 +30,125 @@ export const LOSS_REASON_LABELS: Record<LossReason, string> = {
     other: 'その他',
 };
 
-export type Procedure = {
+/** 資格取得届の表示用フィールド（完了時に procedures へ直接保存） */
+export type QualificationProcedureData = {
+    officeSymbol: string;
+    officeNumber: string;
+    companyName: string;
+    officeName: string;
+    officeAddress: string;
+    representativeName: string;
+    phoneNumber: string;
+    employeeLastName: string;
+    employeeFirstName: string;
+    employeeLastNameKana: string;
+    employeeFirstNameKana: string;
+    birthDate: string;
+    myNumber: string;
+    employeeAddress: string;
+    qualificationDate: string;
+    rewardTargetYearMonth: string | null;
+    rewardCashAmount: number | null;
+    rewardInKindAmount: number | null;
+    rewardTotalAmount: number | null;
+    rewardIsMidMonthJoin: boolean;
+    hasDependents: boolean;
+};
+
+/** 扶養追加の理由 */
+export type DependentAddReason =
+    | 'birth'           // 出生
+    | 'cohabitation'    // 同居
+    | 'jobLoss'         // 離職
+    | 'incomeDecrease'  // 収入減
+    | 'other';          // その他
+
+export const DEPENDENT_ADD_REASON_LABELS: Record<DependentAddReason, string> = {
+    birth: '出生',
+    cohabitation: '同居',
+    jobLoss: '離職',
+    incomeDecrease: '収入減',
+    other: 'その他',
+};
+
+/** 扶養削除の理由 */
+export type DependentDeleteReason =
+    | 'death'                    // 死亡
+    | 'employment'               // 就職
+    | 'incomeIncrease'           // 収入増加
+    | 'age75'                    // 75歳到達
+    | 'disabilityCertification'  // 障害認定
+    | 'other';                   // その他
+
+export const DEPENDENT_DELETE_REASON_LABELS: Record<DependentDeleteReason, string> = {
+    death: '死亡',
+    employment: '就職',
+    incomeIncrease: '収入増加',
+    age75: '75歳到達',
+    disabilityCertification: '障害認定',
+    other: 'その他',
+};
+
+/** 扶養変更届の表示・保存用フィールド */
+export type DependentProcedureData = {
+    dependentId: string | null;
+    dependentLastName: string;
+    dependentFirstName: string;
+    dependentBirthDate: string;
+    dependentGender: string;
+    dependentRelationship: string;
+    dependentMyNumber: string;
+    dependentAddress: string;
+    dependentOccupation: string;
+    dependentIncome: number | null;
+    dependencyStartDate: string;
+    dependentAddReason: DependentAddReason | '';
+    dependencyEndDate: string;
+    dependentDeleteReason: DependentDeleteReason | '';
+};
+
+export const EMPTY_DEPENDENT_PROCEDURE_DATA: DependentProcedureData = {
+    dependentId: null,
+    dependentLastName: '',
+    dependentFirstName: '',
+    dependentBirthDate: '',
+    dependentGender: '',
+    dependentRelationship: '',
+    dependentMyNumber: '',
+    dependentAddress: '',
+    dependentOccupation: '',
+    dependentIncome: null,
+    dependencyStartDate: '',
+    dependentAddReason: '',
+    dependencyEndDate: '',
+    dependentDeleteReason: '',
+};
+
+export const EMPTY_QUALIFICATION_PROCEDURE_DATA: QualificationProcedureData = {
+    officeSymbol: '',
+    officeNumber: '',
+    companyName: '',
+    officeName: '',
+    officeAddress: '',
+    representativeName: '',
+    phoneNumber: '',
+    employeeLastName: '',
+    employeeFirstName: '',
+    employeeLastNameKana: '',
+    employeeFirstNameKana: '',
+    birthDate: '',
+    myNumber: '',
+    employeeAddress: '',
+    qualificationDate: '',
+    rewardTargetYearMonth: null,
+    rewardCashAmount: null,
+    rewardInKindAmount: null,
+    rewardTotalAmount: null,
+    rewardIsMidMonthJoin: false,
+    hasDependents: false,
+};
+
+type ProcedureCore = {
     id: string;                         // FirestoreドキュメントID
 
     companyId: string;                  // 会社ID
@@ -64,7 +182,7 @@ export type Procedure = {
     updatedAt: Timestamp;
 };
 
-export type ProcedureInput = Omit<
-    Procedure,
-    'id' | 'createdAt' | 'updatedAt'
->;
+export type Procedure = ProcedureCore & QualificationProcedureData & DependentProcedureData;
+
+export type ProcedureInput = Omit<ProcedureCore, 'id' | 'createdAt' | 'updatedAt'> &
+    Partial<QualificationProcedureData & DependentProcedureData>;

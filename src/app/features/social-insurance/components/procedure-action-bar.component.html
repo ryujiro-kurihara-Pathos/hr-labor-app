@@ -1,0 +1,107 @@
+@if (isCompleted()) {
+    <p class="completed-note">提出済み（{{ submittedDateLabel() }}）</p>
+} @else {
+    <div class="action-bar">
+        <button
+            type="button"
+            class="btn export-btn"
+            (click)="onExport()"
+            [disabled]="isSubmitting()"
+        >
+            エクスポート
+        </button>
+        <button
+            type="button"
+            class="btn submit-btn"
+            (click)="submitClick.emit()"
+            [disabled]="isSubmitting() || submitDisabled()"
+        >
+            @if (isSubmitting()) {
+                処理中...
+            } @else {
+                提出済みにする
+            }
+        </button>
+    </div>
+}
+
+@if (exportMessage()) {
+    <p class="action-note">{{ exportMessage() }}</p>
+}
+@if (actionErrorMessage()) {
+    <p class="action-error">{{ actionErrorMessage() }}</p>
+}
+
+<style>
+    .action-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: flex-end;
+    }
+
+    .btn {
+        height: 38px;
+        padding: 0 14px;
+        border: none;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+
+    .btn:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
+    }
+
+    .export-btn {
+        background: #fff;
+        color: #374151;
+        border: 1px solid #d1d5db;
+    }
+
+    .export-btn:hover:not(:disabled) {
+        background: #f9fafb;
+        border-color: #9ca3af;
+    }
+
+    .submit-btn {
+        background: #2563eb;
+        color: #fff;
+    }
+
+    .submit-btn:hover:not(:disabled) {
+        background: #1d4ed8;
+    }
+
+    .completed-note {
+        margin: 0;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+        color: #065f46;
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .action-note,
+    .action-error {
+        margin: 8px 0 0;
+        font-size: 12px;
+        line-height: 1.5;
+        text-align: right;
+    }
+
+    .action-note {
+        color: #6b7280;
+    }
+
+    .action-error {
+        color: #b91c1c;
+        font-weight: 600;
+    }
+</style>

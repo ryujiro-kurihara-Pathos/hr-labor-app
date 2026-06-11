@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { HealthInsuranceType, Office } from '../models/office.model';
 import { OfficeService } from '../services/office.service';
@@ -13,7 +13,7 @@ import {
 @Component({
     selector: 'app-office-page',
     standalone: true,
-    imports: [FormsModule],
+    imports: [FormsModule, RouterLink],
     templateUrl: './office-page.component.html',
 })
 

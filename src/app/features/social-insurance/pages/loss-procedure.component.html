@@ -13,7 +13,12 @@
                 {{ statusLabel(item.status) }}
             </span>
         </div>
-        <button type="button" class="btn edit-btn">編集</button>
+        <app-procedure-action-bar
+            [procedure]="item"
+            [isSubmitting]="isSubmitting()"
+            [actionErrorMessage]="submitErrorMessage()"
+            (submitClick)="submitProcedure()"
+        />
     </div>
 
     <div class="title">
@@ -109,7 +114,6 @@
         <p class="memo-text">{{ item.memo }}</p>
     }
 
-    <button type="button" class="btn export-btn">エクスポート</button>
 </section>
 
 <style>
@@ -174,17 +178,6 @@
         font-size: 15px;
         font-weight: 600;
         cursor: pointer;
-    }
-
-    .edit-btn {
-        background: #e5e7eb;
-        color: #333;
-    }
-
-    .export-btn {
-        margin-top: 20px;
-        background: #2563eb;
-        color: #fff;
     }
 
     .title {

@@ -13,7 +13,12 @@
                 {{ statusLabel(item.status) }}
             </span>
         </div>
-        <button type="button" class="btn edit-btn">編集</button>
+        <app-procedure-action-bar
+            [procedure]="item"
+            [isSubmitting]="isSubmitting()"
+            [actionErrorMessage]="submitErrorMessage()"
+            (submitClick)="submitProcedure()"
+        />
     </div>
 
     <div class="title">
@@ -41,7 +46,7 @@
         <div class="office-code-group">
             <span class="office-code-label">事業所番号</span>
             <div class="office-code-boxes" aria-label="事業所番号">
-                <p>{{ office().officeNumber || '—' }}</p>
+                <p>{{ displayOfficeNumber() || '—' }}</p>
             </div>
         </div>
     </div>
@@ -49,19 +54,19 @@
     <dl class="detail-meta office-meta">
         <div class="meta-row">
             <dt>事業所名称</dt>
-            <dd>{{ company().name }} {{ office().name }}</dd>
+            <dd>{{ displayCompanyName() }} {{ displayOfficeName() }}</dd>
         </div>
         <div class="meta-row">
             <dt>事業所所在地</dt>
-            <dd>〒{{ office().postalCode }} {{ office().prefecture }}{{ office().city }}{{ office().streetAddress }} {{ office().buildingName }}</dd>
+            <dd>{{ displayOfficeAddress() }}</dd>
         </div>
         <div class="meta-row">
             <dt>事業主氏名</dt>
-            <dd>{{ company().representativeName || '—' }}</dd>
+            <dd>{{ displayRepresentativeName() || '—' }}</dd>
         </div>
         <div class="meta-row">
             <dt>電話番号</dt>
-            <dd>{{ office().phoneNumber || '—' }}</dd>
+            <dd>{{ displayPhoneNumber() || '—' }}</dd>
         </div>
     </dl>
 
@@ -69,33 +74,29 @@
     <dl class="detail-meta">
         <div class="meta-row">
             <dt>被保険者氏名</dt>
-            <dd>{{ employee().lastName }} {{ employee().firstName }}</dd>
+            <dd>{{ displayEmployeeLastName() }} {{ displayEmployeeFirstName() }}</dd>
         </div>
         <div class="meta-row">
             <dt>フリガナ</dt>
-            <dd>{{ employee().lastNameKana || '—' }} {{ employee().firstNameKana || '—' }}</dd>
+            <dd>{{ displayEmployeeLastNameKana() || '—' }} {{ displayEmployeeFirstNameKana() || '—' }}</dd>
         </div>
         <div class="meta-row">
             <dt>生年月日</dt>
-            <dd>{{ dateLabel(employee().birthDate) }}</dd>
+            <dd>{{ dateLabel(displayBirthDate()) }}</dd>
         </div>
         <div class="meta-row">
             <dt>個人番号または基礎年金番号</dt>
-            <dd>{{ employee().myNumber || '—' }}</dd>
+            <dd>{{ displayMyNumber() || '—' }}</dd>
         </div>
         <div class="meta-row">
             <dt>住所</dt>
-            <dd>{{ employeeAddressLabel(employee()) }}</dd>
+            <dd>{{ displayEmployeeAddress() }}</dd>
         </div>
         <div class="meta-row">
             <dt>資格取得日</dt>
-            <dd>{{ dateLabel(qualificationDate()) }}</dd>
+            <dd>{{ dateLabel(displayQualificationDate()) }}</dd>
         </div>
-        <div class="meta-row">
-            <dt>取得理由</dt>
-            <dd>—</dd>
-        </div>
-        @if (monthlyReward(); as reward) {
+        @if (displayMonthlyReward(); as reward) {
             <div class="meta-row">
                 <dt>対象年月</dt>
                 <dd>{{ reward.targetYearMonth }}（入社月）</dd>
@@ -131,14 +132,22 @@
                 <dt>報酬月額合計</dt>
                 <dd>—</dd>
             </div>
-            <div class="meta-row note-row">
-                <dt></dt>
-                <dd class="field-note">入社月の報酬月額が未登録です。保険料計算画面で登録してください。</dd>
-            </div>
+            @if (!isCompleted()) {
+                <div class="meta-row note-row">
+                    <dt></dt>
+                    <dd class="field-note">入社月の報酬月額が未登録です。保険料計算画面で登録してください。</dd>
+                    @if (employee(); as emp) {
+                        <a
+                            [routerLink]="['/premium', emp.id]"
+                            [queryParams]="{ ym: convertJoinedDateToYearMonth(emp.joinedDate) }"
+                        >登録へ</a>
+                    }
+                </div>
+            }
         }
         <div class="meta-row">
             <dt>扶養の有無</dt>
-            <dd>{{ hasDependents() ? '有' : '無' }}</dd>
+            <dd>{{ displayHasDependents() ? '有' : '無' }}</dd>
         </div>
     </dl>
 
@@ -147,7 +156,6 @@
         <p class="memo-text">{{ item.memo }}</p>
     }
 
-    <button type="button" class="btn export-btn">エクスポート</button>
 </section>
 
 <style>
@@ -198,9 +206,6 @@
         font-weight: 600;
         cursor: pointer;
     }
-
-    .edit-btn { background: #e5e7eb; color: #333; }
-    .export-btn { margin-top: 20px; background: #2563eb; color: #fff; }
 
     .title {
         display: flex;

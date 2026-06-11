@@ -1,53 +1,324 @@
-@if(isLoading()) {
-    <p>Loading...</p>
-} @else {
-    <h2>会社情報</h2>
-    <p>{{ company()?.name }}</p>
-    <p>{{ company()?.representativeName }}</p>
-    <p>{{ company()?.address }}</p>
+<div class="company-page">
+    <header class="page-header">
+        <h1>会社・事業所情報</h1>
+        <p class="page-note">会社の基本情報と事業所の一覧を管理します。事業所カードをクリックすると詳細を編集できます。</p>
+    </header>
 
-    <h2>事業所一覧</h2>
-    <button (click)="openOfficeModal()">事業所を登録</button>
+    @if (isLoading()) {
+        <p class="loading">読み込み中...</p>
+    } @else if (errorMessage()) {
+        <p class="error">{{ errorMessage() }}</p>
+    } @else if (company(); as c) {
+        <section class="company-section">
+            <h2 class="section-title">会社情報</h2>
+            <article class="info-card">
+                <div class="company-name-row">
+                    <p class="company-name">{{ c.name }}</p>
+                </div>
+                <dl class="info-meta">
+                    <div class="meta-row">
+                        <dt>代表者</dt>
+                        <dd>{{ c.representativeName || '—' }}</dd>
+                    </div>
+                    <div class="meta-row">
+                        <dt>所在地</dt>
+                        <dd>{{ c.address || '—' }}</dd>
+                    </div>
+                </dl>
+            </article>
+        </section>
 
-    @if(isOfficeModalOpen()) {
-        <app-office-create-modal
-            (close)="closeOfficeModal()"
-            (submit)="onCreateOffice($event)"
-            [isLoading]="isOfficeSaving()"
-        />
-    }
+        <section class="offices-section">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">事業所一覧</h2>
+                    <p class="section-note">
+                        @if (isLoadingOffices()) {
+                            読み込み中...
+                        } @else {
+                            {{ offices().length }}件の事業所
+                        }
+                    </p>
+                </div>
+                <button type="button" class="btn primary-btn" (click)="openOfficeModal()">
+                    事業所を登録
+                </button>
+            </div>
 
-    @if(isLoadingOffices()) {
-        <p>Loading...</p>
-    } @else {
-        <div class="office-list">
-            @for(office of offices(); track office.id) {
-                <div class="office-card" [routerLink]="['/company/offices', office.id]">
-                    @if(office.status === 'disabled') {
-                        <span class="status-badge disabled">無効化</span>
+            @if (isOfficeModalOpen()) {
+                <app-office-create-modal
+                    (close)="closeOfficeModal()"
+                    (submit)="onCreateOffice($event)"
+                    [isLoading]="isOfficeSaving()"
+                />
+            }
+
+            @if (isLoadingOffices()) {
+                <p class="loading">事業所を読み込み中...</p>
+            } @else if (errorMessageOffices()) {
+                <p class="error">{{ errorMessageOffices() }}</p>
+            } @else if (offices().length === 0) {
+                <div class="empty-state">
+                    <p class="empty-title">事業所がまだ登録されていません</p>
+                    <p class="empty-note">「事業所を登録」から最初の事業所を追加してください。</p>
+                </div>
+            } @else {
+                <div class="office-list">
+                    @for (office of offices(); track office.id) {
+                        <a class="office-card" [routerLink]="['/company/offices', office.id]">
+                            <div class="office-card-header">
+                                <p class="office-name">{{ office.name }}</p>
+                                @if (office.status === 'disabled') {
+                                    <span class="status-badge disabled">無効化</span>
+                                } @else {
+                                    <span class="status-badge active">有効</span>
+                                }
+                            </div>
+                            <dl class="office-meta">
+                                <div class="meta-row">
+                                    <dt>所在地</dt>
+                                    <dd>{{ formatOfficeAddress(office) }}</dd>
+                                </div>
+                                <div class="meta-row">
+                                    <dt>健保</dt>
+                                    <dd>{{ healthInsuranceLabel(office.healthInsuranceType) }}</dd>
+                                </div>
+                                @if (office.officeSymbol || office.officeNumber) {
+                                    <div class="meta-row">
+                                        <dt>整理記号</dt>
+                                        <dd>
+                                            {{ office.officeSymbol || '—' }}
+                                            @if (office.officeNumber) {
+                                                <span class="office-number">／ {{ office.officeNumber }}</span>
+                                            }
+                                        </dd>
+                                    </div>
+                                }
+                            </dl>
+                        </a>
                     }
-                    <p>{{ office.name }}</p>
-                    <p>{{ formatOfficeAddress(office) }}</p>
-                    <p>{{ office.healthInsuranceType }}</p>
                 </div>
             }
-        </div>
+        </section>
     }
-}
+</div>
 
 <style>
+    .company-page {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 24px 16px 40px;
+    }
+
+    .page-header h1 {
+        margin: 0 0 8px;
+        font-size: 22px;
+    }
+
+    .page-note {
+        margin: 0;
+        color: #6b7280;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    .company-section {
+        margin-top: 24px;
+    }
+
+    .offices-section {
+        margin-top: 32px;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 12px;
+    }
+
+    .section-title {
+        margin: 0 0 4px;
+        font-size: 17px;
+    }
+
+    .section-note {
+        margin: 0;
+        color: #6b7280;
+        font-size: 13px;
+    }
+
+    .info-card {
+        padding: 20px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    }
+
+    .company-name-row {
+        margin-bottom: 16px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #f3f4f6;
+    }
+
+    .company-name {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .info-meta,
+    .office-meta {
+        margin: 0;
+        display: grid;
+        gap: 8px;
+    }
+
+    .meta-row {
+        display: flex;
+        gap: 12px;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    .meta-row dt {
+        flex-shrink: 0;
+        width: 72px;
+        margin: 0;
+        color: #6b7280;
+        font-weight: 500;
+    }
+
+    .meta-row dd {
+        margin: 0;
+        color: #111827;
+        word-break: break-all;
+    }
+
+    .office-number {
+        color: #6b7280;
+    }
+
+    .loading,
+    .empty-note {
+        color: #6b7280;
+        font-size: 14px;
+    }
+
+    .error {
+        margin: 16px 0 0;
+        color: #b91c1c;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .empty-state {
+        padding: 32px 20px;
+        text-align: center;
+        background: #f9fafb;
+        border: 1px dashed #d1d5db;
+        border-radius: 8px;
+    }
+
+    .empty-title {
+        margin: 0 0 6px;
+        font-size: 15px;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .empty-note {
+        margin: 0;
+    }
+
     .office-list {
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 12px;
     }
+
     .office-card {
+        display: block;
         padding: 16px;
-        background-color: #fff;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+        text-decoration: none;
+        color: inherit;
         cursor: pointer;
+        transition: border-color 0.15s, box-shadow 0.15s;
     }
+
     .office-card:hover {
-        background-color: #f0f0f0;
+        border-color: #93c5fd;
+        box-shadow: 0 4px 10px rgba(59, 130, 246, 0.12);
+    }
+
+    .office-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .office-name {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+    }
+
+    .status-badge {
+        flex-shrink: 0;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .status-badge.active {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .status-badge.disabled {
+        background: #f3f4f6;
+        color: #4b5563;
+    }
+
+    .btn {
+        flex-shrink: 0;
+        height: 40px;
+        padding: 0 16px;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+
+    .primary-btn {
+        background: #2563eb;
+        color: #fff;
+    }
+
+    .primary-btn:hover {
+        background: #1d4ed8;
+    }
+
+    @media (max-width: 640px) {
+        .section-header {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .primary-btn {
+            width: 100%;
+        }
     }
 </style>

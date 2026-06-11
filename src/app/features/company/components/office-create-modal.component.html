@@ -1,6 +1,7 @@
 <div class="modal-backdrop" (click)="onBackdropClick($event)">
     <div class="modal-card" role="dialog" aria-labelledby="office-modal-title">
-        <h1 id="office-modal-title">事業所登録</h1>
+        <h1 id="office-modal-title">事業所を登録</h1>
+        <p class="modal-note">登録後、詳細画面で住所や社会保険番号などを編集できます。</p>
 
         <div class="form-field">
             <label for="office-name">事業所名</label>
@@ -80,8 +81,15 @@
     }
 
     h1 {
-        margin: 0 0 20px;
+        margin: 0 0 8px;
         font-size: 22px;
+    }
+
+    .modal-note {
+        margin: 0 0 20px;
+        color: #6b7280;
+        font-size: 13px;
+        line-height: 1.5;
     }
 
     .form-field {
@@ -127,7 +135,7 @@
         height: 42px;
         border: none;
         border-radius: 8px;
-        background-color: #2f6fed;
+        background-color: #2563eb;
         color: #fff;
         font-size: 15px;
         font-weight: 600;
