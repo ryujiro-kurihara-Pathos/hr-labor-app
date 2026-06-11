@@ -16,6 +16,7 @@ import { InsurancePremiumPageComponent } from './features/insurance/pages/insura
 import { InsurancePremiumDetailPageComponent } from './features/insurance/pages/insurance-premium-detail-page.component';
 import { SocialInsuranceProceduresPageComponent } from './features/social-insurance/pages/social-insurance-procedures-page.component';
 import { SocialInsuranceProcedureDetailPageComponent } from './features/social-insurance/pages/social-insurance-procedure-detail-page.component';
+import { SocialInsuranceStatusPageComponent } from './features/social-insurance/pages/social-insurance-status-page.component';
 import { ProfilePageComponent } from './features/users/pages/profile-page.component';
 
 export const routes: Routes = [
@@ -74,6 +75,11 @@ export const routes: Routes = [
             {
                 path: 'employees/:employeeId',
                 component: EmployeeDetailPageComponent,
+            },
+            // 社会保険加入状況
+            {
+                path: 'social-insurance-status',
+                component: SocialInsuranceStatusPageComponent,
             },
             // 保険料計算
             {

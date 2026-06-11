@@ -608,6 +608,15 @@
         <section class="card premium-card">
             <h2 class="section-title">社会保険料（{{ targetYearMonthLabel() }}）</h2>
 
+            @if (employee(); as emp) {
+                <p class="join-status-summary">
+                    <span>{{ joinStatusSummary() }}</span>
+                    <a [routerLink]="['/employees', emp.id]" fragment="social-insurance" class="join-status-link">
+                        加入状況を編集
+                    </a>
+                </p>
+            }
+
             <div class="premium-subsection monthly-premium-subsection">
                 <div class="premium-subsection-header">
                     <span class="card-type-badge monthly">月次報酬</span>
@@ -624,7 +633,6 @@
                         <thead>
                             <tr>
                                 <th>種別</th>
-                                <th>加入判定</th>
                                 <th class="num">料率（本人）</th>
                                 <th class="num">料率（会社）</th>
                                 <th class="num">保険料（本人）</th>
@@ -634,16 +642,6 @@
                         <tbody>
                             <tr>
                                 <td>健康保険</td>
-                                <td>
-                                    <span
-                                        class="join-status-badge"
-                                        [class.ok]="healthInsuranceJoinStatus() === 'active'"
-                                        [class.ng]="healthInsuranceJoinStatus() === 'inactive'"
-                                        [class.unknown]="healthInsuranceJoinStatus() === 'unknown'"
-                                    >
-                                        {{ displayInsuranceStatus(healthInsuranceJoinStatus()) }}
-                                    </span>
-                                </td>
                                 <td class="num">{{ insuranceRatePercentLabel(healthInsuranceRate()) ?? '—' }}%</td>
                                 <td class="num">{{ insuranceRatePercentLabel(healthInsuranceEmployerRate()) ?? '—' }}%</td>
                                 <td class="num">
@@ -663,16 +661,6 @@
                             </tr>
                             <tr>
                                 <td>厚生年金</td>
-                                <td>
-                                    <span
-                                        class="join-status-badge"
-                                        [class.ok]="pensionInsuranceJoinStatus() === 'active'"
-                                        [class.ng]="pensionInsuranceJoinStatus() === 'inactive'"
-                                        [class.unknown]="pensionInsuranceJoinStatus() === 'unknown'"
-                                    >
-                                        {{ displayInsuranceStatus(pensionInsuranceJoinStatus()) }}
-                                    </span>
-                                </td>
                                 <td class="num">{{ insuranceRatePercentLabel(pensionInsuranceRate) }}%</td>
                                 <td class="num">{{ insuranceRatePercentLabel(pensionInsuranceRate) }}%</td>
                                 <td class="num">
@@ -692,16 +680,6 @@
                             </tr>
                             <tr>
                                 <td>介護保険</td>
-                                <td>
-                                    <span
-                                        class="join-status-badge"
-                                        [class.ok]="careInsuranceJoinStatus() === 'active'"
-                                        [class.ng]="careInsuranceJoinStatus() === 'inactive'"
-                                        [class.unknown]="careInsuranceJoinStatus() === 'unknown'"
-                                    >
-                                        {{ displayInsuranceStatus(careInsuranceJoinStatus()) }}
-                                    </span>
-                                </td>
                                 <td class="num">{{ insuranceRatePercentLabel(careInsuranceRate()) ?? '—' }}%</td>
                                 <td class="num">{{ insuranceRatePercentLabel(careInsuranceEmployerRate()) ?? '—' }}%</td>
                                 <td class="num">
@@ -722,7 +700,7 @@
                         </tbody>
                         <tfoot>
                             <tr>
-                                <th colspan="4">合計</th>
+                                <th colspan="3">合計</th>
                                 <th class="num">{{ socialInsurancePremium() | number }}円</th>
                                 <th class="num">{{ socialInsuranceEmployerPremium() | number }}円</th>
                             </tr>
@@ -751,7 +729,6 @@
                                     <thead>
                                         <tr>
                                             <th>種別</th>
-                                            <th>加入判定</th>
                                             <th class="num">料率（本人）</th>
                                             <th class="num">料率（会社）</th>
                                             <th class="num">保険料（本人）</th>
@@ -761,16 +738,6 @@
                                     <tbody>
                                         <tr>
                                             <td>健康保険</td>
-                                            <td>
-                                                <span
-                                                    class="join-status-badge"
-                                                    [class.ok]="healthInsuranceJoinStatus() === 'active'"
-                                                    [class.ng]="healthInsuranceJoinStatus() === 'inactive'"
-                                                    [class.unknown]="healthInsuranceJoinStatus() === 'unknown'"
-                                                >
-                                                    {{ displayInsuranceStatus(healthInsuranceJoinStatus()) }}
-                                                </span>
-                                            </td>
                                             <td class="num">{{ insuranceRatePercentLabel(healthInsuranceRate()) ?? '—' }}%</td>
                                             <td class="num">{{ insuranceRatePercentLabel(healthInsuranceEmployerRate()) ?? '—' }}%</td>
                                             <td class="num">
@@ -790,16 +757,6 @@
                                         </tr>
                                         <tr>
                                             <td>厚生年金</td>
-                                            <td>
-                                                <span
-                                                    class="join-status-badge"
-                                                    [class.ok]="pensionInsuranceJoinStatus() === 'active'"
-                                                    [class.ng]="pensionInsuranceJoinStatus() === 'inactive'"
-                                                    [class.unknown]="pensionInsuranceJoinStatus() === 'unknown'"
-                                                >
-                                                    {{ displayInsuranceStatus(pensionInsuranceJoinStatus()) }}
-                                                </span>
-                                            </td>
                                             <td class="num">{{ insuranceRatePercentLabel(pensionInsuranceRate) }}%</td>
                                             <td class="num">{{ insuranceRatePercentLabel(pensionInsuranceRate) }}%</td>
                                             <td class="num">
@@ -819,16 +776,6 @@
                                         </tr>
                                         <tr>
                                             <td>介護保険</td>
-                                            <td>
-                                                <span
-                                                    class="join-status-badge"
-                                                    [class.ok]="careInsuranceJoinStatus() === 'active'"
-                                                    [class.ng]="careInsuranceJoinStatus() === 'inactive'"
-                                                    [class.unknown]="careInsuranceJoinStatus() === 'unknown'"
-                                                >
-                                                    {{ displayInsuranceStatus(careInsuranceJoinStatus()) }}
-                                                </span>
-                                            </td>
                                             <td class="num">{{ insuranceRatePercentLabel(careInsuranceRate()) ?? '—' }}%</td>
                                             <td class="num">{{ insuranceRatePercentLabel(careInsuranceEmployerRate()) ?? '—' }}%</td>
                                             <td class="num">
@@ -849,7 +796,7 @@
                                     </tbody>
                                     <tfoot>
                                         <tr>
-                                            <th colspan="4">合計</th>
+                                            <th colspan="3">合計</th>
                                             <th class="num">
                                                 @if (socialInsuranceBonusPremium(); as premium) {
                                                     {{ premium | number }}円
@@ -1695,6 +1642,32 @@
 
     .premium-table .num {
         text-align: right;
+    }
+
+    .join-status-summary {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        margin: 0 0 16px;
+        padding: 10px 12px;
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 13px;
+        color: #374151;
+    }
+
+    .join-status-link {
+        margin-left: auto;
+        color: #2563eb;
+        text-decoration: none;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .join-status-link:hover {
+        text-decoration: underline;
     }
 
     .join-status-badge {

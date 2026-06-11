@@ -238,6 +238,7 @@ export class QualificationProcedureComponent {
                 item.id,
                 procedureData,
                 submittedDate,
+                employee.id,
             );
 
             this.procedureUpdated.emit({

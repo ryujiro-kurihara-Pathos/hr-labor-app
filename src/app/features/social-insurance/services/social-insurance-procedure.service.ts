@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 
 
@@ -39,7 +39,8 @@ import {
     QualificationProcedureData,
 } from '../models/procedures.model';
 import { hasSavedQualificationData } from '../utils/qualification-procedure-data.util';
-import { todayDateString } from '../utils/procedure-display.util';
+import { resolveLossDate, todayDateString } from '../utils/procedure-display.util';
+import { SocialInsuranceStatusService } from './social-insurance-status.service';
 
 
 
@@ -52,6 +53,7 @@ import { todayDateString } from '../utils/procedure-display.util';
 
 
 export class SocialInsuranceProcedureService {
+    private readonly socialInsuranceStatusService = inject(SocialInsuranceStatusService);
 
     private readonly collectionName = 'socialInsuranceProcedures';
 
@@ -381,35 +383,47 @@ export class SocialInsuranceProcedureService {
         };
 
         await this.updateProcedure(updated);
+
+        if (procedure.procedureType === 'loss' && procedure.employeeId) {
+            const status = await this.socialInsuranceStatusService.getInsuranceStatusByEmployeeId(
+                procedure.employeeId,
+            );
+            const lossDate = resolveLossDate(
+                status?.healthInsuranceEndDate,
+                status?.pensionInsuranceEndDate,
+                procedure.occurredDate,
+            );
+            if (lossDate) {
+                await this.socialInsuranceStatusService.syncLossDates(procedure.employeeId, lossDate);
+            }
+        }
+
         return updated;
     }
 
     // 資格取得届を完了し、表示データを procedures に直接保存する
     async completeQualificationProcedure(
-
         procedureId: string,
-
         procedureData: QualificationProcedureData,
-
         completedDate: string,
-
+        employeeId: string,
     ): Promise<void> {
-
         const docRef = doc(db, this.collectionName, procedureId);
 
         await updateDoc(docRef, {
-
             status: 'completed',
-
             completedDate,
-
             submittedDate: completedDate,
-
             ...procedureData,
-
             updatedAt: serverTimestamp(),
-
         });
 
+        const qualificationDate = procedureData.qualificationDate?.trim();
+        if (qualificationDate) {
+            await this.socialInsuranceStatusService.syncQualificationDates(
+                employeeId,
+                qualificationDate,
+            );
+        }
     }
 }

@@ -45,6 +45,7 @@ import { OfficeService } from '../../company/services/office.service';
 import { findCareInsuranceRate, findHealthInsuranceRate } from '../../insurance-rate/utils/insurance-rate-lookup.util';
 import { KYOKAI_HEALTH_INSURANCE_RATE_FILES } from '../../insurance-rate/data/insurance-rates';
 import { insuranceJoinStatus } from '../../social-insurance/models/social-insurance-status.model';
+import { insuranceJoinStatusLabel } from '../../social-insurance/utils/social-insurance-status-display.util';
 import { BonusReward } from '../../bonus/models/bonus-reward.model';
 import { BonusRewardService } from '../../bonus/services/bonus-reward.service';
 import {
@@ -327,8 +328,17 @@ export class InsurancePremiumDetailPageComponent {
 
     // 社会保険加入判定の日本語表示（対象, 対象外, 判定不可）
     displayInsuranceStatus(insuranceStatus: insuranceJoinStatus): string {
-        return insuranceStatus === 'active' ? '対象' : insuranceStatus === 'inactive' ? '対象外' : '判定不可';
+        return insuranceJoinStatusLabel(insuranceStatus);
     }
+
+    joinStatusSummary = computed((): string => {
+        const parts = [
+            `健保: ${this.displayInsuranceStatus(this.healthInsuranceJoinStatus())}`,
+            `年金: ${this.displayInsuranceStatus(this.pensionInsuranceJoinStatus())}`,
+            `介護: ${this.displayInsuranceStatus(this.careInsuranceJoinStatus())}`,
+        ];
+        return parts.join(' / ');
+    });
 
     // 健康保険(厚生年金)加入判定(active: 対象, inactive: 対象外, unknown: 判定不可)
     healthInsuranceJoinStatus = computed((): insuranceJoinStatus => {

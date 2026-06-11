@@ -11,6 +11,7 @@ import { SocialInsuranceProcedureService } from '../../social-insurance/services
 import { Office } from '../../company/models/office.model';
 import { Dependent, Employee, EmployeeInput, EmployeeStatus, EmploymentType, toEmployeeInput } from '../models/employee.models';
 import { insuranceJoinStatus, SocialInsuranceStatus, SocialInsuranceStatusInput } from '../../social-insurance/models/social-insurance-status.model';
+import { formatInsuranceDate } from '../../social-insurance/utils/social-insurance-status-display.util';
 import { Procedure, ProcedureStatus } from '../../social-insurance/models/procedures.model';
 import { getQualificationDate } from '../../insurance/utils/standard-remuneration-determination.util';
 import { qualificationProcedureDueDate } from '../../social-insurance/utils/qualification-procedure-data.util';
@@ -84,6 +85,14 @@ export class EmployeeDetailPageComponent {
     isStudent = false;
     expectedEmploymentOver2Months = false;
 
+    healthInsuranceStartDate = '';
+    healthInsuranceEndDate = '';
+    pensionInsuranceStartDate = '';
+    pensionInsuranceEndDate = '';
+    careInsuranceStartDate = '';
+    careInsuranceEndDate = '';
+    insuranceMemo = '';
+
     private socialInsuranceSnapshot: SocialInsuranceDraft = this.createEmptySocialInsuranceDraft();
 
     // 社会保険情報
@@ -100,6 +109,16 @@ export class EmployeeDetailPageComponent {
 
         await this.loadEmployee(employeeId);
         await this.loadDependents();
+        this.scrollToSocialInsuranceFragment();
+    }
+
+    private scrollToSocialInsuranceFragment(): void {
+        const fragment = this.route.snapshot.fragment;
+        if (fragment !== 'social-insurance') return;
+
+        queueMicrotask(() => {
+            document.getElementById('social-insurance')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
     }
 
     // 従業員情報の読み込み
@@ -443,6 +462,7 @@ export class EmployeeDetailPageComponent {
             this.syncFormFromEmployee(employee);
         }
         this.applySocialInsuranceDraft(this.socialInsuranceSnapshot);
+        this.syncFormFromSocialInsuranceStatus(this.socialInsuranceStatus());
         this.errorMessage.set('');
         this.isEditing.set(false);
     }
@@ -493,12 +513,13 @@ export class EmployeeDetailPageComponent {
             healthInsuranceStatus: this.judgeHealthInsurance(),
             pensionInsuranceStatus: this.judgePensionInsurance(),
             careInsuranceStatus: this.careInsuranceJudge(),
-            healthInsuranceStartDate: currentSocialInsuranceStatus?.healthInsuranceStartDate ?? null,
-            healthInsuranceEndDate: currentSocialInsuranceStatus?.healthInsuranceEndDate ?? null,
-            pensionInsuranceStartDate: currentSocialInsuranceStatus?.pensionInsuranceStartDate ?? null,
-            pensionInsuranceEndDate: currentSocialInsuranceStatus?.pensionInsuranceEndDate ?? null,
-            careInsuranceStartDate: currentSocialInsuranceStatus?.careInsuranceStartDate ?? null,
-            careInsuranceEndDate: currentSocialInsuranceStatus?.careInsuranceEndDate ?? null,
+            healthInsuranceStartDate: this.emptyToNullDate(this.healthInsuranceStartDate),
+            healthInsuranceEndDate: this.emptyToNullDate(this.healthInsuranceEndDate),
+            pensionInsuranceStartDate: this.emptyToNullDate(this.pensionInsuranceStartDate),
+            pensionInsuranceEndDate: this.emptyToNullDate(this.pensionInsuranceEndDate),
+            careInsuranceStartDate: this.emptyToNullDate(this.careInsuranceStartDate),
+            careInsuranceEndDate: this.emptyToNullDate(this.careInsuranceEndDate),
+            memo: this.insuranceMemo.trim(),
         };
 
         try {
@@ -709,7 +730,11 @@ export class EmployeeDetailPageComponent {
 
     // 社会保険の判定
     displayInsuranceStatus(insuranceStatus: insuranceJoinStatus): string {
-        return insuranceStatus === 'active' ? '対象' : insuranceStatus === 'inactive' ? '対象外' : '判定不可';
+        return insuranceStatus === 'active' ? '対象' : insuranceStatus === 'inactive' ? '対象外' : '未設定';
+    }
+
+    formatInsuranceDate(value: string): string {
+        return formatInsuranceDate(value);
     }
 
     /** 事業所の通常労働者に対する4分の3基準（週の時間・月の日数の両方） */
@@ -806,7 +831,19 @@ export class EmployeeDetailPageComponent {
         this.prescribedWage = this.numberToFormValue(status?.prescribedWage);
         this.isStudent = status?.isStudent ?? false;
         this.expectedEmploymentOver2Months = status?.expectedEmploymentOver2Months ?? false;
+        this.healthInsuranceStartDate = status?.healthInsuranceStartDate ?? '';
+        this.healthInsuranceEndDate = status?.healthInsuranceEndDate ?? '';
+        this.pensionInsuranceStartDate = status?.pensionInsuranceStartDate ?? '';
+        this.pensionInsuranceEndDate = status?.pensionInsuranceEndDate ?? '';
+        this.careInsuranceStartDate = status?.careInsuranceStartDate ?? '';
+        this.careInsuranceEndDate = status?.careInsuranceEndDate ?? '';
+        this.insuranceMemo = status?.memo ?? '';
         this.socialInsuranceSnapshot = this.captureSocialInsuranceDraft();
+    }
+
+    private emptyToNullDate(value: string): string | null {
+        const trimmed = value.trim();
+        return trimmed || null;
     }
 
     private numberToFormValue(value: number | null | undefined): string | number {

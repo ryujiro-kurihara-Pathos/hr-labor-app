@@ -6,9 +6,10 @@ import {
     serverTimestamp,
     setDoc,
     getDoc,
+    updateDoc,
     Timestamp } from 'firebase/firestore';
 import { db } from '../../../core/firebase';
-import { Company, CompanyInput } from '../models/company.model';
+import { Company, CompanyInput, CompanyUpdateInput } from '../models/company.model';
 
 @Injectable({
     providedIn: 'root',
@@ -48,5 +49,13 @@ export class CompanyService {
         } as Company;
 
         return company;
+    }
+
+    async updateCompany(companyId: string, input: CompanyUpdateInput): Promise<void> {
+        const docRef = doc(db, 'companies', companyId);
+        await updateDoc(docRef, {
+            ...input,
+            updatedAt: serverTimestamp(),
+        });
     }
 }

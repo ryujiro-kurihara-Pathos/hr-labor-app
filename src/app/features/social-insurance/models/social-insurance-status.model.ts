@@ -32,6 +32,8 @@ export type SocialInsuranceStatus = {
     careInsuranceStartDate: string | null;        // 介護保険の対象開始日
     careInsuranceEndDate: string | null;          // 介護保険の対象終了日
 
+    memo: string;                               // 備考
+
     // 作成・更新日時
     createdAt: Timestamp;                         // 作成日時
     updatedAt: Timestamp;                         // 更新日時

@@ -1,4 +1,5 @@
 import { Component, signal, inject } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink, Router } from '@angular/router';
 
 import { Company } from '../models/company.model';
@@ -14,7 +15,7 @@ import { formatOfficeAddress } from '../utils/office-format.util';
 @Component({
     selector: 'app-company-page',
     standalone: true,
-    imports: [RouterLink, OfficeCreateModalComponent],
+    imports: [RouterLink, FormsModule, OfficeCreateModalComponent],
     templateUrl: './company-page.component.html',
 })
 
@@ -29,7 +30,13 @@ export class CompanyPageComponent {
     company = signal<Company | null>(null);
 
     isLoading = signal<boolean>(false);
+    isSavingCompany = signal<boolean>(false);
+    isEditingCompany = signal<boolean>(false);
     errorMessage = signal<string>('');
+
+    companyName = '';
+    representativeName = '';
+    companyAddress = '';
 
     // 事業所一覧
     offices = signal<Office[]>([]);
@@ -68,11 +75,73 @@ export class CompanyPageComponent {
             }
 
             this.company.set(company);
+            this.syncFormFromCompany(company);
         } catch (error) {
             console.error('会社情報の取得に失敗しました。', error);
         } finally {
             this.isLoading.set(false);
         }
+    }
+
+    startCompanyEdit(): void {
+        const company = this.company();
+        if (!company) return;
+
+        this.syncFormFromCompany(company);
+        this.errorMessage.set('');
+        this.isEditingCompany.set(true);
+    }
+
+    cancelCompanyEdit(): void {
+        const company = this.company();
+        if (company) {
+            this.syncFormFromCompany(company);
+        }
+        this.errorMessage.set('');
+        this.isEditingCompany.set(false);
+    }
+
+    async saveCompany(): Promise<void> {
+        const company = this.company();
+        if (!company) return;
+
+        const name = this.companyName.trim();
+        const representativeName = this.representativeName.trim();
+        const address = this.companyAddress.trim();
+
+        if (!name || !representativeName || !address) {
+            this.errorMessage.set('会社名・代表者・所在地を入力してください');
+            return;
+        }
+
+        this.isSavingCompany.set(true);
+        this.errorMessage.set('');
+
+        try {
+            await this.companyService.updateCompany(company.id, {
+                name,
+                representativeName,
+                address,
+            });
+            this.company.set({
+                ...company,
+                name,
+                representativeName,
+                address,
+            });
+            this.isEditingCompany.set(false);
+        } catch (error) {
+            console.error('会社情報の更新に失敗しました', error);
+            this.errorMessage.set('会社情報の更新に失敗しました');
+        } finally {
+            this.isSavingCompany.set(false);
+        }
+    }
+
+    private syncFormFromCompany(company: Company): void {
+        this.companyName = company.name;
+        this.representativeName = company.representativeName;
+        this.companyAddress = company.address;
     }
 
     formatOfficeAddress(office: Office): string {

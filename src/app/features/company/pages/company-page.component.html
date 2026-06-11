@@ -10,21 +10,74 @@
         <p class="error">{{ errorMessage() }}</p>
     } @else if (company(); as c) {
         <section class="company-section">
-            <h2 class="section-title">会社情報</h2>
+            <div class="section-header">
+                <h2 class="section-title">会社情報</h2>
+                @if (!isEditingCompany()) {
+                    <button type="button" class="btn edit-btn" (click)="startCompanyEdit()">編集</button>
+                }
+            </div>
             <article class="info-card">
-                <div class="company-name-row">
-                    <p class="company-name">{{ c.name }}</p>
-                </div>
-                <dl class="info-meta">
-                    <div class="meta-row">
-                        <dt>代表者</dt>
-                        <dd>{{ c.representativeName || '—' }}</dd>
+                @if (isEditingCompany()) {
+                    <div class="form-field">
+                        <label for="company-name">会社名</label>
+                        <input
+                            id="company-name"
+                            type="text"
+                            name="companyName"
+                            [(ngModel)]="companyName"
+                        />
                     </div>
-                    <div class="meta-row">
-                        <dt>所在地</dt>
-                        <dd>{{ c.address || '—' }}</dd>
+                    <div class="form-field">
+                        <label for="representative-name">代表者</label>
+                        <input
+                            id="representative-name"
+                            type="text"
+                            name="representativeName"
+                            [(ngModel)]="representativeName"
+                        />
                     </div>
-                </dl>
+                    <div class="form-field">
+                        <label for="company-address">所在地</label>
+                        <input
+                            id="company-address"
+                            type="text"
+                            name="companyAddress"
+                            [(ngModel)]="companyAddress"
+                        />
+                    </div>
+                    <div class="form-actions">
+                        <button
+                            type="button"
+                            class="btn primary-btn"
+                            (click)="saveCompany()"
+                            [disabled]="isSavingCompany()"
+                        >
+                            {{ isSavingCompany() ? '保存中...' : '保存' }}
+                        </button>
+                        <button
+                            type="button"
+                            class="btn secondary-btn"
+                            (click)="cancelCompanyEdit()"
+                            [disabled]="isSavingCompany()"
+                        >
+                            キャンセル
+                        </button>
+                    </div>
+                } @else {
+                    <div class="company-name-row">
+                        <p class="company-name">{{ c.name }}</p>
+                    </div>
+                    <dl class="info-meta">
+                        <div class="meta-row">
+                            <dt>代表者</dt>
+                            <dd>{{ c.representativeName || '—' }}</dd>
+                        </div>
+                        <div class="meta-row">
+                            <dt>所在地</dt>
+                            <dd>{{ c.address || '—' }}</dd>
+                        </div>
+                    </dl>
+                }
             </article>
         </section>
 
@@ -124,6 +177,79 @@
 
     .company-section {
         margin-top: 24px;
+    }
+
+    .company-section .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 12px;
+    }
+
+    .company-section .section-title {
+        margin: 0;
+    }
+
+    .edit-btn {
+        background: #fff;
+        color: #2563eb;
+        border: 1px solid #2563eb;
+    }
+
+    .edit-btn:hover {
+        background: #eff6ff;
+    }
+
+    .form-field {
+        margin-bottom: 16px;
+    }
+
+    .form-field label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .form-field input {
+        width: 100%;
+        height: 40px;
+        padding: 0 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 14px;
+        box-sizing: border-box;
+    }
+
+    .form-field input:focus {
+        outline: none;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 20px;
+        padding-top: 16px;
+        border-top: 1px solid #f3f4f6;
+    }
+
+    .secondary-btn {
+        background: #fff;
+        color: #374151;
+        border: 1px solid #d1d5db;
+    }
+
+    .secondary-btn:hover:not(:disabled) {
+        background: #f9fafb;
+    }
+
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
     }
 
     .offices-section {

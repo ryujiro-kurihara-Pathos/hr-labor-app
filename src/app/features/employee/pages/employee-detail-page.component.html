@@ -283,6 +283,7 @@
                 </section>
             }
 
+            <section id="social-insurance" class="social-insurance-section">
             <h2 class="section-title">社会保険（加入要件入力・参考判定）</h2>
             @if (isEditing() && isActiveEmployee()) {
                 <p class="insurance-judgment-note">
@@ -460,11 +461,83 @@
                 </div>
             </div>
 
+            <h3 class="subsection-title">資格取得・喪失日</h3>
+            @if (isEditing() && isActiveEmployee()) {
+                <div class="form-grid-two">
+                    <div class="form-field">
+                        <label for="health-start">健康保険 資格取得日</label>
+                        <input id="health-start" type="date" name="healthInsuranceStartDate" [(ngModel)]="healthInsuranceStartDate" />
+                    </div>
+                    <div class="form-field">
+                        <label for="health-end">健康保険 資格喪失日</label>
+                        <input id="health-end" type="date" name="healthInsuranceEndDate" [(ngModel)]="healthInsuranceEndDate" />
+                    </div>
+                    <div class="form-field">
+                        <label for="pension-start">厚生年金 資格取得日</label>
+                        <input id="pension-start" type="date" name="pensionInsuranceStartDate" [(ngModel)]="pensionInsuranceStartDate" />
+                    </div>
+                    <div class="form-field">
+                        <label for="pension-end">厚生年金 資格喪失日</label>
+                        <input id="pension-end" type="date" name="pensionInsuranceEndDate" [(ngModel)]="pensionInsuranceEndDate" />
+                    </div>
+                    <div class="form-field">
+                        <label for="care-start">介護保険 対象開始日</label>
+                        <input id="care-start" type="date" name="careInsuranceStartDate" [(ngModel)]="careInsuranceStartDate" />
+                    </div>
+                    <div class="form-field">
+                        <label for="care-end">介護保険 対象終了日</label>
+                        <input id="care-end" type="date" name="careInsuranceEndDate" [(ngModel)]="careInsuranceEndDate" />
+                    </div>
+                </div>
+                <div class="form-field">
+                    <label for="insurance-memo">備考</label>
+                    <textarea
+                        id="insurance-memo"
+                        name="insuranceMemo"
+                        rows="3"
+                        [(ngModel)]="insuranceMemo"
+                        placeholder="加入状況に関するメモ"
+                    ></textarea>
+                </div>
+            } @else {
+                <dl class="detail-list">
+                    <div class="detail-row">
+                        <dt>健康保険 資格取得日</dt>
+                        <dd>{{ formatInsuranceDate(healthInsuranceStartDate) }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>健康保険 資格喪失日</dt>
+                        <dd>{{ formatInsuranceDate(healthInsuranceEndDate) }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>厚生年金 資格取得日</dt>
+                        <dd>{{ formatInsuranceDate(pensionInsuranceStartDate) }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>厚生年金 資格喪失日</dt>
+                        <dd>{{ formatInsuranceDate(pensionInsuranceEndDate) }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>介護保険 対象開始日</dt>
+                        <dd>{{ formatInsuranceDate(careInsuranceStartDate) }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>介護保険 対象終了日</dt>
+                        <dd>{{ formatInsuranceDate(careInsuranceEndDate) }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>備考</dt>
+                        <dd>{{ insuranceMemo.trim() || '—' }}</dd>
+                    </div>
+                </dl>
+            }
+
             @if (needsQualificationProcedurePrompt()) {
                 <p class="insurance-judgment-note" role="note">
                     健康保険の加入対象ですが、まだ資格取得手続きが完了していません。手続きをしてください。
                 </p>
             }
+            </section>
 
             <section class="qualification-procedure-section">
                 <h2 class="section-title">手続き一覧</h2>
@@ -1026,5 +1099,35 @@
         flex: 1;
         background: #e5e7eb;
         color: #333;
+    }
+
+    .subsection-title {
+        margin: 20px 0 12px;
+        font-size: 15px;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .form-grid-two {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px 16px;
+    }
+
+    .social-insurance-section textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 14px;
+        font-family: inherit;
+        box-sizing: border-box;
+        resize: vertical;
+    }
+
+    @media (max-width: 640px) {
+        .form-grid-two {
+            grid-template-columns: 1fr;
+        }
     }
 </style>

@@ -12,3 +12,5 @@ export type Company = {
 }
 
 export type CompanyInput = Omit<Company, 'id' | 'createdAt' | 'updatedAt'>;
+
+export type CompanyUpdateInput = Pick<CompanyInput, 'name' | 'representativeName' | 'address'>;

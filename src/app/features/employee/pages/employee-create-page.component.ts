@@ -140,6 +140,7 @@ export class EmployeeCreatePageComponent {
                 pensionInsuranceEndDate: null,      // 厚生年金の資格喪失日
                 careInsuranceStartDate: null,       // 介護保険の対象開始日
                 careInsuranceEndDate: null,         // 介護保険の対象終了日
+                memo: '',
             }
             await this.socialInsuranceStatusService.createSocialInsuranceStatus(socialInsuranceStatusInput);
 
