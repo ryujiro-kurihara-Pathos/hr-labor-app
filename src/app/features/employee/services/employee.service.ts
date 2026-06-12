@@ -62,16 +62,49 @@ export class EmployeeService {
         };
     }
 
+    /** 会社内の既存社員番号から次の8桁連番を採番する */
+    async generateNextEmployeeNumber(companyId: string): Promise<string> {
+        const employees = await this.getEmployeesByCompanyId(companyId);
+        const used = new Set(
+            employees.map((employee) => employee.employeeNumber.trim()).filter(Boolean),
+        );
+
+        let max = 0;
+        for (const number of used) {
+            if (!/^\d{1,8}$/.test(number)) continue;
+            max = Math.max(max, Number(number));
+        }
+
+        for (let candidate = max + 1; candidate <= 99_999_999; candidate++) {
+            const next = String(candidate).padStart(8, '0');
+            if (!used.has(next)) return next;
+        }
+
+        return this.generateRandomEmployeeNumber(used);
+    }
+
+    private generateRandomEmployeeNumber(used: Set<string>): string {
+        for (let attempt = 0; attempt < 100; attempt++) {
+            const next = String(Math.floor(Math.random() * 100_000_000)).padStart(8, '0');
+            if (!used.has(next)) return next;
+        }
+        throw new Error('社員番号の生成に失敗しました');
+    }
+
     // Firestoreに従業員を登録
     async createEmployee(employeeInput: EmployeeInput): Promise<Employee> {
+        const employeeNumber = employeeInput.employeeNumber.trim()
+            || await this.generateNextEmployeeNumber(employeeInput.companyId);
+
         const docRef = doc(collection(db, 'employees'));
         const createdAt = serverTimestamp() as Timestamp;
         const employee: Employee = {
             id: docRef.id,
             ...employeeInput,
+            employeeNumber,
             createdAt: createdAt,
             updatedAt: createdAt,
-        }
+        };
         await setDoc(docRef, employee);
         return employee;
     }

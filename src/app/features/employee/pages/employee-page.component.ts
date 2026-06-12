@@ -2,7 +2,14 @@ import { Component, signal, inject, computed } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
-import { Employee, EmployeeStatus, EmploymentType } from '../models/employee.models';
+import { Employee, EmploymentType } from '../models/employee.models';
+import {
+    EmployeeStatusFilter,
+    employeeDisplayStatusLabel,
+    isEmployeeFullyRetired,
+    isEmployeePendingRetirement,
+    matchesEmployeeStatusFilter,
+} from '../utils/employee-status-display.util';
 import { EmployeeService } from '../services/employee.service';
 import { AuthService } from '../../auth/services/auth.service';
 import { UserService } from '../../users/services/user.service';
@@ -30,7 +37,7 @@ export class EmployeePageComponent {
     employees = signal<Employee[]>([]);
     keyword = signal<string>('');
     selectedOfficeId = signal<string>('');
-    selectedStatus = signal<'' | EmployeeStatus>('');
+    selectedStatus = signal<EmployeeStatusFilter>('');
 
     officeOptions = computed(() => {
         const map = this.officeNameById();
@@ -84,10 +91,6 @@ export class EmployeePageComponent {
         }
     }
 
-    statusLabel(status: EmployeeStatus): string {
-        return status === 'active' ? '在籍' : '退職';
-    }
-
     employmentTypeLabel(type: EmploymentType): string {
         if (type === 'full-time') return '正社員';
         if (type === 'part-time') return 'パート・アルバイト';
@@ -99,25 +102,15 @@ export class EmployeePageComponent {
     }
 
     isPendingRetirement(employee: Employee): boolean {
-        if (employee.status !== 'retired' || !employee.retiredDate) return false;
-
-        const retired = employee.retiredDate.toDate();
-        const today = new Date();
-        retired.setHours(0, 0, 0, 0);
-        today.setHours(0, 0, 0, 0);
-        return retired >= today;
+        return isEmployeePendingRetirement(employee);
     }
 
     statusBadgeLabel(employee: Employee): string {
-        if (this.isPendingRetirement(employee)) {
-            const d = employee.retiredDate!.toDate();
-            return `${d.getMonth() + 1}/${d.getDate()}退職予定`;
-        }
-        return this.statusLabel(employee.status);
+        return employeeDisplayStatusLabel(employee);
     }
 
     isRetiredBadge(employee: Employee): boolean {
-        return employee.status === 'retired' && !this.isPendingRetirement(employee);
+        return isEmployeeFullyRetired(employee);
     }
 
     searchEmployees(): Employee[] {
@@ -130,7 +123,7 @@ export class EmployeePageComponent {
             list = list.filter((employee) => employee.officeId === officeId);
         }
         if (status) {
-            list = list.filter((employee) => employee.status === status);
+            list = list.filter((employee) => matchesEmployeeStatusFilter(employee, status));
         }
         if (!keyword) return list;
 

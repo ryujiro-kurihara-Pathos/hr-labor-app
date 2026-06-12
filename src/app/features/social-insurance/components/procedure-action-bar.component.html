@@ -1,32 +1,64 @@
 @if (isCompleted()) {
-    <p class="completed-note">提出済み（{{ submittedDateLabel() }}）</p>
+    <div class="action-bar">
+        <p class="completed-note">提出済み（{{ submittedDateLabel() }}）</p>
+        @if (canExportCsv()) {
+            <button
+                type="button"
+                class="btn export-btn"
+                (click)="onExportCsv()"
+            >
+                エクスポート
+            </button>
+        }
+    </div>
 } @else {
     <div class="action-bar">
-        <button
-            type="button"
-            class="btn export-btn"
-            (click)="onExport()"
-            [disabled]="isSubmitting()"
-        >
-            エクスポート
-        </button>
-        <button
-            type="button"
-            class="btn submit-btn"
-            (click)="submitClick.emit()"
-            [disabled]="isSubmitting() || submitDisabled()"
-        >
-            @if (isSubmitting()) {
-                処理中...
-            } @else {
-                提出済みにする
+        @if (canDelete()) {
+            <button
+                type="button"
+                class="btn delete-btn"
+                (click)="onDelete()"
+                [disabled]="isDeleting() || isSubmitting()"
+            >
+                @if (isDeleting()) {
+                    削除中...
+                } @else {
+                    削除
+                }
+            </button>
+        }
+        <div class="action-bar-end">
+            @if (canExportCsv()) {
+                <button
+                    type="button"
+                    class="btn export-btn"
+                    (click)="onExportCsv()"
+                    [disabled]="isDeleting() || isSubmitting()"
+                >
+                    エクスポート
+                </button>
             }
-        </button>
+            <button
+                type="button"
+                class="btn submit-btn"
+                (click)="onSubmit()"
+                [disabled]="isDeleting() || isSubmitting() || submitDisabled()"
+            >
+                @if (isSubmitting()) {
+                    処理中...
+                } @else {
+                    提出済みにする
+                }
+            </button>
+        </div>
     </div>
 }
 
 @if (exportMessage()) {
     <p class="action-note">{{ exportMessage() }}</p>
+}
+@if (deleteErrorMessage()) {
+    <p class="action-error">{{ deleteErrorMessage() }}</p>
 }
 @if (actionErrorMessage()) {
     <p class="action-error">{{ actionErrorMessage() }}</p>
@@ -36,8 +68,17 @@
     .action-bar {
         display: flex;
         flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
         gap: 8px;
-        justify-content: flex-end;
+        width: 100%;
+    }
+
+    .action-bar-end {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-left: auto;
     }
 
     .btn {
@@ -67,6 +108,17 @@
         border-color: #9ca3af;
     }
 
+    .delete-btn {
+        background: #fff;
+        color: #b91c1c;
+        border: 1px solid #fecaca;
+    }
+
+    .delete-btn:hover:not(:disabled) {
+        background: #fef2f2;
+        border-color: #fca5a5;
+    }
+
     .submit-btn {
         background: #2563eb;
         color: #fff;
@@ -86,6 +138,8 @@
         font-size: 13px;
         font-weight: 600;
         white-space: nowrap;
+        flex: 1;
+        min-width: 0;
     }
 
     .action-note,

@@ -47,6 +47,8 @@ export class SignupPageComponent {
     // ユーザー情報
     lastName = '';
     firstName = '';
+    lastNameKana = '';
+    firstNameKana = '';
     email = '';
 
     password = '';
@@ -101,6 +103,8 @@ export class SignupPageComponent {
                 uid: user.uid,
                 lastName: input.lastName,
                 firstName: input.firstName,
+                lastNameKana: this.lastNameKana.trim(),
+                firstNameKana: this.firstNameKana.trim(),
                 email: input.email,
                 
                 role: 'admin',

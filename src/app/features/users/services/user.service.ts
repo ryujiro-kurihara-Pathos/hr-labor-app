@@ -16,6 +16,24 @@ import {
 })
 
 export class UserService {
+    private normalizeUser(id: string, data: Record<string, unknown>): AppUser {
+        return {
+            id,
+            uid: String(data['uid'] ?? id),
+            lastName: String(data['lastName'] ?? ''),
+            firstName: String(data['firstName'] ?? ''),
+            lastNameKana: String(data['lastNameKana'] ?? ''),
+            firstNameKana: String(data['firstNameKana'] ?? ''),
+            email: String(data['email'] ?? ''),
+            role: (data['role'] as AppUser['role']) ?? 'employee',
+            status: (data['status'] as AppUser['status']) ?? 'active',
+            companyId: String(data['companyId'] ?? ''),
+            employeeId: (data['employeeId'] as string | null) ?? null,
+            createdAt: data['createdAt'] as AppUser['createdAt'],
+            updatedAt: data['updatedAt'] as AppUser['updatedAt'],
+        };
+    }
+
     // Firestoreにユーザーを登録
     async createUser(userInput: AppUserInput) {
         const docRef = doc(db, 'users', userInput.uid);
@@ -39,6 +57,6 @@ export class UserService {
         
         if(!docSnap.exists()) return null;
 
-        return { id: uid, ...docSnap.data() } as AppUser;
+        return this.normalizeUser(uid, docSnap.data() as Record<string, unknown>);
     }
 }

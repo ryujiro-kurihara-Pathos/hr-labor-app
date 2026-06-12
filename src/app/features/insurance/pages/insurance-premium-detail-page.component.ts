@@ -30,6 +30,7 @@ import {
     FixedWageFieldKey,
 } from '../utils/fixed-wage-change.util';
 import { findLatestRegisteredRewardBefore } from '../utils/latest-reward.util';
+import { confirmedRewardsByYearMonth, normalizeRewardStatus } from '../utils/reward-status.util';
 import {
     formatYearMonthLabel,
     getFirstRegularDeterminationYearMonth,
@@ -46,6 +47,11 @@ import { findCareInsuranceRate, findHealthInsuranceRate } from '../../insurance-
 import { KYOKAI_HEALTH_INSURANCE_RATE_FILES } from '../../insurance-rate/data/insurance-rates';
 import { insuranceJoinStatus } from '../../social-insurance/models/social-insurance-status.model';
 import { insuranceJoinStatusLabel } from '../../social-insurance/utils/social-insurance-status-display.util';
+import {
+    isCareInsurancePremiumTargetMonth,
+    judgeCareInsuranceStatus,
+} from '../../social-insurance/utils/care-insurance-period.util';
+import { isInsurancePremiumTargetMonth } from '../../social-insurance/utils/insurance-premium-period.util';
 import { BonusReward } from '../../bonus/models/bonus-reward.model';
 import { BonusRewardService } from '../../bonus/services/bonus-reward.service';
 import {
@@ -60,7 +66,7 @@ import { SocialInsuranceProcedureService } from '../../social-insurance/services
 import { Procedure, ProcedureStatus } from '../../social-insurance/models/procedures.model';
 import { procedureStatusLabel } from '../../social-insurance/utils/procedure-display.util';
 
-type MonthRewardStatus = 'loading' | 'registered' | 'unregistered' | 'excluded';
+type MonthRewardStatus = 'loading' | 'draft' | 'confirmed' | 'unregistered' | 'excluded';
 
 @Component({
     selector: 'app-insurance-premium-detail-page',
@@ -83,6 +89,7 @@ export class InsurancePremiumDetailPageComponent {
     standardReward = signal<StandardMonthlyReward | null>(null); // 標準報酬月額
     employeeRewards = signal<Record<string, StandardMonthlyReward>>({}); // 従業員の報酬月額
     healthInsuranceStartDate = signal<string | null>(null); // 健康保険の資格取得日
+    healthInsuranceEndDate = signal<string | null>(null); // 健康保険の資格喪失日
     healthInsuranceStatus = signal<insuranceJoinStatus | null>(null); // 健康保険の加入判定
     pensionInsuranceStatus = signal<insuranceJoinStatus | null>(null); // 厚生年金の加入判定
     careInsuranceStatus = signal<insuranceJoinStatus | null>(null); // 介護保険の加入判定
@@ -168,7 +175,7 @@ export class InsurancePremiumDetailPageComponent {
         const employee = this.employee();
         if (!yearMonth || !employee || !isRewardTargetMonth(employee, yearMonth)) return null;
 
-        const rewards = this.employeeRewards();
+        const rewards = confirmedRewardsByYearMonth(this.employeeRewards());
 
         for (let offset = 0; offset <= 2; offset++) {
             const originMonth = addMonthsToYearMonth(yearMonth, -offset);
@@ -227,7 +234,7 @@ export class InsurancePremiumDetailPageComponent {
         if (!employee || !yearMonth) return null;
         return this.determinationService.resolve(
             employee,
-            this.employeeRewards(),
+            confirmedRewardsByYearMonth(this.employeeRewards()),
             yearMonth,
             this.healthInsuranceStartDate(),
             this.employeeBonuses(),
@@ -274,8 +281,17 @@ export class InsurancePremiumDetailPageComponent {
         const yearMonth = this.targetYearMonth();
         if (!employee || !yearMonth) return 'unregistered';
         if (!isRewardTargetMonth(employee, yearMonth)) return 'excluded';
-        if (this.standardReward()) return 'registered';
+
+        const status = normalizeRewardStatus(this.standardReward());
+        if (status === 'draft') return 'draft';
+        if (status === 'confirmed') return 'confirmed';
         return 'unregistered';
+    });
+
+    /** 下書きまたは未登録のときのみフォームを編集可能 */
+    isRewardEditable = computed(() => {
+        const status = this.monthRewardStatus();
+        return status === 'unregistered' || status === 'draft';
     });
 
     // 月次報酬の登録済み報酬月額
@@ -350,9 +366,39 @@ export class InsurancePremiumDetailPageComponent {
         return this.pensionInsuranceStatus() ?? 'unknown';
     });
 
+    isHealthPremiumMonth = computed((): boolean => {
+        const targetYearMonth = this.targetYearMonth();
+        if (!targetYearMonth) return false;
+        return isInsurancePremiumTargetMonth(
+            targetYearMonth,
+            this.healthInsuranceStartDate(),
+            this.healthInsuranceEndDate(),
+        );
+    });
+
+    isCarePremiumMonth = computed((): boolean => {
+        const employee = this.employee();
+        const targetYearMonth = this.targetYearMonth();
+        if (!employee || !targetYearMonth) return false;
+        return isCareInsurancePremiumTargetMonth(
+            targetYearMonth,
+            this.healthInsuranceStartDate(),
+            this.healthInsuranceEndDate(),
+            employee.birthDate,
+        );
+    });
+
     // 介護保険加入判定(active: 対象, inactive: 対象外, unknown: 判定不可)
     careInsuranceJoinStatus = computed((): insuranceJoinStatus => {
-        return this.careInsuranceStatus() ?? 'unknown';
+        const employee = this.employee();
+        const targetYearMonth = this.targetYearMonth();
+        if (!employee || !targetYearMonth) return 'unknown';
+        return judgeCareInsuranceStatus(
+            targetYearMonth,
+            this.healthInsuranceStartDate(),
+            this.healthInsuranceEndDate(),
+            employee.birthDate,
+        );
     });
 
     // 随時改定の判定
@@ -392,7 +438,7 @@ export class InsurancePremiumDetailPageComponent {
             firstRegularYm,
             employee,
             qualificationDate,
-            this.employeeRewards(),
+            confirmedRewardsByYearMonth(this.employeeRewards()),
             (monthlyReward) => this.calculator.calculate(monthlyReward),
             this.employeeBonuses(),
         );
@@ -478,8 +524,10 @@ export class InsurancePremiumDetailPageComponent {
         switch (this.monthRewardStatus()) {
             case 'loading':
                 return '確認中';
-            case 'registered':
-                return '登録済み';
+            case 'draft':
+                return '下書き';
+            case 'confirmed':
+                return '確定';
             case 'unregistered':
                 return '未登録';
             case 'excluded':
@@ -491,6 +539,10 @@ export class InsurancePremiumDetailPageComponent {
         switch (this.monthRewardStatus()) {
             case 'loading':
                 return 'この月の報酬情報を確認しています。';
+            case 'draft':
+                return '下書きとして保存されています。確定するまで編集できます。';
+            case 'confirmed':
+                return '確定済みのため編集できません。';
             case 'unregistered':
                 if (this.prefilledFromYearMonthLabel()) {
                     return `直近の登録済み（${this.prefilledFromYearMonthLabel()}）を参考表示しています。`;
@@ -581,8 +633,9 @@ export class InsurancePremiumDetailPageComponent {
         // 社会保険情報を取得
         const status = await this.socialInsuranceStatusService.getInsuranceStatusByEmployeeId(employeeId);
 
-        // 健康保険の資格取得日を設定
+        // 健康保険の資格取得日・喪失日を設定
         this.healthInsuranceStartDate.set(status?.healthInsuranceStartDate ?? null);
+        this.healthInsuranceEndDate.set(status?.healthInsuranceEndDate ?? null);
         // 健康保険の加入状況を設定
         this.healthInsuranceStatus.set(status?.healthInsuranceStatus ?? null);
         // 厚生年金の加入状況を設定
@@ -971,8 +1024,15 @@ export class InsurancePremiumDetailPageComponent {
         };
     }
 
-    // 月次報酬を保存
-    async saveStandardMonthlyReward() {
+    async saveDraftStandardMonthlyReward() {
+        await this.persistStandardMonthlyReward('draft');
+    }
+
+    async confirmStandardMonthlyReward() {
+        await this.persistStandardMonthlyReward('confirmed');
+    }
+
+    private async persistStandardMonthlyReward(mode: 'draft' | 'confirmed') {
         const employeeId = this.employeeId();
         if (!employeeId) return;
         if (!this.targetYearMonth()) {
@@ -984,15 +1044,16 @@ export class InsurancePremiumDetailPageComponent {
             return;
         }
 
-        // ローディング
         this.isSaving.set(true);
-
-        // エラーメッセージ
         this.errorMessage.set('');
         this.message.set('');
 
         try {
-            const saved = await this.rewardService.upsert(this.buildInput());
+            const input = this.buildInput();
+            const saved =
+                mode === 'draft'
+                    ? await this.rewardService.saveDraft(input)
+                    : await this.rewardService.confirm(input);
             this.standardReward.set(saved);
             this.prefilledFromYearMonth.set(null);
             this.setFormFromStandardReward();
@@ -1000,11 +1061,17 @@ export class InsurancePremiumDetailPageComponent {
                 ...current,
                 [saved.targetYearMonth]: saved,
             }));
-            await Promise.all([
-                this.loadRegularDecisionProcedure(),
-                this.loadRevisionProcedure(),
-            ]);
-            this.message.set(`${saved.targetYearMonth} の報酬情報を保存しました`);
+            if (mode === 'confirmed') {
+                await Promise.all([
+                    this.loadRegularDecisionProcedure(),
+                    this.loadRevisionProcedure(),
+                ]);
+            }
+            this.message.set(
+                mode === 'draft'
+                    ? `${saved.targetYearMonth} の報酬情報を下書き保存しました`
+                    : `${saved.targetYearMonth} の報酬情報を確定しました`,
+            );
         } catch (error) {
             console.error('保存に失敗しました', error);
             const msg = error instanceof Error ? error.message : '保存に失敗しました';
@@ -1056,11 +1123,13 @@ export class InsurancePremiumDetailPageComponent {
 
     // 健康保険料（本人負担）
     healthInsurancePremium = computed((): number | null => {
+        if (!this.isHealthPremiumMonth()) return null;
         return this.calculatePremium(this.applicableHealthStandardAmount(), this.healthInsuranceRate());
     });
 
     // 健康保険料（会社負担）
     healthInsuranceEmployerPremium = computed((): number | null => {
+        if (!this.isHealthPremiumMonth()) return null;
         return this.calculatePremium(
             this.applicableHealthStandardAmount(),
             this.healthInsuranceEmployerRate(),
@@ -1072,21 +1141,25 @@ export class InsurancePremiumDetailPageComponent {
 
     // 厚生年金料（本人負担）
     pensionInsurancePremium = computed((): number | null => {
+        if (!this.isHealthPremiumMonth()) return null;
         return this.calculatePremium(this.applicableHealthStandardAmount(), this.pensionInsuranceRate);
     });
 
     // 厚生年金料（会社負担）
     pensionInsuranceEmployerPremium = computed((): number | null => {
+        if (!this.isHealthPremiumMonth()) return null;
         return this.calculatePremium(this.applicableHealthStandardAmount(), this.pensionInsuranceRate);
     });
 
     // 介護保険料（本人負担）
     careInsurancePremium = computed((): number | null => {
+        if (!this.isCarePremiumMonth()) return null;
         return this.calculatePremium(this.applicableHealthStandardAmount(), this.careInsuranceRate());
     });
 
     // 介護保険料（会社負担）
     careInsuranceEmployerPremium = computed((): number | null => {
+        if (!this.isCarePremiumMonth()) return null;
         return this.calculatePremium(
             this.applicableHealthStandardAmount(),
             this.careInsuranceEmployerRate(),
@@ -1241,16 +1314,19 @@ export class InsurancePremiumDetailPageComponent {
     // 賞与に対する保険料
     // 健康保険料（本人負担）
     healthInsuranceBonusPremium = computed((): number | null => {
+        if (!this.isHealthPremiumMonth()) return null;
         return this.calculatePremium(this.getPreviewStandardBonusAmount(), this.healthInsuranceRate());
     })
 
     // 厚生年金料（本人負担）
     pensionInsuranceBonusPremium = computed((): number | null => {
+        if (!this.isHealthPremiumMonth()) return null;
         return this.calculatePremium(this.getPreviewStandardBonusAmount(), this.pensionInsuranceRate);
     })
 
     // 介護保険料（本人負担）
     careInsuranceBonusPremium = computed((): number | null => {
+        if (!this.isCarePremiumMonth()) return null;
         return this.calculatePremium(this.getPreviewStandardBonusAmount(), this.careInsuranceRate());
     })
 

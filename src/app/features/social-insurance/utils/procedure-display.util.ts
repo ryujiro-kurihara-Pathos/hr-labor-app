@@ -1,6 +1,7 @@
 import { Timestamp } from 'firebase/firestore';
 
 import { Employee } from '../../employee/models/employee.models';
+import { lossDateFromRetirementDate } from './insurance-premium-period.util';
 import {
     LOSS_REASON_LABELS,
     LossReason,
@@ -136,6 +137,12 @@ export function lossReasonLabel(reason: LossReason | null | undefined): string {
     return LOSS_REASON_LABELS[reason];
 }
 
+export type ResolveLossDateOptions = {
+    lossReason?: LossReason | null;
+    /** 退職日（YYYY-MM-DD）。退職の場合は翌日を資格喪失日とする */
+    retiredDate?: string | null;
+};
+
 /** 健康保険・厚生年金の喪失日、手続き発生日の順で表示用の喪失日を解決する */
 export function employeeAddressLabel(employee: Employee): string {
     const parts = [
@@ -152,6 +159,17 @@ export function resolveLossDate(
     healthInsuranceEndDate: string | null | undefined,
     pensionInsuranceEndDate: string | null | undefined,
     occurredDate: string | null | undefined,
+    options?: ResolveLossDateOptions,
 ): string | null {
-    return healthInsuranceEndDate || pensionInsuranceEndDate || occurredDate || null;
+    if (healthInsuranceEndDate?.trim()) return healthInsuranceEndDate.trim();
+    if (pensionInsuranceEndDate?.trim()) return pensionInsuranceEndDate.trim();
+
+    if (options?.lossReason === 'retirement') {
+        const retirementDate = options.retiredDate?.trim() || occurredDate?.trim();
+        if (retirementDate) {
+            return lossDateFromRetirementDate(retirementDate);
+        }
+    }
+
+    return occurredDate?.trim() || null;
 }

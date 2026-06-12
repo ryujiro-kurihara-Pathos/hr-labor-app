@@ -26,6 +26,8 @@ import {
 
     updateDoc,
 
+    deleteDoc,
+
 } from 'firebase/firestore';
 
 
@@ -39,6 +41,8 @@ import {
     QualificationProcedureData,
 } from '../models/procedures.model';
 import { hasSavedQualificationData } from '../utils/qualification-procedure-data.util';
+import { EmployeeService } from '../../employee/services/employee.service';
+import { dateStringFromTimestamp } from '../utils/insurance-premium-period.util';
 import { resolveLossDate, todayDateString } from '../utils/procedure-display.util';
 import { SocialInsuranceStatusService } from './social-insurance-status.service';
 
@@ -54,6 +58,7 @@ import { SocialInsuranceStatusService } from './social-insurance-status.service'
 
 export class SocialInsuranceProcedureService {
     private readonly socialInsuranceStatusService = inject(SocialInsuranceStatusService);
+    private readonly employeeService = inject(EmployeeService);
 
     private readonly collectionName = 'socialInsuranceProcedures';
 
@@ -246,6 +251,19 @@ export class SocialInsuranceProcedureService {
 
     }
 
+    async listQualificationProceduresByCompanyId(companyId: string): Promise<Procedure[]> {
+        const docRef = collection(db, this.collectionName);
+        const q = query(
+            docRef,
+            where('companyId', '==', companyId),
+            where('procedureType', '==', 'qualification'),
+        );
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map((docSnap) =>
+            this.toProcedure(docSnap.id, docSnap.data() as Record<string, unknown>),
+        );
+    }
+
     // employeeIdから資格取得手続きを取得
     async getQualificationProcedureByEmployeeId(employeeId: string, companyId: string): Promise<Procedure | null> {
 
@@ -338,6 +356,20 @@ export class SocialInsuranceProcedureService {
         return this.toProcedure(snapshot.docs[0].id, snapshot.docs[0].data() as Record<string, unknown>);
     }
 
+    /** 未提出の手続きを削除 */
+    async deleteProcedure(procedureId: string): Promise<void> {
+        const existing = await this.getProcedureById(procedureId);
+        if (!existing) {
+            throw new Error('手続きが見つかりませんでした');
+        }
+        if (existing.status === 'completed') {
+            throw new Error('提出済みの手続きは削除できません');
+        }
+
+        const docRef = doc(db, this.collectionName, procedureId);
+        await deleteDoc(docRef);
+    }
+
     // 手続きを更新
     async updateProcedure(procedure: Procedure): Promise<void> {
 
@@ -388,10 +420,17 @@ export class SocialInsuranceProcedureService {
             const status = await this.socialInsuranceStatusService.getInsuranceStatusByEmployeeId(
                 procedure.employeeId,
             );
+            const employee = procedure.employeeId
+                ? await this.employeeService.getEmployeeById(procedure.employeeId)
+                : null;
             const lossDate = resolveLossDate(
                 status?.healthInsuranceEndDate,
                 status?.pensionInsuranceEndDate,
                 procedure.occurredDate,
+                {
+                    lossReason: procedure.lossReason,
+                    retiredDate: dateStringFromTimestamp(employee?.retiredDate ?? null),
+                },
             );
             if (lossDate) {
                 await this.socialInsuranceStatusService.syncLossDates(procedure.employeeId, lossDate);

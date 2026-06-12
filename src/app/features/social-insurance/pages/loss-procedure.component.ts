@@ -1,4 +1,5 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { Timestamp } from 'firebase/firestore';
 
 import { Employee } from '../../employee/models/employee.models';
 import { Office } from '../../company/models/office.model';
@@ -39,10 +40,18 @@ export class LossProcedureComponent {
 
     lossDate = computed(() => {
         const status = this.socialInsuranceStatus();
+        const procedure = this.procedure();
+        const employee = this.employee();
         return resolveLossDate(
             status?.healthInsuranceEndDate,
             status?.pensionInsuranceEndDate,
-            this.procedure().occurredDate,
+            procedure.occurredDate,
+            {
+                lossReason: procedure.lossReason,
+                retiredDate: employee.retiredDate
+                    ? this.retiredDateString(employee.retiredDate)
+                    : null,
+            },
         );
     });
 
@@ -63,6 +72,14 @@ export class LossProcedureComponent {
 
     officeSymbolSuffixChars(): string[] {
         return splitOfficeSymbol(this.office().officeSymbol).suffix;
+    }
+
+    private retiredDateString(retiredDate: Timestamp): string {
+        const date = retiredDate.toDate();
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
     }
 
     async submitProcedure(): Promise<void> {

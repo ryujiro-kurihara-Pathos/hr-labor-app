@@ -1,1 +1,372 @@
-<h1>プロフィール</h1>
+<div class="profile-page">
+    @if (isLoading()) {
+        <p class="loading">読み込み中...</p>
+    } @else if (errorMessage() && !currentUser()) {
+        <p class="error">{{ errorMessage() }}</p>
+    } @else if (currentUser(); as user) {
+        <header class="page-header">
+            <h1>プロフィール</h1>
+            <p class="page-note">アカウント情報と所属を確認できます。</p>
+        </header>
+
+        @if (errorMessage()) {
+            <p class="alert alert-error">{{ errorMessage() }}</p>
+        }
+
+        <section class="hero-card">
+            <span class="avatar" aria-hidden="true">{{ userInitial() }}</span>
+            <div class="hero-body">
+                <p class="hero-kicker">ログイン中のアカウント</p>
+                <h2 class="hero-name">{{ displayName() }}</h2>
+                <p class="hero-email">{{ user.email }}</p>
+                <div class="hero-badges">
+                    <span class="badge role" [class.admin]="user.role === 'admin'">
+                        {{ roleLabel(user.role) }}
+                    </span>
+                    <span
+                        class="badge status"
+                        [class.active]="user.status === 'active'"
+                        [class.inactive]="user.status === 'inactive'"
+                    >
+                        {{ statusLabel(user.status) }}
+                    </span>
+                </div>
+            </div>
+        </section>
+
+        <div class="content-grid">
+            <section class="info-card">
+                <h3 class="card-title">アカウント情報</h3>
+                <dl class="info-dl">
+                    <div class="info-row">
+                        <dt>氏名</dt>
+                        <dd>{{ displayName() }}</dd>
+                    </div>
+                    <div class="info-row">
+                        <dt>メールアドレス</dt>
+                        <dd class="mono">{{ user.email }}</dd>
+                    </div>
+                    <div class="info-row">
+                        <dt>ユーザーID</dt>
+                        <dd class="mono muted">{{ user.uid }}</dd>
+                    </div>
+                    <div class="info-row">
+                        <dt>権限</dt>
+                        <dd>{{ roleLabel(user.role) }}</dd>
+                    </div>
+                    <div class="info-row">
+                        <dt>ステータス</dt>
+                        <dd>{{ statusLabel(user.status) }}</dd>
+                    </div>
+                    <div class="info-row">
+                        <dt>登録日時</dt>
+                        <dd>{{ formatDateTime(user.createdAt) }}</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="info-card">
+                <h3 class="card-title">所属</h3>
+                <dl class="info-dl">
+                    <div class="info-row">
+                        <dt>会社</dt>
+                        <dd>
+                            @if (companyName() !== '—') {
+                                <a routerLink="/company" class="text-link">{{ companyName() }}</a>
+                            } @else {
+                                —
+                            }
+                        </dd>
+                    </div>
+                    <div class="info-row">
+                        <dt>紐づく従業員</dt>
+                        <dd>
+                            @if (linkedEmployee(); as employee) {
+                                <a [routerLink]="['/employees', employee.id]" class="text-link">
+                                    {{ employee.lastName }} {{ employee.firstName }}
+                                </a>
+                                @if (employee.employeeNumber) {
+                                    <span class="sub-note">（{{ employee.employeeNumber }}）</span>
+                                }
+                            } @else {
+                                <span class="muted">未紐づけ</span>
+                            }
+                        </dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="actions-card">
+            <h3 class="card-title">アカウント操作</h3>
+            <p class="actions-note">別のアカウントで利用する場合はログアウトしてください。</p>
+            <button
+                type="button"
+                class="btn logout-btn"
+                (click)="onLogout()"
+                [disabled]="isLoggingOut()"
+            >
+                {{ isLoggingOut() ? 'ログアウト中...' : 'ログアウト' }}
+            </button>
+        </section>
+    }
+</div>
+
+<style>
+    .profile-page {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 8px 0 40px;
+    }
+
+    .page-header h1 {
+        margin: 0 0 8px;
+        font-size: 22px;
+    }
+
+    .page-note {
+        margin: 0;
+        color: #6b7280;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    .loading {
+        color: #6b7280;
+        font-size: 14px;
+    }
+
+    .error {
+        color: #b91c1c;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .alert {
+        margin: 16px 0 0;
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-size: 14px;
+    }
+
+    .alert-error {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #b91c1c;
+    }
+
+    .hero-card {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        margin-top: 24px;
+        padding: 24px;
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 55%, #fff 100%);
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    }
+
+    .avatar {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 72px;
+        height: 72px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%);
+        color: #fff;
+        font-size: 28px;
+        font-weight: 800;
+        flex-shrink: 0;
+        box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
+    }
+
+    .hero-body {
+        min-width: 0;
+    }
+
+    .hero-kicker {
+        margin: 0 0 4px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #2563eb;
+        letter-spacing: 0.04em;
+    }
+
+    .hero-name {
+        margin: 0;
+        font-size: 24px;
+        line-height: 1.3;
+        color: #111827;
+    }
+
+    .hero-email {
+        margin: 6px 0 12px;
+        font-size: 14px;
+        color: #6b7280;
+        word-break: break-all;
+    }
+
+    .hero-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .badge.role {
+        background: #e5e7eb;
+        color: #374151;
+    }
+
+    .badge.role.admin {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .badge.status.active {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .badge.status.inactive {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .content-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 16px;
+        margin-top: 20px;
+    }
+
+    @media (min-width: 640px) {
+        .content-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+
+    .info-card,
+    .actions-card {
+        padding: 20px;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        background: #fff;
+    }
+
+    .actions-card {
+        margin-top: 16px;
+    }
+
+    .card-title {
+        margin: 0 0 14px;
+        font-size: 15px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .info-dl {
+        margin: 0;
+    }
+
+    .info-row {
+        display: grid;
+        grid-template-columns: 108px 1fr;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid #f3f4f6;
+        font-size: 14px;
+    }
+
+    .info-row:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    .info-row:first-child {
+        padding-top: 0;
+    }
+
+    .info-row dt {
+        margin: 0;
+        color: #6b7280;
+        font-weight: 600;
+    }
+
+    .info-row dd {
+        margin: 0;
+        color: #111827;
+        word-break: break-word;
+    }
+
+    .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 13px;
+    }
+
+    .muted {
+        color: #9ca3af;
+    }
+
+    .sub-note {
+        display: block;
+        margin-top: 2px;
+        font-size: 12px;
+        color: #6b7280;
+    }
+
+    .text-link {
+        color: #2563eb;
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .text-link:hover {
+        text-decoration: underline;
+    }
+
+    .actions-note {
+        margin: 0 0 14px;
+        font-size: 13px;
+        color: #6b7280;
+        line-height: 1.6;
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 40px;
+        padding: 0 18px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    .logout-btn {
+        border: 1px solid #fecaca;
+        background: #fff;
+        color: #b91c1c;
+    }
+
+    .logout-btn:hover:not(:disabled) {
+        background: #fef2f2;
+        border-color: #fca5a5;
+    }
+
+    .logout-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+</style>

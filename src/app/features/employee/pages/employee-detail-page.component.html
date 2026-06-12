@@ -6,195 +6,225 @@
         <a routerLink="/employees" class="back-link">従業員一覧へ</a>
     } @else {
         <div class="employee-card">
+            <a routerLink="/employees" class="back-link">← 従業員一覧</a>
+
             <div class="page-header">
-                <div class="page-header-title">
-                    <h1>従業員詳細</h1>
-                    <span
-                        class="status-badge"
-                        [class.retired]="employee()!.status === 'retired'"
-                    >
-                        {{ statusLabel(employee()!.status) }}
-                    </span>
+                <div class="profile-head">
+                    @if (isEditing()) {
+                        <h1>従業員情報の編集</h1>
+                        <p class="profile-sub">{{ lastName }} {{ firstName }}</p>
+                    } @else {
+                        <h1>{{ employee()!.lastName }} {{ employee()!.firstName }}</h1>
+                        @if (employee()!.lastNameKana || employee()!.firstNameKana) {
+                            <p class="profile-kana">
+                                {{ employee()!.lastNameKana }} {{ employee()!.firstNameKana }}
+                            </p>
+                        }
+                        <div class="profile-meta">
+                            <span class="meta-chip">社員番号 {{ employee()!.employeeNumber || '—' }}</span>
+                            <span
+                                class="status-badge"
+                                [class.retired]="isFullyRetired(employee()!)"
+                                [class.pending-retirement]="isPendingRetirement(employee()!)"
+                            >
+                                {{ employeeStatusLabel(employee()!) }}
+                            </span>
+                            @if (officeName()) {
+                                <span class="meta-chip muted">{{ officeName() }}</span>
+                            }
+                        </div>
+                    }
                 </div>
-                @if (!isEditing() && isActiveEmployee()) {
-                    <button type="button" class="btn edit-btn" (click)="startEdit()">編集</button>
+                @if (!isEditing()) {
+                    <div class="header-actions">
+                        <a [routerLink]="['/premium', employee()!.id]" class="btn sub-btn">保険料計算</a>
+                        @if (isActiveEmployee()) {
+                            <button type="button" class="btn primary-btn" (click)="startEdit()">編集</button>
+                        }
+                    </div>
                 }
             </div>
 
             @if (isEditing()) {
-                <div class="form-field">
-                    <label for="last-name">姓</label>
-                    <input id="last-name" type="text" name="lastName" [(ngModel)]="lastName" />
-                </div>
-                <div class="form-field">
-                    <label for="first-name">名</label>
-                    <input id="first-name" type="text" name="firstName" [(ngModel)]="firstName" />
-                </div>
-                <div class="form-field">
-                    <label for="last-name-kana">姓（カナ）</label>
-                    <input id="last-name-kana" type="text" name="lastNameKana" [(ngModel)]="lastNameKana" />
-                </div>
-                <div class="form-field">
-                    <label for="first-name-kana">名（カナ）</label>
-                    <input id="first-name-kana" type="text" name="firstNameKana" [(ngModel)]="firstNameKana" />
-                </div>
-                <div class="form-field">
-                    <label for="my-number">マイナンバー</label>
-                    <input
-                        id="my-number"
-                        type="text"
-                        name="myNumber"
-                        [(ngModel)]="myNumber"
-                        inputmode="numeric"
-                        autocomplete="off"
-                        placeholder="12桁（ハイフンなし）"
-                    />
-                </div>
-                <div class="form-field">
-                    <label for="gender">性別</label>
-                    <select id="gender" name="gender" [(ngModel)]="gender">
-                        <option value="male">男性</option>
-                        <option value="female">女性</option>
-                    </select>
-                </div>
-                <div class="form-field">
-                    <label for="employee-number">社員番号</label>
-                    <input id="employee-number" type="text" name="employeeNumber" [(ngModel)]="employeeNumber" />
-                </div>
-                <div class="form-field">
-                    <label for="phone-number">電話番号</label>
-                    <input id="phone-number" type="text" name="phoneNumber" [(ngModel)]="phoneNumber" />
-                </div>
-                <div class="form-field">
-                    <label for="postal-code">郵便番号</label>
-                    <input id="postal-code" type="text" name="postalCode" [(ngModel)]="postalCode" placeholder="例: 1000001" />
-                </div>
-                <div class="form-field">
-                    <label for="prefecture">都道府県</label>
-                    <input id="prefecture" type="text" name="prefecture" [(ngModel)]="prefecture" />
-                </div>
-                <div class="form-field">
-                    <label for="city">市区町村</label>
-                    <input id="city" type="text" name="city" [(ngModel)]="city" />
-                </div>
-                <div class="form-field">
-                    <label for="street-address">丁目番地</label>
-                    <input id="street-address" type="text" name="streetAddress" [(ngModel)]="streetAddress" />
-                </div>
-                <div class="form-field">
-                    <label for="building-name">建物名・号室</label>
-                    <input id="building-name" type="text" name="buildingName" [(ngModel)]="buildingName" />
-                </div>
-                <div class="form-field">
-                    <label for="birth-date">生年月日</label>
-                    <input id="birth-date" type="date" name="birthDate" [(ngModel)]="birthDate" />
-                </div>
-                <div class="form-field">
-                    <label for="joined-date">入社日</label>
-                    <input id="joined-date" type="date" name="joinedDate" [(ngModel)]="joinedDate" />
-                </div>
-                <div class="form-field">
-                    <label for="department">部署</label>
-                    <input id="department" type="text" name="department" [(ngModel)]="department" />
-                </div>
-                <div class="form-field">
-                    <label for="position">役職</label>
-                    <input id="position" type="text" name="position" [(ngModel)]="position" />
-                </div>
-                <div class="form-field">
-                    <label for="dependents">扶養家族</label>
-                </div>
-            } @else {
-                <dl class="detail-list">
-                    <div class="detail-row">
-                        <dt>氏名</dt>
-                        <dd>{{ employee()!.lastName }} {{ employee()!.firstName }}</dd>
-                    </div>
-                    <div class="detail-row">
-                        <dt>氏名（カナ）</dt>
-                        <dd>{{ employee()!.lastNameKana || '—' }} {{ employee()!.firstNameKana || '—' }}</dd>
-                    </div>
-                    <div class="detail-row">
-                        <dt>マイナンバー</dt>
-                        <dd>{{ employee()!.myNumber || '—' }}</dd>
-                    </div>
-                    <div class="detail-row">
-                        <dt>性別</dt>
-                        <dd>{{ genderLabel(employee()!.gender) }}</dd>
-                    </div>
-                    <div class="detail-row">
-                        <dt>社員番号</dt>
-                        <dd>{{ employee()!.employeeNumber || '—' }}</dd>
-                    </div>
-                    <div class="detail-row">
-                        <dt>電話番号</dt>
-                        <dd>{{ employee()!.phoneNumber || '—' }}</dd>
-                    </div>
-                    <div class="detail-row">
-                        <dt>住所</dt>
-                        <dd>{{ formatAddress(employee()!) }}</dd>
-                    </div>
-                    <div class="detail-row">
-                        <dt>事業所</dt>
-                        <dd>{{ officeName() }}</dd>
-                    </div>
-                    <div class="detail-row">
-                        <dt>生年月日</dt>
-                        <dd>{{ employee()!.birthDate }}</dd>
-                        <dd>(満{{ age() }}歳)</dd>
-                    </div>
-                    <div class="detail-row">
-                        <dt>入社日</dt>
-                        <dd>{{ employee()!.joinedDate }}</dd>
-                    </div>
-                    <div class="detail-row">
-                        <dt>部署</dt>
-                        <dd>{{ employee()!.department || '—' }}</dd>
-                    </div>
-                    <div class="detail-row">
-                        <dt>役職</dt>
-                        <dd>{{ employee()!.position || '—' }}</dd>
-                    </div>
-                    <div class="detail-row">
-                        <dt>扶養家族</dt>
-                        <dd>{{ dependents().length }}人</dd>
-                        <dd>
-                            @if (openDependentChangeProcedure()) {
-                                <a
-                                    [routerLink]="['/procedures', openDependentChangeProcedure()!.id]"
-                                    class="btn sub-btn"
-                                >
-                                    扶養変更届へ
-                                </a>
-                            } @else {
-                                <button type="button" class="btn sub-btn" (click)="createDependentProcedure()">
-                                    扶養家族を変更する
-                                </button>
-                            }
-                        </dd>
-                    </div>
-                    <div class="detail-row">
-                        <dt>在籍状態</dt>
-                        <dd>{{ statusLabel(employee()!.status) }}</dd>
-                    </div>
-                    @if (employee()!.status === 'retired') {
-                        <div class="detail-row">
-                            <dt>退職日</dt>
-                            <dd>{{ formatRetiredDate(employee()!.retiredDate) }}</dd>
+                <section class="profile-section">
+                    <h2 class="section-title">基本情報</h2>
+                    <div class="form-grid-two">
+                        <div class="form-field">
+                            <label for="last-name">姓</label>
+                            <input id="last-name" type="text" name="lastName" [(ngModel)]="lastName" />
                         </div>
-                    }
-                </dl>
+                        <div class="form-field">
+                            <label for="first-name">名</label>
+                            <input id="first-name" type="text" name="firstName" [(ngModel)]="firstName" />
+                        </div>
+                        <div class="form-field">
+                            <label for="last-name-kana">姓（カナ）</label>
+                            <input id="last-name-kana" type="text" name="lastNameKana" [(ngModel)]="lastNameKana" />
+                        </div>
+                        <div class="form-field">
+                            <label for="first-name-kana">名（カナ）</label>
+                            <input id="first-name-kana" type="text" name="firstNameKana" [(ngModel)]="firstNameKana" />
+                        </div>
+                        <div class="form-field">
+                            <label for="gender">性別</label>
+                            <select id="gender" name="gender" [(ngModel)]="gender">
+                                <option value="male">男性</option>
+                                <option value="female">女性</option>
+                            </select>
+                        </div>
+                        <div class="form-field">
+                            <label for="birth-date">生年月日</label>
+                            <input id="birth-date" type="date" name="birthDate" [(ngModel)]="birthDate" />
+                        </div>
+                        <div class="form-field">
+                            <label for="employee-number">社員番号</label>
+                            <input id="employee-number" type="text" name="employeeNumber" [(ngModel)]="employeeNumber" />
+                        </div>
+                        <div class="form-field">
+                            <label for="my-number">マイナンバー</label>
+                            <input
+                                id="my-number"
+                                type="text"
+                                name="myNumber"
+                                [(ngModel)]="myNumber"
+                                inputmode="numeric"
+                                autocomplete="off"
+                                placeholder="12桁（ハイフンなし）"
+                            />
+                        </div>
+                    </div>
+                </section>
+
+                <section class="profile-section">
+                    <h2 class="section-title">勤務・所属</h2>
+                    <div class="form-grid-two">
+                        <div class="form-field">
+                            <label for="joined-date">入社日</label>
+                            <input id="joined-date" type="date" name="joinedDate" [(ngModel)]="joinedDate" />
+                        </div>
+                        <div class="form-field">
+                            <label for="department">部署</label>
+                            <input id="department" type="text" name="department" [(ngModel)]="department" />
+                        </div>
+                        <div class="form-field">
+                            <label for="position">役職</label>
+                            <input id="position" type="text" name="position" [(ngModel)]="position" />
+                        </div>
+                    </div>
+                </section>
+
+                <section class="profile-section">
+                    <h2 class="section-title">連絡先・住所</h2>
+                    <div class="form-grid-two">
+                        <div class="form-field">
+                            <label for="phone-number">電話番号</label>
+                            <input id="phone-number" type="text" name="phoneNumber" [(ngModel)]="phoneNumber" />
+                        </div>
+                        <div class="form-field">
+                            <label for="postal-code">郵便番号</label>
+                            <input id="postal-code" type="text" name="postalCode" [(ngModel)]="postalCode" placeholder="例: 1000001" />
+                        </div>
+                        <div class="form-field">
+                            <label for="prefecture">都道府県</label>
+                            <input id="prefecture" type="text" name="prefecture" [(ngModel)]="prefecture" />
+                        </div>
+                        <div class="form-field">
+                            <label for="city">市区町村</label>
+                            <input id="city" type="text" name="city" [(ngModel)]="city" />
+                        </div>
+                        <div class="form-field form-field-wide">
+                            <label for="street-address">丁目番地</label>
+                            <input id="street-address" type="text" name="streetAddress" [(ngModel)]="streetAddress" />
+                        </div>
+                        <div class="form-field form-field-wide">
+                            <label for="building-name">建物名・号室</label>
+                            <input id="building-name" type="text" name="buildingName" [(ngModel)]="buildingName" />
+                        </div>
+                    </div>
+                </section>
+            } @else {
+                <section class="profile-section">
+                    <h2 class="section-title">基本情報</h2>
+                    <dl class="detail-grid">
+                        <div class="detail-row">
+                            <dt>性別</dt>
+                            <dd>{{ genderLabel(employee()!.gender) }}</dd>
+                        </div>
+                        <div class="detail-row">
+                            <dt>生年月日</dt>
+                            <dd>
+                                {{ formatInsuranceDate(employee()!.birthDate) }}
+                                @if (age() !== null) {
+                                    <span class="sub-text">（満{{ age() }}歳）</span>
+                                }
+                            </dd>
+                        </div>
+                        <div class="detail-row">
+                            <dt>入社日</dt>
+                            <dd>{{ formatInsuranceDate(employee()!.joinedDate) }}</dd>
+                        </div>
+                        <div class="detail-row">
+                            <dt>部署 / 役職</dt>
+                            <dd>
+                                {{ employee()!.department || '—' }}
+                                @if (employee()!.position) {
+                                    <span class="sub-text">／ {{ employee()!.position }}</span>
+                                }
+                            </dd>
+                        </div>
+                        <div class="detail-row">
+                            <dt>電話番号</dt>
+                            <dd>{{ employee()!.phoneNumber || '—' }}</dd>
+                        </div>
+                        <div class="detail-row">
+                            <dt>マイナンバー</dt>
+                            <dd class="mono">{{ employee()!.myNumber || '—' }}</dd>
+                        </div>
+                    </dl>
+                </section>
+
+                <section class="profile-section">
+                    <h2 class="section-title">住所</h2>
+                    <p class="address-block">{{ formatAddress(employee()!) }}</p>
+                </section>
+
+                <section class="profile-section">
+                    <h2 class="section-title">扶養家族・在籍</h2>
+                    <dl class="detail-grid">
+                        <div class="detail-row">
+                            <dt>扶養家族</dt>
+                            <dd class="inline-action">
+                                <span>{{ dependents().length }}人</span>
+                                @if (openDependentChangeProcedure()) {
+                                    <a
+                                        [routerLink]="['/procedures', openDependentChangeProcedure()!.id]"
+                                        class="link-btn"
+                                    >
+                                        扶養変更届へ
+                                    </a>
+                                } @else {
+                                    <button type="button" class="link-btn" (click)="createDependentProcedure()">
+                                        扶養家族を変更
+                                    </button>
+                                }
+                            </dd>
+                        </div>
+                        <div class="detail-row">
+                            <dt>在籍状態</dt>
+                            <dd>{{ employeeStatusLabel(employee()!) }}</dd>
+                        </div>
+                        @if (employee()!.retiredDate) {
+                            <div class="detail-row">
+                                <dt>退職日</dt>
+                                <dd>{{ formatRetiredDate(employee()!.retiredDate) }}</dd>
+                            </div>
+                        }
+                    </dl>
+                </section>
             }
 
             @if (!isEditing()) {
-                <section class="insurance-link-section">
-                    <h2 class="section-title">報酬・標準報酬月額</h2>
-                    <a [routerLink]="['/premium', employee()!.id]" class="btn sub-btn insurance-link-btn">
-                        保険料計算へ
-                    </a>
-                </section>
-
-                <section class="retire-section">
+                <section class="retire-section action-panel">
                     <h2 class="section-title">在籍・退職</h2>
                     @if (isActiveEmployee()) {
                         @if (!isRetireFormOpen()) {
@@ -283,8 +313,15 @@
                 </section>
             }
 
-            <section id="social-insurance" class="social-insurance-section">
-            <h2 class="section-title">社会保険（加入要件入力・参考判定）</h2>
+            <section id="social-insurance" class="social-insurance-section profile-section">
+            <h2 class="section-title">社会保険</h2>
+            <p class="section-note">加入要件の入力と参考判定。資格日は手続き提出で自動登録されます。</p>
+            <app-part-time-insurance-warning
+                [employeeId]="employee()?.id ?? null"
+                [employmentType]="employmentType"
+                [status]="socialInsuranceStatus()"
+                [judgmentInput]="partTimeJudgmentInput()"
+            />
             @if (isEditing() && isActiveEmployee()) {
                 <p class="insurance-judgment-note">
                     <span class="required-mark" aria-hidden="true">*</span> は健康保険・厚生年金の判定に必要な項目です
@@ -450,7 +487,7 @@
                     </span>
                 </div>
                 <div class="result-row">
-                    <span class="result-label">介護保険（年齢）</span>
+                    <span class="result-label">介護保険</span>
                     <span class="result-badge" [class.ok]="careInsuranceJudge() === 'active'" [class.ng]="careInsuranceJudge() === 'inactive'">
                         @if(isEditing()) {
                             {{ displayInsuranceStatus(careInsuranceJudge()) }}
@@ -463,32 +500,36 @@
 
             <h3 class="subsection-title">資格取得・喪失日</h3>
             @if (isEditing() && isActiveEmployee()) {
-                <div class="form-grid-two">
-                    <div class="form-field">
-                        <label for="health-start">健康保険 資格取得日</label>
-                        <input id="health-start" type="date" name="healthInsuranceStartDate" [(ngModel)]="healthInsuranceStartDate" />
+                <p class="insurance-date-note">資格取得日・喪失日は手続き提出で自動登録されます。</p>
+                <dl class="detail-list">
+                    <div class="detail-row">
+                        <dt>健康保険 資格取得日</dt>
+                        <dd>{{ formatHealthStartDateLabel() }}</dd>
                     </div>
-                    <div class="form-field">
-                        <label for="health-end">健康保険 資格喪失日</label>
-                        <input id="health-end" type="date" name="healthInsuranceEndDate" [(ngModel)]="healthInsuranceEndDate" />
+                    <div class="detail-row">
+                        <dt>健康保険 資格喪失日</dt>
+                        <dd>{{ formatHealthEndDateLabel() }}</dd>
                     </div>
-                    <div class="form-field">
-                        <label for="pension-start">厚生年金 資格取得日</label>
-                        <input id="pension-start" type="date" name="pensionInsuranceStartDate" [(ngModel)]="pensionInsuranceStartDate" />
+                    <div class="detail-row">
+                        <dt>厚生年金 資格取得日</dt>
+                        <dd>{{ formatPensionStartDateLabel() }}</dd>
                     </div>
-                    <div class="form-field">
-                        <label for="pension-end">厚生年金 資格喪失日</label>
-                        <input id="pension-end" type="date" name="pensionInsuranceEndDate" [(ngModel)]="pensionInsuranceEndDate" />
+                    <div class="detail-row">
+                        <dt>厚生年金 資格喪失日</dt>
+                        <dd>{{ formatPensionEndDateLabel() }}</dd>
                     </div>
-                    <div class="form-field">
-                        <label for="care-start">介護保険 対象開始日</label>
-                        <input id="care-start" type="date" name="careInsuranceStartDate" [(ngModel)]="careInsuranceStartDate" />
+                </dl>
+                <p class="insurance-date-note">介護保険は資格日と生年月日から自動算出されます。</p>
+                <dl class="detail-list">
+                    <div class="detail-row">
+                        <dt>対象日</dt>
+                        <dd>{{ formatCareStartDateLabel() }}</dd>
                     </div>
-                    <div class="form-field">
-                        <label for="care-end">介護保険 対象終了日</label>
-                        <input id="care-end" type="date" name="careInsuranceEndDate" [(ngModel)]="careInsuranceEndDate" />
+                    <div class="detail-row">
+                        <dt>喪失日</dt>
+                        <dd>{{ formatCareEndDateLabel() }}</dd>
                     </div>
-                </div>
+                </dl>
                 <div class="form-field">
                     <label for="insurance-memo">備考</label>
                     <textarea
@@ -503,27 +544,27 @@
                 <dl class="detail-list">
                     <div class="detail-row">
                         <dt>健康保険 資格取得日</dt>
-                        <dd>{{ formatInsuranceDate(healthInsuranceStartDate) }}</dd>
+                        <dd>{{ formatHealthStartDateLabel() }}</dd>
                     </div>
                     <div class="detail-row">
                         <dt>健康保険 資格喪失日</dt>
-                        <dd>{{ formatInsuranceDate(healthInsuranceEndDate) }}</dd>
+                        <dd>{{ formatHealthEndDateLabel() }}</dd>
                     </div>
                     <div class="detail-row">
                         <dt>厚生年金 資格取得日</dt>
-                        <dd>{{ formatInsuranceDate(pensionInsuranceStartDate) }}</dd>
+                        <dd>{{ formatPensionStartDateLabel() }}</dd>
                     </div>
                     <div class="detail-row">
                         <dt>厚生年金 資格喪失日</dt>
-                        <dd>{{ formatInsuranceDate(pensionInsuranceEndDate) }}</dd>
+                        <dd>{{ formatPensionEndDateLabel() }}</dd>
                     </div>
                     <div class="detail-row">
-                        <dt>介護保険 対象開始日</dt>
-                        <dd>{{ formatInsuranceDate(careInsuranceStartDate) }}</dd>
+                        <dt>対象日</dt>
+                        <dd>{{ formatCareStartDateLabel() }}</dd>
                     </div>
                     <div class="detail-row">
-                        <dt>介護保険 対象終了日</dt>
-                        <dd>{{ formatInsuranceDate(careInsuranceEndDate) }}</dd>
+                        <dt>喪失日</dt>
+                        <dd>{{ formatCareEndDateLabel() }}</dd>
                     </div>
                     <div class="detail-row">
                         <dt>備考</dt>
@@ -539,8 +580,8 @@
             }
             </section>
 
-            <section class="qualification-procedure-section">
-                <h2 class="section-title">手続き一覧</h2>
+            <section class="qualification-procedure-section profile-section">
+                <h2 class="section-title">手続き</h2>
 
                 <div class="qualification-procedure-box">
                     @if (isHealthInsuranceEligible()) {
@@ -671,7 +712,7 @@
 
 <style>
     .employee-detail-page {
-        max-width: 520px;
+        max-width: 760px;
         margin: 0 auto;
         padding: 24px 16px;
     }
@@ -689,24 +730,158 @@
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
     }
 
+    .back-link {
+        display: inline-block;
+        margin-bottom: 12px;
+        font-size: 13px;
+        color: #2563eb;
+        text-decoration: none;
+    }
+
+    .back-link:hover {
+        text-decoration: underline;
+    }
+
     .page-header {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        gap: 12px;
-        margin-bottom: 24px;
+        gap: 16px;
+        margin-bottom: 8px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #f3f4f6;
     }
 
-    .page-header-title {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 10px;
+    .profile-head {
+        min-width: 0;
     }
 
     h1 {
         margin: 0;
-        font-size: 22px;
+        font-size: 24px;
+        color: #111827;
+        line-height: 1.3;
+    }
+
+    .profile-kana,
+    .profile-sub {
+        margin: 4px 0 0;
+        font-size: 14px;
+        color: #6b7280;
+    }
+
+    .profile-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 12px;
+    }
+
+    .meta-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 6px;
+        background: #f3f4f6;
+        font-size: 12px;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .meta-chip.muted {
+        background: #eff6ff;
+        color: #1d4ed8;
+    }
+
+    .header-actions {
+        display: flex;
+        flex-shrink: 0;
+        gap: 8px;
+    }
+
+    .header-actions .btn {
+        flex: none;
+        height: 40px;
+        font-size: 14px;
+        text-decoration: none;
+    }
+
+    .profile-section {
+        padding-top: 24px;
+    }
+
+    .profile-section .section-title {
+        margin-top: 0;
+        margin-bottom: 14px;
+        font-size: 16px;
+    }
+
+    .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0 24px;
+        margin: 0;
+    }
+
+    .address-block {
+        margin: 0;
+        padding: 14px 16px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        font-size: 15px;
+        line-height: 1.6;
+        color: #111827;
+    }
+
+    .sub-text {
+        color: #6b7280;
+        font-size: 13px;
+    }
+
+    .mono {
+        font-family: ui-monospace, monospace;
+        font-size: 14px;
+        letter-spacing: 0.02em;
+    }
+
+    .inline-action {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .link-btn {
+        padding: 0;
+        border: none;
+        background: none;
+        color: #2563eb;
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    .link-btn:hover {
+        text-decoration: underline;
+    }
+
+    .action-panel {
+        margin-top: 24px;
+        padding: 16px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+    }
+
+    .action-panel .section-title {
+        margin-top: 0;
+    }
+
+    .form-field-wide {
+        grid-column: 1 / -1;
     }
 
     .status-badge {
@@ -725,24 +900,13 @@
         color: #4b5563;
     }
 
-    .insurance-link-section {
-        margin-bottom: 8px;
-        padding-top: 8px;
-        border-top: 1px solid #f3f4f6;
-    }
-
-    .insurance-link-btn {
-        display: inline-block;
-        text-align: center;
-        text-decoration: none;
-        flex: none;
-        padding: 10px 16px;
+    .status-badge.pending-retirement {
+        background: #fef3c7;
+        color: #92400e;
     }
 
     .retire-section {
-        margin-bottom: 8px;
-        padding-top: 8px;
-        border-top: 1px solid #f3f4f6;
+        margin-bottom: 0;
     }
 
     .qualification-procedure-section {
@@ -848,7 +1012,9 @@
 
     .section-title {
         margin: 28px 0 10px;
-        font-size: 18px;
+        font-size: 17px;
+        font-weight: 700;
+        color: #374151;
     }
 
     .section-note {
@@ -858,7 +1024,8 @@
         line-height: 1.5;
     }
 
-    .insurance-judgment-note {
+    .insurance-judgment-note,
+    .insurance-date-note {
         margin: 0 0 14px;
         padding: 10px 12px;
         background: #fffbeb;
@@ -975,16 +1142,6 @@
         font-weight: 600;
     }
 
-    .back-link {
-        font-size: 14px;
-        color: #2563eb;
-        text-decoration: none;
-    }
-
-    .back-link:hover {
-        text-decoration: underline;
-    }
-
     .detail-list {
         margin: 0;
     }
@@ -1067,11 +1224,6 @@
         cursor: not-allowed;
     }
 
-    .edit-btn {
-        background: #e5e7eb;
-        color: #333;
-    }
-
     .retire-btn {
         width: 100%;
         background: #fff;
@@ -1126,7 +1278,20 @@
     }
 
     @media (max-width: 640px) {
-        .form-grid-two {
+        .page-header {
+            flex-direction: column;
+        }
+
+        .header-actions {
+            width: 100%;
+        }
+
+        .header-actions .btn {
+            flex: 1;
+        }
+
+        .form-grid-two,
+        .detail-grid {
             grid-template-columns: 1fr;
         }
     }

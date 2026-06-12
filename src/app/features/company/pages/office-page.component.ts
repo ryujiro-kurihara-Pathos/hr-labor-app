@@ -4,6 +4,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { HealthInsuranceType, Office } from '../models/office.model';
 import { OfficeService } from '../services/office.service';
+import { ConfirmService } from '../../../shared/services/confirm.service';
 import {
     formatOfficeAddress,
     normalizeOfficeNumber,
@@ -20,7 +21,8 @@ import {
 export class OfficePageComponent {
     private readonly route = inject(ActivatedRoute);
     private readonly officeService = inject(OfficeService);
-    private readonly router = inject(Router);   
+    private readonly router = inject(Router);
+    private readonly confirmService = inject(ConfirmService);
 
     // 事業所
     office = signal<Office | null>(null);
@@ -178,11 +180,12 @@ export class OfficePageComponent {
 
     // 事業所の削除
     async deleteOffice(): Promise<void> {
-        // 事業所IDの取得
         const officeId = this.office()?.id;
-        if(!officeId) return;
+        if (!officeId) return;
 
-        // ローディング
+        const confirmed = await this.confirmService.confirmDelete();
+        if (!confirmed) return;
+
         this.isLoading.set(true);
 
         try {

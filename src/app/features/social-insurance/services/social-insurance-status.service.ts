@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 
 import {
     doc,
@@ -13,13 +13,21 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../../core/firebase';
 
+import { EmployeeService } from '../../employee/services/employee.service';
 import { SocialInsuranceStatus, SocialInsuranceStatusInput } from '../models/social-insurance-status.model';
+import {
+    computeCareInsurancePeriod,
+    currentYearMonth,
+    judgeCareInsuranceStatus,
+} from '../utils/care-insurance-period.util';
 
 @Injectable({
     providedIn: 'root',
 })
 
 export class SocialInsuranceStatusService {
+    private readonly employeeService = inject(EmployeeService);
+
     private normalizeStatus(id: string, data: Record<string, unknown>): SocialInsuranceStatus {
         return {
             id,
@@ -125,11 +133,16 @@ export class SocialInsuranceStatusService {
         const status = await this.getInsuranceStatusByEmployeeId(employeeId);
         if (!status) return;
 
-        await this.updateSocialInsuranceStatus(status.id, {
+        const nextInput: SocialInsuranceStatusInput = {
             ...this.toStatusInput(status),
             healthInsuranceStartDate: date,
             pensionInsuranceStartDate: date,
-        });
+        };
+
+        await this.updateSocialInsuranceStatus(
+            status.id,
+            await this.withSyncedCareInsuranceDates(employeeId, nextInput),
+        );
     }
 
     async syncLossDates(employeeId: string, lossDate: string): Promise<void> {
@@ -139,11 +152,59 @@ export class SocialInsuranceStatusService {
         const status = await this.getInsuranceStatusByEmployeeId(employeeId);
         if (!status) return;
 
-        await this.updateSocialInsuranceStatus(status.id, {
+        const nextInput: SocialInsuranceStatusInput = {
             ...this.toStatusInput(status),
             healthInsuranceEndDate: date,
             pensionInsuranceEndDate: date,
-        });
+        };
+
+        await this.updateSocialInsuranceStatus(
+            status.id,
+            await this.withSyncedCareInsuranceDates(employeeId, nextInput),
+        );
+    }
+
+    async clearLossDates(employeeId: string): Promise<void> {
+        const status = await this.getInsuranceStatusByEmployeeId(employeeId);
+        if (!status) return;
+        if (!status.healthInsuranceEndDate && !status.pensionInsuranceEndDate) return;
+
+        const nextInput: SocialInsuranceStatusInput = {
+            ...this.toStatusInput(status),
+            healthInsuranceEndDate: null,
+            pensionInsuranceEndDate: null,
+        };
+
+        await this.updateSocialInsuranceStatus(
+            status.id,
+            await this.withSyncedCareInsuranceDates(employeeId, nextInput),
+        );
+    }
+
+    async withSyncedCareInsuranceDates(
+        employeeId: string,
+        input: SocialInsuranceStatusInput,
+    ): Promise<SocialInsuranceStatusInput> {
+        const employee = await this.employeeService.getEmployeeById(employeeId);
+        if (!employee) return input;
+
+        const period = computeCareInsurancePeriod(
+            input.healthInsuranceStartDate,
+            input.healthInsuranceEndDate,
+            employee.birthDate,
+        );
+
+        return {
+            ...input,
+            careInsuranceStartDate: period.startDate,
+            careInsuranceEndDate: period.endDate,
+            careInsuranceStatus: judgeCareInsuranceStatus(
+                currentYearMonth(),
+                input.healthInsuranceStartDate,
+                input.healthInsuranceEndDate,
+                employee.birthDate,
+            ),
+        };
     }
 
     // 社会保険情報を取得

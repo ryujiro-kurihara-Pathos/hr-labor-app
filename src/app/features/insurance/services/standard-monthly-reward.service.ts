@@ -14,7 +14,11 @@ import {
 } from 'firebase/firestore';
 
 import { db } from '../../../core/firebase';
-import { StandardMonthlyReward, StandardMonthlyRewardInput } from '../models/standard-monthly-reward.model';
+import {
+    StandardMonthlyReward,
+    StandardMonthlyRewardInput,
+    StandardMonthlyRewardStatus,
+} from '../models/standard-monthly-reward.model';
 import { detectFixedWageChanges } from '../utils/fixed-wage-change.util';
 import { addMonthsToYearMonth } from '../utils/reward-target-month.util';
 import { StandardMonthlyRewardCalculatorService } from './standard-monthly-reward-calculator.service';
@@ -73,16 +77,31 @@ export class StandardMonthlyRewardService {
         return results;
     }
 
-    // 標準報酬月額を登録・更新
-    async upsert(input: StandardMonthlyRewardInput): Promise<StandardMonthlyReward> {
-        const monthlyReward = this.sumRewardFields(input);
-        const calc = this.calculator.calculate(monthlyReward);
+    /** 下書きとして保存（入力途中でも保存可能） */
+    async saveDraft(input: StandardMonthlyRewardInput): Promise<StandardMonthlyReward> {
+        return this.upsert(input, 'draft');
+    }
 
-        if (monthlyReward <= 0) {
-            throw new Error('報酬月額を入力してください');
-        }
-        if (!calc.health || !calc.pension) {
-            throw new Error('等級を判定できませんでした');
+    /** 確定として保存（等級算定のバリデーションあり） */
+    async confirm(input: StandardMonthlyRewardInput): Promise<StandardMonthlyReward> {
+        return this.upsert(input, 'confirmed');
+    }
+
+    // 標準報酬月額を登録・更新
+    async upsert(
+        input: StandardMonthlyRewardInput,
+        status: Extract<StandardMonthlyRewardStatus, 'draft' | 'confirmed'>,
+    ): Promise<StandardMonthlyReward> {
+        const monthlyReward = this.sumRewardFields(input);
+        const calc = monthlyReward > 0 ? this.calculator.calculate(monthlyReward) : null;
+
+        if (status === 'confirmed') {
+            if (monthlyReward <= 0) {
+                throw new Error('報酬月額を入力してください');
+            }
+            if (!calc?.health || !calc?.pension) {
+                throw new Error('等級を判定できませんでした');
+            }
         }
 
         const id = this.docId(input.employeeId, input.targetYearMonth);
@@ -113,12 +132,13 @@ export class StandardMonthlyRewardService {
             commissionPay: input.commissionPay,
             otherVariablePay: input.otherVariablePay,
             monthlyReward,
-            healthInsuranceGrade: calc.health.grade,
-            healthInsuranceStandardMonthlyAmount: calc.health.standardMonthlyAmount,
-            pensionInsuranceGrade: calc.pension.grade,
-            pensionInsuranceStandardMonthlyAmount: calc.pension.standardMonthlyAmount,
+            healthInsuranceGrade: calc?.health?.grade ?? 0,
+            healthInsuranceStandardMonthlyAmount: calc?.health?.standardMonthlyAmount ?? 0,
+            pensionInsuranceGrade: calc?.pension?.grade ?? 0,
+            pensionInsuranceStandardMonthlyAmount: calc?.pension?.standardMonthlyAmount ?? 0,
             fixedWageChanged: wageChange.fixedWageChanged,
             changedFixedWageFields: wageChange.changedFixedWageFields,
+            status,
         };
 
         if (!existing.exists()) {

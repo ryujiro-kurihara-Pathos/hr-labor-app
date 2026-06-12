@@ -16,6 +16,7 @@ import { StandardMonthlyRewardService } from '../services/standard-monthly-rewar
 import { StandardRemunerationDeterminationService } from '../services/standard-remuneration-determination.service';
 import { SocialInsuranceStatusService } from '../../social-insurance/services/social-insurance-status.service';
 import { addMonthsToYearMonth, isRewardTargetMonth } from '../utils/reward-target-month.util';
+import { isRewardConfirmed } from '../utils/reward-status.util';
 
 export type InsurancePremiumListRow = {
     employee: Employee;
@@ -175,7 +176,7 @@ export class InsurancePremiumPageComponent {
                 employee,
                 reward,
                 effective,
-                isRegistered: reward !== null,
+                isRegistered: isRewardConfirmed(reward),
                 isTargetMonth,
             };
         });

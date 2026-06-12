@@ -42,6 +42,7 @@ import { BonusRewardService } from '../../bonus/services/bonus-reward.service';
 import { SocialInsuranceStatusService } from '../services/social-insurance-status.service';
 import { StandardMonthlyReward } from '../../insurance/models/standard-monthly-reward.model';
 import { BonusReward } from '../../bonus/models/bonus-reward.model';
+import { ProcedureCsvExportContext } from '../utils/procedure-csv-export.util';
 
 type StandardRemunerationAmounts = {
     health: number;
@@ -118,11 +119,12 @@ export class EmployeeProcedureSheetComponent {
     revisionReason = signal<string | null>(null);
 
     // 賞与支払
-    // 賞与額
     bonusPaymentAmount = signal<number | null>(null);
-    // 賞与額の取得
+    bonusReward = signal<BonusReward | null>(null);
+
     async loadBonusPaymentAmount(): Promise<void> {
         this.bonusPaymentAmount.set(null);
+        this.bonusReward.set(null);
 
         const employee = this.employee();
         if (!employee) return;
@@ -132,7 +134,10 @@ export class EmployeeProcedureSheetComponent {
 
         try {
             const bonuses = await this.bonusRewardService.getBonusRewardsByEmployee(employee.companyId, employee.id);
-            this.bonusPaymentAmount.set(bonuses[0].bonusAmount);
+            const bonus =
+                bonuses.find((item) => item.targetYearMonth === targetYearMonth) ?? bonuses[0] ?? null;
+            this.bonusReward.set(bonus);
+            this.bonusPaymentAmount.set(bonus?.bonusAmount ?? null);
         } catch (error) {
             console.error('賞与額の取得に失敗しました', error);
         }
@@ -142,6 +147,61 @@ export class EmployeeProcedureSheetComponent {
         const targetYearMonth = this.procedure().targetYearMonth;
         if (!targetYearMonth || this.variant() !== 'regularDecision') return null;
         return addMonthsToYearMonth(targetYearMonth, 3);
+    });
+
+    exportContext = computed((): ProcedureCsvExportContext => {
+        const variant = this.variant();
+        const procedure = this.procedure();
+
+        if (variant === 'regularDecision') {
+            const std = this.standardRemuneration();
+            const average = this.averageMonthlyReward();
+            const effectiveFrom = this.applicationYearMonth();
+            if (!std || average === null || !effectiveFrom) return {};
+
+            return {
+                regularDecision: {
+                    averageMonthlyReward: average,
+                    healthStandardAmount: std.health,
+                    pensionStandardAmount: std.pension,
+                    effectiveFrom,
+                    months: this.regularDecisionMonths().map((month) => ({
+                        totalAmount: month.totalAmount ?? 0,
+                        paymentBaseDays: month.paymentBaseDays ?? 0,
+                    })),
+                },
+            };
+        }
+
+        if (variant === 'revision') {
+            const revised = this.revisionRevisedMonthlyReward();
+            const previous = this.revisionPreviousMonthlyReward();
+            const targetYearMonth = procedure.targetYearMonth;
+            if (revised === null || !targetYearMonth) return {};
+
+            const calculation = this.calculator.calculate(revised);
+            const fixedWageChangeMonth = addMonthsToYearMonth(targetYearMonth, -3);
+
+            return {
+                revision: {
+                    fixedWageChangeMonth,
+                    changeDescription: this.revisionReason() ?? '',
+                    previousStandardAmount: previous ?? 0,
+                    revisedStandardAmount:
+                        calculation.health?.standardMonthlyAmount ?? revised,
+                    effectiveFrom: targetYearMonth,
+                    months: [],
+                },
+            };
+        }
+
+        if (variant === 'bonusPayment') {
+            const bonus = this.bonusReward();
+            if (!bonus) return {};
+            return { bonusReward: bonus };
+        }
+
+        return {};
     });
 
     constructor() {

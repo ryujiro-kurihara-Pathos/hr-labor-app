@@ -94,6 +94,9 @@
                     @if (!unsetOnly() && unsetCount() > 0) {
                         <span class="unset-hint">· 未設定 {{ unsetCount() }}名</span>
                     }
+                    @if (laborConditionWarningCount() > 0) {
+                        <span class="warning-hint">· 労働条件未入力 {{ laborConditionWarningCount() }}名</span>
+                    }
                     @if (hasActiveFilters()) {
                         <span class="filter-hint">（絞り込み中）</span>
                     }
@@ -136,41 +139,47 @@
                             <tr
                                 class="clickable-row"
                                 [routerLink]="employeeDetailLink(row.employee.id)"
-                                [fragmentment]="employeeDetailFragment()"
+                                [fragment]="employeeDetailFragment()"
                             >
                                 <td class="name-cell">
                                     {{ row.employee.lastName }} {{ row.employee.firstName }}
                                     <span class="sub">{{ row.employee.employeeNumber || '—' }}</span>
+                                    @if (needsLaborConditionWarning(row)) {
+                                        <span class="labor-warning-tag">労働条件未入力</span>
+                                    }
                                 </td>
                                 <td>{{ officeNameById()[row.employee.officeId] || '—' }}</td>
                                 <td>
                                     <span
                                         class="status-badge"
-                                        [class.ok]="statusForRow(row, 'health') === 'active'"
+                                        [class.enrolled]="isEnrolledForRow(row, 'health')"
+                                        [class.ok]="statusForRow(row, 'health') === 'active' && !isEnrolledForRow(row, 'health')"
                                         [class.ng]="statusForRow(row, 'health') === 'inactive'"
                                         [class.unknown]="statusForRow(row, 'health') === 'unknown'"
                                     >
-                                        {{ insuranceJoinStatusLabel(statusForRow(row, 'health')) }}
+                                        {{ joinStatusLabelForRow(row, 'health') }}
                                     </span>
                                 </td>
                                 <td>
                                     <span
                                         class="status-badge"
-                                        [class.ok]="statusForRow(row, 'pension') === 'active'"
+                                        [class.enrolled]="isEnrolledForRow(row, 'pension')"
+                                        [class.ok]="statusForRow(row, 'pension') === 'active' && !isEnrolledForRow(row, 'pension')"
                                         [class.ng]="statusForRow(row, 'pension') === 'inactive'"
                                         [class.unknown]="statusForRow(row, 'pension') === 'unknown'"
                                     >
-                                        {{ insuranceJoinStatusLabel(statusForRow(row, 'pension')) }}
+                                        {{ joinStatusLabelForRow(row, 'pension') }}
                                     </span>
                                 </td>
                                 <td>
                                     <span
                                         class="status-badge"
-                                        [class.ok]="statusForRow(row, 'care') === 'active'"
+                                        [class.enrolled]="isEnrolledForRow(row, 'care')"
+                                        [class.ok]="statusForRow(row, 'care') === 'active' && !isEnrolledForRow(row, 'care')"
                                         [class.ng]="statusForRow(row, 'care') === 'inactive'"
                                         [class.unknown]="statusForRow(row, 'care') === 'unknown'"
                                     >
-                                        {{ insuranceJoinStatusLabel(statusForRow(row, 'care')) }}
+                                        {{ joinStatusLabelForRow(row, 'care') }}
                                     </span>
                                 </td>
                                 <td>{{ formatInsuranceDate(row.status?.healthInsuranceStartDate) }}</td>
@@ -278,6 +287,22 @@
         color: #2563eb;
     }
 
+    .warning-hint {
+        color: #b45309;
+    }
+
+    .labor-warning-tag {
+        display: inline-block;
+        margin-top: 4px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        color: #92400e;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
     .table-wrap {
         overflow-x: auto;
         border: 1px solid #e5e7eb;
@@ -346,6 +371,11 @@
     .status-badge.ok {
         background: #dcfce7;
         color: #166534;
+    }
+
+    .status-badge.enrolled {
+        background: #dbeafe;
+        color: #1d4ed8;
     }
 
     .status-badge.ng {

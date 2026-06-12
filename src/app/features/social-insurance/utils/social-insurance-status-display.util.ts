@@ -1,7 +1,43 @@
 import { insuranceJoinStatus, SocialInsuranceStatus } from '../models/social-insurance-status.model';
 
+export type InsuranceJoinKind = 'health' | 'pension' | 'care';
+
 export function insuranceJoinStatusLabel(status: insuranceJoinStatus): string {
     return status === 'active' ? '対象' : status === 'inactive' ? '対象外' : '未設定';
+}
+
+/** 資格取得手続き提出済み、または資格取得日が登録済みなら加入中とみなす */
+export function isInsuranceEnrolled(
+    joinStatus: insuranceJoinStatus,
+    kind: InsuranceJoinKind,
+    socialStatus: SocialInsuranceStatus | null,
+    qualificationSubmitted: boolean,
+): boolean {
+    if (joinStatus !== 'active') return false;
+    if (qualificationSubmitted) return true;
+    if (!socialStatus) return false;
+
+    switch (kind) {
+        case 'health':
+            return Boolean(socialStatus.healthInsuranceStartDate?.trim());
+        case 'pension':
+            return Boolean(socialStatus.pensionInsuranceStartDate?.trim());
+        case 'care':
+            return Boolean(socialStatus.careInsuranceStartDate?.trim());
+    }
+}
+
+/** 加入状況一覧ページ用の表示ラベル */
+export function insuranceJoinStatusListLabel(
+    joinStatus: insuranceJoinStatus,
+    kind: InsuranceJoinKind,
+    socialStatus: SocialInsuranceStatus | null,
+    qualificationSubmitted: boolean,
+): string {
+    if (isInsuranceEnrolled(joinStatus, kind, socialStatus, qualificationSubmitted)) {
+        return '加入中';
+    }
+    return insuranceJoinStatusLabel(joinStatus);
 }
 
 export function isUnsetInsuranceStatus(status: SocialInsuranceStatus | null): boolean {

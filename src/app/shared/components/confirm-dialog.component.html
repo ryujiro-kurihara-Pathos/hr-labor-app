@@ -1,0 +1,104 @@
+@if (dialog(); as state) {
+    <div class="confirm-backdrop" (click)="onBackdropClick($event)">
+        <div
+            class="confirm-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            [attr.aria-labelledby]="'confirm-dialog-message'"
+        >
+            <p id="confirm-dialog-message" class="confirm-message">{{ state.message }}</p>
+            <div class="confirm-actions">
+                <button type="button" class="btn cancel-btn" (click)="cancel()">
+                    {{ state.cancelLabel }}
+                </button>
+                <button
+                    type="button"
+                    class="btn confirm-btn"
+                    [class.danger]="state.danger"
+                    (click)="confirm()"
+                >
+                    {{ state.confirmLabel }}
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .confirm-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        background: rgba(15, 23, 42, 0.45);
+    }
+
+    .confirm-dialog {
+        width: min(100%, 400px);
+        padding: 24px;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 20px 40px rgba(15, 23, 42, 0.18);
+    }
+
+    .confirm-message {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+        line-height: 1.6;
+        color: #111827;
+        text-align: center;
+    }
+
+    .confirm-actions {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        margin-top: 24px;
+    }
+
+    .btn {
+        min-width: 108px;
+        min-height: 40px;
+        padding: 0 16px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    .cancel-btn {
+        border: 1px solid #d1d5db;
+        background: #fff;
+        color: #374151;
+    }
+
+    .cancel-btn:hover {
+        background: #f9fafb;
+    }
+
+    .confirm-btn {
+        border: 1px solid #2563eb;
+        background: #2563eb;
+        color: #fff;
+    }
+
+    .confirm-btn:hover {
+        background: #1d4ed8;
+        border-color: #1d4ed8;
+    }
+
+    .confirm-btn.danger {
+        border-color: #dc2626;
+        background: #dc2626;
+    }
+
+    .confirm-btn.danger:hover {
+        background: #b91c1c;
+        border-color: #b91c1c;
+    }
+</style>

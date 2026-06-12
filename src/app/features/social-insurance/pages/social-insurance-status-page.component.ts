@@ -8,16 +8,20 @@ import { AuthService } from '../../auth/services/auth.service';
 import { UserService } from '../../users/services/user.service';
 import { OfficeService } from '../../company/services/office.service';
 import { SocialInsuranceStatusService } from '../services/social-insurance-status.service';
+import { SocialInsuranceProcedureService } from '../services/social-insurance-procedure.service';
 import {
     insuranceJoinStatus,
     SocialInsuranceStatus,
 } from '../models/social-insurance-status.model';
 import {
     formatInsuranceDate,
-    insuranceJoinStatusLabel,
+    InsuranceJoinKind,
+    insuranceJoinStatusListLabel,
+    isInsuranceEnrolled,
     isUnsetInsuranceStatus,
     memoPreview,
 } from '../utils/social-insurance-status-display.util';
+import { needsPartTimeInsuranceJudgmentWarning } from '../utils/part-time-insurance-judgment.util';
 
 export type SocialInsuranceStatusListRow = {
     employee: Employee;
@@ -38,8 +42,8 @@ export class SocialInsuranceStatusPageComponent {
     private readonly authService = inject(AuthService);
     private readonly userService = inject(UserService);
     private readonly statusService = inject(SocialInsuranceStatusService);
+    private readonly procedureService = inject(SocialInsuranceProcedureService);
 
-    readonly insuranceJoinStatusLabel = insuranceJoinStatusLabel;
     readonly formatInsuranceDate = formatInsuranceDate;
     readonly memoPreview = memoPreview;
 
@@ -49,6 +53,8 @@ export class SocialInsuranceStatusPageComponent {
     employees = signal<Employee[]>([]);
     statusByEmployeeId = signal<Record<string, SocialInsuranceStatus>>({});
     officeNameById = signal<Record<string, string>>({});
+    /** 資格取得手続きを提出済み（完了）の従業員ID */
+    submittedQualificationEmployeeIds = signal<Set<string>>(new Set());
 
     keyword = signal('');
     selectedOfficeId = signal('');
@@ -119,14 +125,23 @@ export class SocialInsuranceStatusPageComponent {
             }
             this.officeNameById.set(officeMap);
 
-            const statuses = await this.statusService.listByEmployeeIds(
-                employees.map((employee) => employee.id),
-            );
+            const [statuses, qualificationProcedures] = await Promise.all([
+                this.statusService.listByEmployeeIds(employees.map((employee) => employee.id)),
+                this.procedureService.listQualificationProceduresByCompanyId(appUser.companyId),
+            ]);
             const statusMap: Record<string, SocialInsuranceStatus> = {};
             for (const status of statuses) {
                 statusMap[status.employeeId] = status;
             }
             this.statusByEmployeeId.set(statusMap);
+
+            const submittedIds = new Set<string>();
+            for (const procedure of qualificationProcedures) {
+                if (procedure.status === 'completed' && procedure.employeeId) {
+                    submittedIds.add(procedure.employeeId);
+                }
+            }
+            this.submittedQualificationEmployeeIds.set(submittedIds);
         } catch (error) {
             console.error('社会保険加入状況の取得に失敗しました', error);
             this.errorMessage.set('データの取得に失敗しました');
@@ -135,12 +150,32 @@ export class SocialInsuranceStatusPageComponent {
         }
     }
 
-    statusForRow(row: SocialInsuranceStatusListRow, kind: 'health' | 'pension' | 'care'): insuranceJoinStatus {
+    statusForRow(row: SocialInsuranceStatusListRow, kind: InsuranceJoinKind): insuranceJoinStatus {
         const status = row.status;
         if (!status) return 'unknown';
         if (kind === 'health') return status.healthInsuranceStatus;
         if (kind === 'pension') return status.pensionInsuranceStatus;
         return status.careInsuranceStatus;
+    }
+
+    joinStatusLabelForRow(row: SocialInsuranceStatusListRow, kind: InsuranceJoinKind): string {
+        const qualificationSubmitted = this.submittedQualificationEmployeeIds().has(row.employee.id);
+        return insuranceJoinStatusListLabel(
+            this.statusForRow(row, kind),
+            kind,
+            row.status,
+            qualificationSubmitted,
+        );
+    }
+
+    isEnrolledForRow(row: SocialInsuranceStatusListRow, kind: InsuranceJoinKind): boolean {
+        const qualificationSubmitted = this.submittedQualificationEmployeeIds().has(row.employee.id);
+        return isInsuranceEnrolled(
+            this.statusForRow(row, kind),
+            kind,
+            row.status,
+            qualificationSubmitted,
+        );
     }
 
     employeeDetailLink(employeeId: string): string[] {
@@ -150,6 +185,14 @@ export class SocialInsuranceStatusPageComponent {
     employeeDetailFragment(): string {
         return 'social-insurance';
     }
+
+    needsLaborConditionWarning(row: SocialInsuranceStatusListRow): boolean {
+        return needsPartTimeInsuranceJudgmentWarning(row.employee.employmentType, row.status);
+    }
+
+    laborConditionWarningCount = computed(
+        () => this.rows().filter((row) => this.needsLaborConditionWarning(row)).length,
+    );
 
     private filterRows(): SocialInsuranceStatusListRow[] {
         const keyword = this.keyword().trim().toLowerCase();

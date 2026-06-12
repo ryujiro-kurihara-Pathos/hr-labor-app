@@ -99,6 +99,76 @@ export class DependentProcedureComponent {
 
     displayData = computed(() => extractDependentProcedureData(this.procedure()));
 
+    exportProcedure = computed((): Procedure => {
+        const item = this.procedure();
+        if (this.useSavedData()) return item;
+
+        const form = this.form();
+        const type = this.changeType();
+        if (!type) return item;
+
+        return {
+            ...item,
+            dependentChanges: type,
+            dependentId: form.dependentId || null,
+            dependentLastName: form.lastName,
+            dependentFirstName: form.firstName,
+            dependentBirthDate: form.birthDate,
+            dependentGender: form.gender,
+            dependentRelationship: form.relationship,
+            dependentMyNumber: form.myNumber,
+            dependentAddress: form.address,
+            dependentOccupation: form.occupation,
+            dependentIncome: form.income === '' ? null : Number(form.income),
+            dependencyStartDate: type === 'delete' ? '' : form.dependencyStartDate,
+            dependentAddReason: type === 'add' ? form.addReason : '',
+            dependencyEndDate: type === 'delete' ? form.dependencyEndDate : '',
+            dependentDeleteReason: type === 'delete' ? form.deleteReason : '',
+        };
+    });
+
+    exportDependent = computed((): Dependent | null => {
+        const item = this.procedure();
+        if (this.useSavedData()) {
+            return {
+                id: item.dependentId ?? '',
+                lastName: item.dependentLastName,
+                firstName: item.dependentFirstName,
+                birthDate: item.dependentBirthDate,
+                relationship: (item.dependentRelationship as Dependent['relationship']) || 'other',
+                dependencyStartDate: item.dependencyStartDate,
+                dependencyEndDate: item.dependencyEndDate || null,
+                status: item.dependentChanges === 'delete' ? 'ended' : 'active',
+                memo: '',
+                gender: item.dependentGender as Dependent['gender'],
+                myNumber: item.dependentMyNumber,
+                address: item.dependentAddress,
+                occupation: item.dependentOccupation,
+                income: item.dependentIncome,
+            };
+        }
+
+        const form = this.form();
+        if (!form.lastName.trim() && !form.firstName.trim()) return null;
+
+        return {
+            id: form.dependentId,
+            lastName: form.lastName,
+            firstName: form.firstName,
+            birthDate: form.birthDate,
+            relationship: (form.relationship as Dependent['relationship']) || 'other',
+            dependencyStartDate: form.dependencyStartDate,
+            dependencyEndDate: form.dependencyEndDate || null,
+            status: this.changeType() === 'delete' ? 'ended' : 'active',
+            memo: '',
+            gender: form.gender || undefined,
+            myNumber: form.myNumber,
+            address: form.address,
+            occupation: form.occupation,
+            income: form.income === '' ? null : Number(form.income),
+        };
+    });
+
     constructor() {
         effect(() => {
             const item = this.procedure();

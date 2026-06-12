@@ -3,6 +3,7 @@ import { RouterLink, RouterLinkActive, Router } from '@angular/router';
 
 import { AuthService } from '../../features/auth/services/auth.service';
 import { AppUser, UserRole } from '../../features/users/models/user.model';
+import { ConfirmService } from '../services/confirm.service';
 
 type NavItem = {
     label: string;
@@ -20,10 +21,11 @@ type NavItem = {
 export class SidebarComponent {
     private readonly authService = inject(AuthService);
     private readonly router = inject(Router);
+    private readonly confirmService = inject(ConfirmService);
 
     @Input() currentUser: AppUser | null = null;
 
-    readonly navItems: NavItem[] = [
+    readonly adminNavItems: NavItem[] = [
         { label: 'ホーム', route: '/home', icon: 'ホ', exact: true },
         { label: '会社・事業所', route: '/company', icon: '社' },
         { label: '従業員管理', route: '/employees', icon: '員' },
@@ -31,6 +33,17 @@ export class SidebarComponent {
         { label: '保険料計算', route: '/premium', icon: '算' },
         { label: '手続き', route: '/procedures', icon: '届' },
     ];
+
+    readonly employeeNavItems: NavItem[] = [
+        { label: 'マイページ', route: '/my-page', icon: '私', exact: true },
+        { label: '保険料', route: '/my-insurance-premium', icon: '算' },
+    ];
+
+    navItems(): NavItem[] {
+        return this.currentUser?.role === 'employee'
+            ? this.employeeNavItems
+            : this.adminNavItems;
+    }
 
     userDisplayName(): string {
         if (!this.currentUser) return 'ゲスト';
@@ -43,16 +56,26 @@ export class SidebarComponent {
         return name.charAt(0);
     }
 
+    profileRoute(): string {
+        return this.currentUser?.role === 'employee' ? '/my-page' : '/profile';
+    }
+
+    homeRoute(): string {
+        return this.currentUser?.role === 'employee' ? '/my-page' : '/home';
+    }
+
     roleLabel(role: UserRole | undefined): string {
         const labels: Record<UserRole, string> = {
             admin: '管理者',
-            labor: '労務担当',
             employee: '従業員',
         };
         return role ? labels[role] : '—';
     }
 
     async onLogout(): Promise<void> {
+        const confirmed = await this.confirmService.confirmLogout();
+        if (!confirmed) return;
+
         try {
             await this.authService.logout();
             await this.router.navigate(['/login']);

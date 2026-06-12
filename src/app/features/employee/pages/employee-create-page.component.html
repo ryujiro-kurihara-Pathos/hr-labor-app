@@ -1,230 +1,301 @@
-@if(isLoading()) {
-    <p>Loading...</p>
-} @else {
-    <p>従業員の追加</p>
+<div class="create-page">
+    @if (isLoading()) {
+        <p class="loading">読み込み中...</p>
+    } @else {
+        <div class="create-card">
+            <header class="page-header">
+                <div>
+                    <a routerLink="/employees" class="back-link">← 従業員一覧</a>
+                    <h1>従業員を追加</h1>
+                    <p class="page-note">必須項目を入力して登録してください。詳細は登録後に編集できます。</p>
+                </div>
+            </header>
 
-    <p>本人情報</p>
+            <form class="create-form" (ngSubmit)="onCreateEmployee()">
+                <section class="form-section">
+                    <h2 class="section-title">所属・入社</h2>
+                    <div class="form-grid">
+                        <div class="form-field">
+                            <label for="office-id">事業所 <span class="required">必須</span></label>
+                            <select id="office-id" name="officeId" [(ngModel)]="employee.officeId" required>
+                                <option value="" disabled>選択してください</option>
+                                @for (office of offices(); track office.id) {
+                                    <option [value]="office.id">{{ office.name }}</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="form-field">
+                            <label for="joined-date">入社日 <span class="required">必須</span></label>
+                            <input id="joined-date" type="date" name="joinedDate" [(ngModel)]="employee.joinedDate" required />
+                        </div>
+                        <div class="form-field">
+                            <label for="employee-number">社員番号</label>
+                            <input
+                                id="employee-number"
+                                type="text"
+                                [value]="nextEmployeeNumber()"
+                                readonly
+                                placeholder="00000001"
+                            />
+                            <p class="field-note">登録時に8桁の連番を自動付与します</p>
+                        </div>
+                    </div>
+                </section>
 
-    <div class="form-row">
-        <div class="form-row-label">
-            <label for="joined-year">入社日</label>
-            <span class="required-badge">必須</span>
+                <section class="form-section">
+                    <h2 class="section-title">本人情報</h2>
+                    <div class="form-grid">
+                        <div class="form-field">
+                            <label for="last-name">姓 <span class="required">必須</span></label>
+                            <input id="last-name" type="text" name="lastName" [(ngModel)]="employee.lastName" placeholder="山田" required />
+                        </div>
+                        <div class="form-field">
+                            <label for="first-name">名 <span class="required">必須</span></label>
+                            <input id="first-name" type="text" name="firstName" [(ngModel)]="employee.firstName" placeholder="太郎" required />
+                        </div>
+                        <div class="form-field">
+                            <label for="birth-date">生年月日 <span class="required">必須</span></label>
+                            <input id="birth-date" type="date" name="birthDate" [(ngModel)]="employee.birthDate" required />
+                        </div>
+                        <div class="form-field">
+                            <label for="my-number">マイナンバー</label>
+                            <input id="my-number" type="text" name="myNumber" [(ngModel)]="employee.myNumber" readonly />
+                            <p class="field-note">登録時に仮の番号を自動生成します</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="form-section">
+                    <h2 class="section-title">住所</h2>
+                    <div class="form-grid">
+                        <div class="form-field">
+                            <label for="postal-code">郵便番号</label>
+                            <input id="postal-code" type="text" name="postalCode" [(ngModel)]="employee.postalCode" placeholder="1000001" inputmode="numeric" />
+                        </div>
+                        <div class="form-field">
+                            <label for="prefecture">都道府県</label>
+                            <select id="prefecture" name="prefecture" [(ngModel)]="employee.prefecture">
+                                <option value="">選択してください</option>
+                                @for (prefecture of prefectures; track prefecture) {
+                                    <option [value]="prefecture">{{ prefecture }}</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="form-field form-field-wide">
+                            <label for="city">市区町村</label>
+                            <input id="city" type="text" name="city" [(ngModel)]="employee.city" placeholder="千代田区" />
+                        </div>
+                        <div class="form-field form-field-wide">
+                            <label for="street-address">丁目番地</label>
+                            <input id="street-address" type="text" name="streetAddress" [(ngModel)]="employee.streetAddress" placeholder="永田町1-7-1" />
+                        </div>
+                        <div class="form-field form-field-wide">
+                            <label for="building-name">建物名・号室</label>
+                            <input id="building-name" type="text" name="buildingName" [(ngModel)]="employee.buildingName" placeholder="永田町ビル101号室" />
+                        </div>
+                    </div>
+                </section>
+
+                @if (errorMessage()) {
+                    <p class="error-message" role="alert">{{ errorMessage() }}</p>
+                }
+
+                <div class="form-actions">
+                    <a routerLink="/employees" class="btn secondary-btn">キャンセル</a>
+                    <button class="btn primary-btn" type="submit" [disabled]="isLoadingEmployee()">
+                        {{ isLoadingEmployee() ? '登録中...' : '登録する' }}
+                    </button>
+                </div>
+            </form>
         </div>
-        <div class="date-selects">
-            <select
-                id="joined-year"
-                name="joinedYear"
-                class="date-select date-select-year"
-                [(ngModel)]="joinedYear"
-                (ngModelChange)="updateJoinedDate()"
-            >
-                @for (year of joinYears; track year) {
-                    <option [value]="year">
-                        {{ year }}
-                    </option>
-                }
-            </select>
-            <span class="date-unit">年</span>
-
-            <select
-                id="joined-month"
-                name="joinedMonth"
-                class="date-select date-select-month"
-                [(ngModel)]="joinedMonth"
-                (ngModelChange)="updateJoinedDate()"
-            >
-                @for (month of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]; track month) {
-                    <option [value]="month">{{ month }}</option>
-                }
-            </select>
-            <span class="date-unit">月</span>
-
-            <select
-                id="joined-day"
-                name="joinedDay"
-                class="date-select date-select-day"
-                [(ngModel)]="joinedDay"
-                (ngModelChange)="updateJoinedDate()"
-            >
-                @for (day of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]; track day) {
-                    <option [value]="day">{{ day }}</option>
-                }
-            </select>
-            <span class="date-unit">日</span>
-        </div>
-        <input type="hidden" name="joinedDate" [(ngModel)]="employee.joinedDate" />
-    </div>
-
-    <p>姓</p>
-    <input type="text" name="lastName" [(ngModel)]="employee.lastName" placeholder="例：山田">
-
-    <p>名</p>
-    <input type="text" name="firstName" [(ngModel)]="employee.firstName" placeholder="例：太郎">
-
-    <div class="form-row">
-        <div class="form-row-label">
-            <label for="birth-year">生年月日</label>
-            <span class="required-badge">必須</span>
-        </div>
-        <div class="date-selects">
-            <select
-                id="birth-year"
-                name="birthYear"
-                class="date-select date-select-year"
-                [(ngModel)]="birthYear"
-                (ngModelChange)="updateBirthDate()"
-            >
-                @for (year of birthYears; track year) {
-                    <option [value]="year">
-                        {{ year }}
-                    </option>
-                }
-            </select>
-            <span class="date-unit">年</span>
-
-            <select
-                id="birth-month"
-                name="birthMonth"
-                class="date-select date-select-month"
-                [(ngModel)]="birthMonth"
-                (ngModelChange)="updateBirthDate()"
-            >
-                @for (month of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]; track month) {
-                    <option [value]="month">{{ month }}</option>
-                }
-            </select>
-            <span class="date-unit">月</span>
-
-            <select
-                id="birth-day"
-                name="birthDay"
-                class="date-select date-select-day"
-                [(ngModel)]="birthDay"
-                (ngModelChange)="updateBirthDate()"
-            >
-                @for (day of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]; track day) {
-                    <option [value]="day">{{ day }}</option>
-                }
-            </select>
-            <span class="date-unit">日</span>
-        </div>
-        <input type="hidden" name="birthDate" [(ngModel)]="employee.birthDate" />
-    </div>
-
-    <div class="form-row">
-        <div class="form-row-label">
-            <label for="my-number">マイナンバー</label>
-            <span class="required-badge">必須</span>
-        </div>
-        <input type="text" name="myNumber" [(ngModel)]="employee.myNumber" disabled>
-        <p>※このアプリでは仮のマイナンバーは自動生成されます。</p>
-    </div>
-
-    <div>
-        <p>住所</p>
-        <p>〒</p>
-        <input type="text" name="postalCode" [(ngModel)]="employee.postalCode" placeholder="例：1000001">
-        <button>検索</button>
-
-        <p>都道府県</p>
-        <select name="prefecture" [(ngModel)]="employee.prefecture">
-            @for (prefecture of prefectures; track prefecture) {
-                <option [value]="prefecture">{{ prefecture }}</option>
-            }
-        </select>
-
-        <p>市区町村</p>
-        <input type="text" name="city" [(ngModel)]="employee.city" placeholder="例：千代田区">
-
-        <p>丁目番地</p>
-        <input type="text" name="streetAddress" [(ngModel)]="employee.streetAddress" placeholder="例：永田町1-7-1">
-
-        <p>建物名・号室</p>
-        <input type="text" name="buildingName" [(ngModel)]="employee.buildingName" placeholder="例：永田町ビル101号室">
-    </div>
-
-    <p>事業所</p>
-    <select name="officeId" [(ngModel)]="employee.officeId">
-        @for (office of offices(); track office.id) {
-            <option [value]="office.id">{{ office.name }}</option>
-        }
-    </select>
-
-    <p>{{ errorMessage() }}</p>
-
-    <p>登録</p>
-    <button class="form-btn" type="button" (click)="onCreateEmployee()">登録</button>
-}
+    }
+</div>
 
 <style>
-    .form-row {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        padding: 12px 16px;
-        background: #f3f4f6;
-        border-radius: 8px;
+    .create-page {
+        max-width: 720px;
+        margin: 0 auto;
     }
 
-    .form-row-label {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-shrink: 0;
-        min-width: 120px;
-    }
-
-    .form-row-label label {
+    .loading {
+        color: #6b7280;
         font-size: 14px;
-        font-weight: 600;
+    }
+
+    .create-card {
+        padding: 28px 32px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
+
+    .page-header {
+        margin-bottom: 28px;
+    }
+
+    .back-link {
+        display: inline-block;
+        margin-bottom: 8px;
+        font-size: 13px;
+        color: #2563eb;
+        text-decoration: none;
+    }
+
+    .back-link:hover {
+        text-decoration: underline;
+    }
+
+    h1 {
+        margin: 0 0 6px;
+        font-size: 22px;
         color: #111827;
     }
 
-    .required-badge {
-        display: inline-flex;
-        align-items: center;
-        padding: 2px 8px;
-        border-radius: 4px;
-        background: #fecaca;
-        color: #b91c1c;
-        font-size: 11px;
+    .page-note {
+        margin: 0;
+        font-size: 14px;
+        color: #6b7280;
+        line-height: 1.5;
+    }
+
+    .form-section + .form-section {
+        margin-top: 28px;
+        padding-top: 28px;
+        border-top: 1px solid #f3f4f6;
+    }
+
+    .section-title {
+        margin: 0 0 16px;
+        font-size: 16px;
         font-weight: 700;
-        line-height: 1.4;
+        color: #374151;
     }
 
-    .date-selects {
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+    }
+
+    .form-field {
         display: flex;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 8px;
+        flex-direction: column;
+        gap: 6px;
     }
 
-    .date-select {
+    .form-field-wide {
+        grid-column: 1 / -1;
+    }
+
+    .form-field label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .required {
+        margin-left: 4px;
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: #fee2e2;
+        color: #b91c1c;
+        font-size: 10px;
+        font-weight: 700;
+        vertical-align: middle;
+    }
+
+    .form-field input,
+    .form-field select {
         height: 40px;
-        padding: 0 32px 0 12px;
+        padding: 0 12px;
         border: 1px solid #d1d5db;
         border-radius: 8px;
         background: #fff;
         font-size: 14px;
         color: #111827;
+    }
+
+    .form-field input[readonly] {
+        background: #f9fafb;
+        color: #6b7280;
+    }
+
+    .form-field select {
         cursor: pointer;
-        appearance: none;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M3 4.5L6 7.5L9 4.5'/%3E%3C/svg%3E");
-        background-repeat: no-repeat;
-        background-position: right 10px center;
     }
 
-    .date-select-year {
-        min-width: 160px;
+    .field-note {
+        margin: 0;
+        font-size: 12px;
+        color: #9ca3af;
     }
 
-    .date-select-month,
-    .date-select-day {
-        min-width: 72px;
+    .error-message {
+        margin: 20px 0 0;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #b91c1c;
+        font-size: 13px;
+        font-weight: 600;
     }
 
-    .date-unit {
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 28px;
+        padding-top: 20px;
+        border-top: 1px solid #f3f4f6;
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 100px;
+        height: 40px;
+        padding: 0 18px;
+        border: none;
+        border-radius: 8px;
         font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    .primary-btn {
+        background: #2563eb;
+        color: #fff;
+    }
+
+    .primary-btn:hover:not(:disabled) {
+        background: #1d4ed8;
+    }
+
+    .primary-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .secondary-btn {
+        background: #fff;
+        border: 1px solid #d1d5db;
         color: #374151;
+    }
+
+    .secondary-btn:hover {
+        background: #f9fafb;
+    }
+
+    @media (max-width: 640px) {
+        .create-card {
+            padding: 20px 16px;
+        }
+
+        .form-grid {
+            grid-template-columns: 1fr;
+        }
     }
 </style>

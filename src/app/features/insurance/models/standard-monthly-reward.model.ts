@@ -8,6 +8,9 @@ import { Timestamp } from 'firebase/firestore';
  * - 決定: 資格取得時・定時・随時で適用する等級と適用期間（将来永続化用）
  */
 
+/** 月次報酬の保存状態（DB 未保存時は default） */
+export type StandardMonthlyRewardStatus = 'default' | 'draft' | 'confirmed';
+
 /** 報酬月額（またはその平均）から等級表で求めた健康保険・厚生年金の標準報酬月額 */
 export type InsuranceStandardRemuneration = {
     healthInsuranceGrade: number;                    // 健康保険の等級
@@ -46,6 +49,9 @@ export type StandardMonthlyReward = {
     fixedWageChanged?: boolean;
     /** 前月から変更のあった項目名 */
     changedFixedWageFields?: string[];
+
+    /** 保存状態（未設定の既存データは確定として扱う） */
+    status?: StandardMonthlyRewardStatus;
 
     createdAt: Timestamp;                            // 作成日時
     updatedAt: Timestamp;                            // 更新日時

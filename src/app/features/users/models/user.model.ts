@@ -1,6 +1,6 @@
 import { Timestamp } from 'firebase/firestore';
 
-export type UserRole = 'admin' | 'labor' | 'employee';
+export type UserRole = 'admin' | 'employee';
 
 export type UserStatus = 'active' | 'inactive';
 
@@ -9,6 +9,8 @@ export type AppUser = {
     uid: string; // ユーザーID
     lastName: string; // 姓
     firstName: string; // 名
+    lastNameKana: string; // 姓（カナ）
+    firstNameKana: string; // 名（カナ）
     email: string; // メールアドレス
 
     role: UserRole; // ユーザーの役割

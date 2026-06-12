@@ -16,6 +16,11 @@
         </div>
         <app-procedure-action-bar
             [procedure]="item"
+            [employee]="employee()"
+            [office]="office()"
+            [company]="company()"
+            [procedureForExport]="exportProcedure()"
+            [exportContext]="{ dependent: exportDependent() }"
             [isSubmitting]="isSaving()"
             [submitDisabled]="!changeType()"
             [actionErrorMessage]="saveErrorMessage()"

@@ -1,0 +1,880 @@
+<div class="my-insurance-premium-page">
+    <header class="page-header">
+        <h1>保険料</h1>
+        <p class="page-note">あなたの社会保険料と標準報酬月額を確認できます。</p>
+    </header>
+
+    @if (isLoading()) {
+        <p class="state-message loading">読み込み中...</p>
+    } @else if (errorMessage()) {
+        <p class="state-message error">{{ errorMessage() }}</p>
+    } @else {
+        @if (viewablePeriodLabel()) {
+            <p class="viewable-period">確認可能期間：{{ viewablePeriodLabel() }}</p>
+        }
+
+        <div class="month-toolbar" [class.is-loading]="isLoadingMonth()">
+            <button
+                type="button"
+                class="month-nav-btn"
+                aria-label="前月"
+                [disabled]="isLoadingMonth() || !canGoPrevMonth()"
+                (click)="shiftMonth(-1)"
+            >
+                ←
+            </button>
+            <div class="month-picker">
+                <label for="target-year-month" class="month-label">対象年月</label>
+                <input
+                    id="target-year-month"
+                    type="month"
+                    [ngModel]="targetYearMonth()"
+                    (ngModelChange)="onTargetYearMonthChange($event)"
+                    [attr.min]="viewableMinYearMonth()"
+                    [attr.max]="viewableMaxYearMonth()"
+                    [disabled]="isLoadingMonth()"
+                />
+                <span class="month-display">{{ targetYearMonthLabel() }}</span>
+            </div>
+            <button
+                type="button"
+                class="month-nav-btn"
+                aria-label="翌月"
+                [disabled]="isLoadingMonth() || !canGoNextMonth()"
+                (click)="shiftMonth(1)"
+            >
+                →
+            </button>
+        </div>
+
+        @if (unconfirmedMonthsLabel()) {
+            <p class="state-message unconfirmed">
+                以下の月は報酬が確定されていないため、登録されていません：{{ unconfirmedMonthsLabel() }}
+            </p>
+        }
+
+        @if (!isViewableMonth()) {
+            <p class="state-message excluded">{{ viewableMonthReason() }}</p>
+        } @else {
+            <section class="summary-card">
+                <div class="summary-main">
+                    <p class="summary-kicker">{{ targetYearMonthLabel() }}の本人負担</p>
+                    <p class="summary-total">
+                        @if (totalSocialInsurancePremium() !== null) {
+                            {{ totalSocialInsurancePremium() | number }}<span class="summary-unit">円</span>
+                        } @else {
+                            —<span class="summary-unit">円</span>
+                        }
+                    </p>
+                    <p class="summary-sub">
+                        @if (totalSocialInsurancePremium() !== null) {
+                            @if (bonusSocialInsurancePremium() !== null && standardAmount() !== null) {
+                                月次報酬（標準報酬月額 {{ standardAmount() | number }}円）＋賞与分
+                            } @else if (bonusSocialInsurancePremium() !== null) {
+                                月次報酬＋賞与分
+                            } @else if (standardAmount() !== null) {
+                                標準報酬月額 {{ standardAmount() | number }}円をもとに計算
+                            } @else {
+                                月次報酬＋賞与分
+                            }
+                        } @else {
+                            標準報酬月額が未確定のため、保険料を表示できません
+                        }
+                    </p>
+                </div>
+                <div class="summary-badges">
+                    <span class="summary-badge health">健康保険</span>
+                    <span class="summary-badge pension">厚生年金</span>
+                    <span class="summary-badge care">介護保険</span>
+                </div>
+            </section>
+
+            <section class="premium-grid">
+                <article class="premium-card health">
+                    <div class="premium-card-header">
+                        <span class="premium-icon">健</span>
+                        <h2 class="premium-card-title">健康保険料</h2>
+                    </div>
+                    <p class="premium-amount">
+                        @if (healthPremium() !== null) {
+                            {{ healthPremium() | number }}<span class="premium-unit">円</span>
+                        } @else {
+                            —<span class="premium-unit">円</span>
+                        }
+                    </p>
+                    <dl class="premium-meta">
+                        <div class="meta-row">
+                            <dt>等級</dt>
+                            <dd>{{ healthGrade() ?? '—' }}</dd>
+                        </div>
+                        <div class="meta-row">
+                            <dt>標準報酬月額</dt>
+                            <dd>
+                                @if (standardAmount() !== null) {
+                                    {{ standardAmount() | number }}円
+                                } @else {
+                                    —
+                                }
+                            </dd>
+                        </div>
+                        <div class="meta-row">
+                            <dt>料率（本人）</dt>
+                            <dd>{{ insuranceRatePercentLabel(healthRateRow()?.employeeRate) }}</dd>
+                        </div>
+                    </dl>
+                </article>
+
+                <article class="premium-card pension">
+                    <div class="premium-card-header">
+                        <span class="premium-icon">年</span>
+                        <h2 class="premium-card-title">厚生年金保険料</h2>
+                    </div>
+                    <p class="premium-amount">
+                        @if (pensionPremium() !== null) {
+                            {{ pensionPremium() | number }}<span class="premium-unit">円</span>
+                        } @else {
+                            —<span class="premium-unit">円</span>
+                        }
+                    </p>
+                    <dl class="premium-meta">
+                        <div class="meta-row">
+                            <dt>等級</dt>
+                            <dd>{{ pensionGrade() ?? '—' }}</dd>
+                        </div>
+                        <div class="meta-row">
+                            <dt>標準報酬月額</dt>
+                            <dd>
+                                @if (standardAmount() !== null) {
+                                    {{ standardAmount() | number }}円
+                                } @else {
+                                    —
+                                }
+                            </dd>
+                        </div>
+                        <div class="meta-row">
+                            <dt>料率（本人）</dt>
+                            <dd>{{ insuranceRatePercentLabel(pensionRate) }}</dd>
+                        </div>
+                    </dl>
+                </article>
+
+                <article class="premium-card care">
+                    <div class="premium-card-header">
+                        <span class="premium-icon">介</span>
+                        <h2 class="premium-card-title">介護保険料</h2>
+                    </div>
+                    <p class="premium-amount">
+                        @if (carePremium() !== null) {
+                            {{ carePremium() | number }}<span class="premium-unit">円</span>
+                        } @else {
+                            —<span class="premium-unit">円</span>
+                        }
+                    </p>
+                    <dl class="premium-meta">
+                        <div class="meta-row">
+                            <dt>対象</dt>
+                            <dd>{{ careTargetLabel() }}（{{ careStatusLabel() }}）</dd>
+                        </div>
+                        <div class="meta-row">
+                            <dt>標準報酬月額</dt>
+                            <dd>
+                                @if (standardAmount() !== null) {
+                                    {{ standardAmount() | number }}円
+                                } @else {
+                                    —
+                                }
+                            </dd>
+                        </div>
+                        <div class="meta-row">
+                            <dt>料率（本人）</dt>
+                            <dd>{{ insuranceRatePercentLabel(careRateRow()?.employeeRate) }}</dd>
+                        </div>
+                    </dl>
+                </article>
+            </section>
+
+            <section class="detail-card">
+                <div class="detail-card-header">
+                    <h2 class="section-title">標準報酬月額</h2>
+                    @if (effectiveStandard()) {
+                        <span class="determination-badge" [class]="determinationBadgeClass()">
+                            {{ effectiveStandard()!.determinationLabel }}
+                        </span>
+                    }
+                </div>
+                @if (effectiveStandard()?.description) {
+                    <p class="detail-note">{{ effectiveStandard()!.description }}</p>
+                }
+                <dl class="detail-dl">
+                    <div class="detail-row">
+                        <dt>決定区分</dt>
+                        <dd>{{ effectiveStandard()?.determinationLabel ?? '—' }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>算定対象月</dt>
+                        <dd>{{ effectiveCalculationMonthsLabel() }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>算定報酬月額</dt>
+                        <dd>
+                            @if (effectiveStandard()?.averageMonthlyReward != null) {
+                                {{ effectiveStandard()!.averageMonthlyReward | number }}円
+                            } @else {
+                                —
+                            }
+                        </dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>健康保険（等級 / 標準報酬月額）</dt>
+                        <dd>
+                            @if (effectiveStandard()?.calculation?.health) {
+                                {{ effectiveStandard()!.calculation!.health!.grade }}等級 /
+                                {{ effectiveStandard()!.calculation!.health!.standardMonthlyAmount | number }}円
+                            } @else {
+                                —
+                            }
+                        </dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>厚生年金（等級 / 標準報酬月額）</dt>
+                        <dd>
+                            @if (effectiveStandard()?.calculation?.pension) {
+                                {{ effectiveStandard()!.calculation!.pension!.grade }}等級 /
+                                {{ effectiveStandard()!.calculation!.pension!.standardMonthlyAmount | number }}円
+                            } @else {
+                                —
+                            }
+                        </dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="detail-card">
+                <div class="detail-card-header">
+                    <h2 class="section-title">月次報酬</h2>
+                    <span class="status-badge" [class]="monthRewardStatusClass()">
+                        {{ monthRewardStatusLabel() }}
+                    </span>
+                </div>
+                @if (!isMonthRewardConfirmed()) {
+                    <p class="detail-note unregistered-note">報酬が登録されていません。</p>
+                } @else {
+                    <dl class="detail-dl">
+                        <div class="detail-row">
+                            <dt>報酬月額</dt>
+                            <dd>
+                                @if (monthRewardTotal() !== null) {
+                                    {{ monthRewardTotal() | number }}円
+                                } @else {
+                                    —
+                                }
+                            </dd>
+                        </div>
+                        @for (field of rewardFields(); track field.label) {
+                            <div class="detail-row">
+                                <dt>{{ field.label }}</dt>
+                                <dd>{{ field.value | number }}円</dd>
+                            </div>
+                        }
+                        @if (rewardFields().length === 0) {
+                            <div class="detail-row">
+                                <dt>内訳</dt>
+                                <dd>登録された手当はありません</dd>
+                            </div>
+                        }
+                    </dl>
+                }
+            </section>
+
+            <section class="detail-card">
+                <div class="detail-card-header">
+                    <h2 class="section-title">賞与</h2>
+                    <span class="card-meta">{{ targetYearMonthLabel() }}</span>
+                </div>
+
+                @if (treatBonusAsMonthlyRemuneration()) {
+                    <p class="detail-note">
+                        この月は賞与が月次報酬に合算されるため、別途の賞与保険料は発生しません。
+                    </p>
+                } @else if (bonusesForPremium().length === 0) {
+                    <div class="bonus-empty">
+                        <p class="bonus-empty-title">この月の賞与はありません</p>
+                        <p class="bonus-empty-note">
+                            賞与支給がある場合、賞与に対する保険料もここに表示されます。
+                        </p>
+                    </div>
+                } @else {
+                    <ul class="bonus-list">
+                        @for (bonus of bonusesForPremium(); track bonus.id) {
+                            <li class="bonus-item">
+                                <div class="bonus-item-header">
+                                    <span class="bonus-date">{{ formatPaymentDate(bonus.paymentDate) }}</span>
+                                    <span class="bonus-amount">{{ bonus.bonusAmount | number }}円</span>
+                                </div>
+                                <dl class="bonus-item-dl">
+                                    <div class="detail-row">
+                                        <dt>標準賞与額</dt>
+                                        <dd>{{ bonus.standardBonusAmount | number }}円</dd>
+                                    </div>
+                                </dl>
+                            </li>
+                        }
+                    </ul>
+                }
+            </section>
+
+            <section class="total-card">
+                <h2 class="total-card-title">本人負担の内訳</h2>
+
+                <div class="total-row">
+                    <span class="total-label">月次報酬分</span>
+                    <span class="total-value">
+                        @if (monthlySocialInsurancePremium() !== null) {
+                            {{ monthlySocialInsurancePremium() ?? 0 | number }}円
+                        } @else {
+                            —
+                        }
+                    </span>
+                </div>
+
+                <div class="total-row">
+                    <span class="total-label">賞与分</span>
+                    <span class="total-value">
+                        {{ bonusSocialInsurancePremium() ?? 0 | number }}円
+                    </span>
+                </div>
+                <div class="total-row grand">
+                    <span class="total-label">本人負担合計</span>
+                    <span class="total-value">
+                        {{ totalSocialInsurancePremium() ?? 0 | number}}円
+                    </span>
+                </div>
+            </section>
+        }
+    }
+</div>
+
+<style>
+    .my-insurance-premium-page {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 8px 0 40px;
+    }
+
+    .page-header h1 {
+        margin: 0 0 8px;
+        font-size: 22px;
+    }
+
+    .page-note {
+        margin: 0;
+        color: #6b7280;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    .state-message {
+        margin: 24px 0 0;
+        padding: 16px 18px;
+        border-radius: 12px;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    .state-message.loading {
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        color: #6b7280;
+    }
+
+    .state-message.error {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #b91c1c;
+    }
+
+    .state-message.excluded {
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        color: #92400e;
+    }
+
+    .state-message.unconfirmed {
+        background: #fff7ed;
+        border: 1px solid #fed7aa;
+        color: #9a3412;
+    }
+
+    .viewable-period {
+        margin: 20px 0 0;
+        font-size: 13px;
+        font-weight: 600;
+        color: #6b7280;
+    }
+
+    .unregistered-note {
+        margin: 0;
+    }
+
+    .month-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        margin-top: 24px;
+        padding: 14px 16px;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        background: #fff;
+    }
+
+    .month-toolbar.is-loading {
+        opacity: 0.7;
+    }
+
+    .month-nav-btn {
+        width: 40px;
+        height: 40px;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        background: #fff;
+        color: #374151;
+        font-size: 16px;
+        cursor: pointer;
+    }
+
+    .month-nav-btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+    }
+
+    .month-picker {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        min-width: 180px;
+    }
+
+    .month-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #6b7280;
+    }
+
+    .month-picker input[type='month'] {
+        width: 100%;
+        max-width: 180px;
+        height: 36px;
+        padding: 0 10px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 14px;
+    }
+
+    .month-display {
+        font-size: 15px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .summary-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        margin-top: 20px;
+        padding: 24px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 60%, #fff 100%);
+        border: 1px solid #bfdbfe;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    }
+
+    .summary-kicker {
+        margin: 0 0 6px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #2563eb;
+        letter-spacing: 0.04em;
+    }
+
+    .summary-total {
+        margin: 0;
+        font-size: 40px;
+        font-weight: 800;
+        line-height: 1.1;
+        color: #1d4ed8;
+    }
+
+    .summary-unit {
+        margin-left: 4px;
+        font-size: 18px;
+        font-weight: 700;
+    }
+
+    .summary-sub {
+        margin: 8px 0 0;
+        font-size: 13px;
+        color: #6b7280;
+    }
+
+    .summary-badges {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+
+    .summary-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .summary-badge.health {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .summary-badge.pension {
+        background: #ede9fe;
+        color: #6d28d9;
+    }
+
+    .summary-badge.care {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .premium-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 14px;
+        margin-top: 20px;
+    }
+
+    @media (min-width: 640px) {
+        .premium-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+
+    .premium-card {
+        padding: 18px;
+        border-radius: 14px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+    }
+
+    .premium-card.health {
+        border-top: 3px solid #3b82f6;
+    }
+
+    .premium-card.pension {
+        border-top: 3px solid #8b5cf6;
+    }
+
+    .premium-card.care {
+        border-top: 3px solid #22c55e;
+    }
+
+    .premium-card-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+    }
+
+    .premium-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: #f3f4f6;
+        font-size: 13px;
+        font-weight: 800;
+        color: #374151;
+    }
+
+    .premium-card.health .premium-icon {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .premium-card.pension .premium-icon {
+        background: #ede9fe;
+        color: #6d28d9;
+    }
+
+    .premium-card.care .premium-icon {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .premium-card-title {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .premium-amount {
+        margin: 0 0 14px;
+        font-size: 28px;
+        font-weight: 800;
+        color: #111827;
+    }
+
+    .premium-unit {
+        margin-left: 2px;
+        font-size: 14px;
+        font-weight: 700;
+        color: #6b7280;
+    }
+
+    .premium-meta,
+    .detail-dl {
+        margin: 0;
+    }
+
+    .meta-row,
+    .detail-row {
+        display: grid;
+        grid-template-columns: 108px 1fr;
+        gap: 10px;
+        padding: 8px 0;
+        border-bottom: 1px solid #f3f4f6;
+        font-size: 13px;
+    }
+
+    .meta-row:last-child,
+    .detail-row:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    .meta-row dt,
+    .detail-row dt {
+        margin: 0;
+        color: #6b7280;
+        font-weight: 600;
+    }
+
+    .meta-row dd,
+    .detail-row dd {
+        margin: 0;
+        color: #111827;
+    }
+
+    .detail-card,
+    .total-card {
+        margin-top: 16px;
+        padding: 20px;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        background: #fff;
+    }
+
+    .detail-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+    }
+
+    .section-title {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .detail-note {
+        margin: 0 0 14px;
+        font-size: 13px;
+        color: #6b7280;
+        line-height: 1.6;
+    }
+
+    .determination-badge,
+    .status-badge {
+        flex-shrink: 0;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .determination-badge.initial {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .determination-badge.regular {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .determination-badge.revision {
+        background: #ede9fe;
+        color: #6d28d9;
+    }
+
+    .status-badge.confirmed {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .status-badge.draft {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .status-badge.unregistered {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .card-meta {
+        font-size: 13px;
+        font-weight: 600;
+        color: #6b7280;
+    }
+
+    .bonus-empty {
+        padding: 20px;
+        border-radius: 10px;
+        background: #f9fafb;
+        border: 1px dashed #d1d5db;
+        text-align: center;
+    }
+
+    .bonus-empty-title {
+        margin: 0 0 6px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .bonus-empty-note {
+        margin: 0;
+        font-size: 13px;
+        color: #6b7280;
+        line-height: 1.6;
+    }
+
+    .bonus-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .bonus-item {
+        padding: 14px;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        background: #f9fafb;
+    }
+
+    .bonus-item-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 8px;
+    }
+
+    .bonus-date {
+        font-size: 13px;
+        font-weight: 600;
+        color: #6b7280;
+    }
+
+    .bonus-amount {
+        font-size: 16px;
+        font-weight: 800;
+        color: #111827;
+    }
+
+    .bonus-item-dl {
+        margin: 0;
+    }
+
+    .total-card {
+        background: #f8fafc;
+    }
+
+    .total-card-title {
+        margin: 0 0 12px;
+        font-size: 16px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .total-note {
+        margin: 8px 0 0;
+        padding-top: 10px;
+        border-top: 1px solid #e5e7eb;
+        font-size: 13px;
+        color: #6b7280;
+        line-height: 1.6;
+    }
+
+    .total-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 14px;
+    }
+
+    .total-row:last-child {
+        border-bottom: none;
+    }
+
+    .total-row.grand {
+        margin-top: 4px;
+        padding-top: 14px;
+        border-top: 2px solid #dbeafe;
+        border-bottom: none;
+    }
+
+    .total-label {
+        font-weight: 600;
+    }
+
+    .total-value {
+        font-weight: 800;
+        color: #111827;
+    }
+
+    .total-row.grand .total-value {
+        font-size: 20px;
+        color: #1d4ed8;
+    }
+
+    @media (max-width: 560px) {
+        .summary-card {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .summary-badges {
+            flex-direction: row;
+            flex-wrap: wrap;
+        }
+    }
+</style>

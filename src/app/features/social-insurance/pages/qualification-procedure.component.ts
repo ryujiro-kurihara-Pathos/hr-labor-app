@@ -191,6 +191,20 @@ export class QualificationProcedureComponent {
         return this.hasDependents();
     });
 
+    exportProcedure = computed((): Procedure => {
+        const item = this.procedure();
+        const reward = this.displayMonthlyReward();
+
+        return {
+            ...item,
+            qualificationDate: this.displayQualificationDate() ?? '',
+            hasDependents: this.displayHasDependents(),
+            rewardCashAmount: reward?.cashAmount ?? item.rewardCashAmount,
+            rewardInKindAmount: reward?.inKindAmount ?? item.rewardInKindAmount,
+            rewardTotalAmount: reward?.totalAmount ?? item.rewardTotalAmount,
+        };
+    });
+
     readonly statusLabel = procedureStatusLabel;
     readonly dateLabel = dateLabel;
     readonly formatYen = formatYen;

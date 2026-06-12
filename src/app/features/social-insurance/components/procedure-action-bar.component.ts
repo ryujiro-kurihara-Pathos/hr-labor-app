@@ -1,7 +1,19 @@
-import { Component, computed, input, output, signal } from '@angular/core';
+import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { Router } from '@angular/router';
 
+import { Company } from '../../company/models/company.model';
+import { Office } from '../../company/models/office.model';
+import { Employee } from '../../employee/models/employee.models';
 import { Procedure } from '../models/procedures.model';
+import { downloadCsv } from '../../../shared/components/utils/csv.utils';
+import { ConfirmService } from '../../../shared/services/confirm.service';
+import { SocialInsuranceProcedureService } from '../services/social-insurance-procedure.service';
 import { dateLabel } from '../utils/procedure-display.util';
+import {
+    buildProcedureCsvExport,
+    canExportProcedureCsv,
+    ProcedureCsvExportContext,
+} from '../utils/procedure-csv-export.util';
 
 @Component({
     selector: 'app-procedure-action-bar',
@@ -9,7 +21,17 @@ import { dateLabel } from '../utils/procedure-display.util';
     templateUrl: './procedure-action-bar.component.html',
 })
 export class ProcedureActionBarComponent {
+    private readonly procedureService = inject(SocialInsuranceProcedureService);
+    private readonly confirmService = inject(ConfirmService);
+    private readonly router = inject(Router);
+
     procedure = input.required<Procedure>();
+    employee = input<Employee | null>(null);
+    office = input<Office | null>(null);
+    company = input<Company | null>(null);
+    /** CSV出力用。未指定時は procedure を使用 */
+    procedureForExport = input<Procedure | null>(null);
+    exportContext = input<ProcedureCsvExportContext>({});
     isSubmitting = input(false);
     submitDisabled = input(false);
     actionErrorMessage = input('');
@@ -17,17 +39,72 @@ export class ProcedureActionBarComponent {
     submitClick = output<void>();
 
     exportMessage = signal('');
+    deleteErrorMessage = signal('');
+    isDeleting = signal(false);
 
     readonly dateLabel = dateLabel;
 
     isCompleted = computed(() => this.procedure().status === 'completed');
+
+    canExportCsv = computed(() => canExportProcedureCsv(this.procedure().procedureType));
+
+    canDelete = computed(() => !this.isCompleted());
 
     submittedDateLabel(): string {
         const item = this.procedure();
         return dateLabel(item.submittedDate || item.completedDate);
     }
 
-    onExport(): void {
-        this.exportMessage.set('出力機能は準備中です。PDF・CSVなどの出力に対応予定です。');
+    onExportCsv(): void {
+        this.exportMessage.set('');
+
+        const result = buildProcedureCsvExport({
+            procedure: this.procedure(),
+            company: this.company(),
+            office: this.office(),
+            employee: this.employee(),
+            procedureForExport: this.procedureForExport(),
+            context: this.exportContext(),
+        });
+
+        if (!result.ok) {
+            this.exportMessage.set(result.error);
+            return;
+        }
+
+        downloadCsv(result.csvText, result.fileName);
+        this.exportMessage.set('CSVを出力しました');
+    }
+
+    async onSubmit(): Promise<void> {
+        if (this.isCompleted() || this.isDeleting() || this.isSubmitting() || this.submitDisabled()) {
+            return;
+        }
+
+        const confirmed = await this.confirmService.confirmSubmit();
+        if (!confirmed) return;
+
+        this.submitClick.emit();
+    }
+
+    async onDelete(): Promise<void> {
+        if (!this.canDelete() || this.isDeleting() || this.isSubmitting()) return;
+
+        const confirmed = await this.confirmService.confirmDelete();
+        if (!confirmed) return;
+
+        this.isDeleting.set(true);
+        this.deleteErrorMessage.set('');
+
+        try {
+            await this.procedureService.deleteProcedure(this.procedure().id);
+            await this.router.navigate(['/procedures']);
+        } catch (error) {
+            console.error('手続きの削除に失敗しました', error);
+            const msg = error instanceof Error ? error.message : '手続きの削除に失敗しました';
+            this.deleteErrorMessage.set(msg);
+        } finally {
+            this.isDeleting.set(false);
+        }
     }
 }

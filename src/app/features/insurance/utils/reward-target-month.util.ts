@@ -18,6 +18,72 @@ export function yearMonthFromTimestamp(ts: Timestamp | null | undefined): string
     return `${y}-${m}`;
 }
 
+/** 在籍中は当月、退職済みは退職月まで閲覧可能 */
+export function viewableYearMonthMax(employee: Employee, currentYearMonth: string): string {
+    const retireYm = yearMonthFromTimestamp(employee.retiredDate);
+    if (retireYm) return retireYm;
+    return currentYearMonth;
+}
+
+export function viewableYearMonthMin(employee: Employee): string | null {
+    return yearMonthFromDateString(employee.joinedDate);
+}
+
+/** 入社月〜退職月（在籍中は当月）の範囲内か */
+export function isViewableYearMonth(
+    employee: Employee,
+    targetYearMonth: string,
+    currentYearMonth: string,
+): boolean {
+    if (!isRewardTargetMonth(employee, targetYearMonth)) return false;
+    return targetYearMonth <= viewableYearMonthMax(employee, currentYearMonth);
+}
+
+export function clampViewableYearMonth(
+    employee: Employee,
+    targetYearMonth: string,
+    currentYearMonth: string,
+): string {
+    const minYm = viewableYearMonthMin(employee);
+    const maxYm = viewableYearMonthMax(employee, currentYearMonth);
+    let ym = targetYearMonth;
+    if (minYm && ym < minYm) ym = minYm;
+    if (ym > maxYm) ym = maxYm;
+    return ym;
+}
+
+export function listViewableYearMonths(employee: Employee, currentYearMonth: string): string[] {
+    const minYm = viewableYearMonthMin(employee);
+    const maxYm = viewableYearMonthMax(employee, currentYearMonth);
+    if (!minYm) return [];
+
+    const months: string[] = [];
+    let ym = minYm;
+    while (ym <= maxYm) {
+        months.push(ym);
+        ym = addMonthsToYearMonth(ym, 1);
+    }
+    return months;
+}
+
+export function viewableYearMonthReason(
+    employee: Employee,
+    targetYearMonth: string,
+    currentYearMonth: string,
+): string | null {
+    if (isViewableYearMonth(employee, targetYearMonth, currentYearMonth)) return null;
+
+    const joinReason = rewardTargetMonthReason(employee, targetYearMonth);
+    if (joinReason) return joinReason;
+
+    const maxYm = viewableYearMonthMax(employee, currentYearMonth);
+    if (targetYearMonth > maxYm) {
+        return `${formatYearMonthLabel(maxYm)}までの期間のみ確認できます。`;
+    }
+
+    return 'この月は確認できません。';
+}
+
 /** 入社月以降かつ退職月以前の年月なら報酬登録対象 */
 export function isRewardTargetMonth(employee: Employee, targetYearMonth: string): boolean {
     if (!YEAR_MONTH_PATTERN.test(targetYearMonth)) return false;

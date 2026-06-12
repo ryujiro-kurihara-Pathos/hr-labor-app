@@ -59,7 +59,11 @@
             <p class="month-loading">報酬情報を読み込み中...</p>
         }
 
-        @if (standardReward()?.fixedWageChanged && changedFixedWageFieldLabels().length > 0) {
+        @if (
+            monthRewardStatus() === 'confirmed' &&
+            standardReward()?.fixedWageChanged &&
+            changedFixedWageFieldLabels().length > 0
+        ) {
             <p class="alert alert-warning">
                 前月から固定的賃金に変更があります（{{ changedFixedWageFieldLabels().join('・') }}）。月額変更の届出が必要な場合があります。
             </p>
@@ -184,6 +188,7 @@
                                 placeholder="例: 88000"
                                 [(ngModel)]="rewardForm.basicSalary"
                                 (ngModelChange)="onRewardFormFieldChange()"
+                                [disabled]="!isRewardEditable() || isLoadingMonth()"
                             />
                             @if (previousFixedWageValue('basicSalary'); as prev) {
                                 <span class="previous-value-hint">前月: {{ prev | number }}円</span>
@@ -202,6 +207,7 @@
                                 placeholder="例: 10000"
                                 [(ngModel)]="rewardForm.commutingAllowance"
                                 (ngModelChange)="onRewardFormFieldChange()"
+                                [disabled]="!isRewardEditable() || isLoadingMonth()"
                             />
                             @if (previousFixedWageValue('commutingAllowance'); as prev) {
                                 <span class="previous-value-hint">前月: {{ prev | number }}円</span>
@@ -220,6 +226,7 @@
                                 placeholder="例: 10000"
                                 [(ngModel)]="rewardForm.positionAllowance"
                                 (ngModelChange)="onRewardFormFieldChange()"
+                                [disabled]="!isRewardEditable() || isLoadingMonth()"
                             />
                             @if (previousFixedWageValue('positionAllowance'); as prev) {
                                 <span class="previous-value-hint">前月: {{ prev | number }}円</span>
@@ -238,6 +245,7 @@
                                 placeholder="例: 10000"
                                 [(ngModel)]="rewardForm.housingAllowance"
                                 (ngModelChange)="onRewardFormFieldChange()"
+                                [disabled]="!isRewardEditable() || isLoadingMonth()"
                             />
                             @if (previousFixedWageValue('housingAllowance'); as prev) {
                                 <span class="previous-value-hint">前月: {{ prev | number }}円</span>
@@ -256,6 +264,7 @@
                                 placeholder="例: 10000"
                                 [(ngModel)]="rewardForm.fixedOvertimePay"
                                 (ngModelChange)="onRewardFormFieldChange()"
+                                [disabled]="!isRewardEditable() || isLoadingMonth()"
                             />
                             @if (previousFixedWageValue('fixedOvertimePay'); as prev) {
                                 <span class="previous-value-hint">前月: {{ prev | number }}円</span>
@@ -274,6 +283,7 @@
                                 placeholder="例: 10000"
                                 [(ngModel)]="rewardForm.otherFixedAllowance"
                                 (ngModelChange)="onRewardFormFieldChange()"
+                                [disabled]="!isRewardEditable() || isLoadingMonth()"
                             />
                             @if (previousFixedWageValue('otherFixedAllowance'); as prev) {
                                 <span class="previous-value-hint">前月: {{ prev | number }}円</span>
@@ -295,6 +305,7 @@
                                 placeholder="例: 15000"
                                 [(ngModel)]="rewardForm.overtimePay"
                                 (ngModelChange)="onRewardFormFieldChange()"
+                                [disabled]="!isRewardEditable() || isLoadingMonth()"
                             />
                         </div>
                         <div class="form-field">
@@ -305,6 +316,7 @@
                                 placeholder="例: 5000"
                                 [(ngModel)]="rewardForm.holidayPay"
                                 (ngModelChange)="onRewardFormFieldChange()"
+                                [disabled]="!isRewardEditable() || isLoadingMonth()"
                             />
                         </div>
                         <div class="form-field">
@@ -315,6 +327,7 @@
                                 placeholder="例: 3000"
                                 [(ngModel)]="rewardForm.nightPay"
                                 (ngModelChange)="onRewardFormFieldChange()"
+                                [disabled]="!isRewardEditable() || isLoadingMonth()"
                             />
                         </div>
                         <div class="form-field">
@@ -325,6 +338,7 @@
                                 placeholder="例: 20000"
                                 [(ngModel)]="rewardForm.commissionPay"
                                 (ngModelChange)="onRewardFormFieldChange()"
+                                [disabled]="!isRewardEditable() || isLoadingMonth()"
                             />
                         </div>
                         <div class="form-field">
@@ -335,31 +349,49 @@
                                 placeholder="例: 5000"
                                 [(ngModel)]="rewardForm.otherVariablePay"
                                 (ngModelChange)="onRewardFormFieldChange()"
+                                [disabled]="!isRewardEditable() || isLoadingMonth()"
                             />
                         </div>
                     </div>
                 </div>
 
-                <button
-                    type="button"
-                    class="btn primary-btn save-btn"
-                    (click)="saveStandardMonthlyReward()"
-                    [disabled]="isSaving() || isLoadingMonth() || !isTargetMonth()"
-                >
-                    @if (isSaving()) {
-                        保存中...
-                    } @else if (monthRewardStatus() === 'registered') {
-                        更新する
-                    } @else {
-                        保存する
-                    }
-                </button>
+                @if (isRewardEditable()) {
+                    <div class="save-actions">
+                        <button
+                            type="button"
+                            class="btn sub-btn save-btn"
+                            (click)="saveDraftStandardMonthlyReward()"
+                            [disabled]="isSaving() || isLoadingMonth() || !isTargetMonth()"
+                        >
+                            @if (isSaving()) {
+                                保存中...
+                            } @else {
+                                下書き保存
+                            }
+                        </button>
+                        <button
+                            type="button"
+                            class="btn primary-btn save-btn"
+                            (click)="confirmStandardMonthlyReward()"
+                            [disabled]="isSaving() || isLoadingMonth() || !isTargetMonth()"
+                        >
+                            @if (isSaving()) {
+                                保存中...
+                            } @else {
+                                確定する
+                            }
+                        </button>
+                    </div>
+                } @else if (monthRewardStatus() === 'confirmed') {
+                    <p class="reward-locked-note">確定済みのため編集できません。</p>
+                }
             </section>
 
             <section
                 class="card month-status-panel"
                 [class.loading]="monthRewardStatus() === 'loading'"
-                [class.registered]="monthRewardStatus() === 'registered'"
+                [class.confirmed]="monthRewardStatus() === 'confirmed'"
+                [class.draft]="monthRewardStatus() === 'draft'"
                 [class.unregistered]="monthRewardStatus() === 'unregistered'"
                 [class.excluded]="monthRewardStatus() === 'excluded'"
             >
@@ -368,7 +400,8 @@
                     <span
                         class="registration-badge"
                         [class.loading]="monthRewardStatus() === 'loading'"
-                        [class.registered]="monthRewardStatus() === 'registered'"
+                        [class.confirmed]="monthRewardStatus() === 'confirmed'"
+                        [class.draft]="monthRewardStatus() === 'draft'"
                         [class.unregistered]="monthRewardStatus() === 'unregistered'"
                         [class.excluded]="monthRewardStatus() === 'excluded'"
                     >
@@ -431,7 +464,12 @@
                 }
 
                 @if (monthRewardStatus() === 'unregistered' && isInputRequiredMonth()) {
-                    <p class="month-status-action">入力が必要な月です。左のフォームに報酬を入力して保存してください。</p>
+                    <p class="month-status-action">
+                        入力が必要な月です。左のフォームに報酬を入力し、下書き保存または確定してください。
+                    </p>
+                }
+                @if (monthRewardStatus() === 'draft') {
+                    <p class="month-status-action">下書き保存済みです。内容を確認して「確定する」を押してください。</p>
                 }
             </section>
         </div>
@@ -1395,8 +1433,21 @@
         color: #fff;
     }
 
-    .save-btn {
+    .save-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
         margin-top: 16px;
+    }
+
+    .save-btn {
+        margin-top: 0;
+    }
+
+    .reward-locked-note {
+        margin: 16px 0 0;
+        font-size: 13px;
+        color: #6b7280;
     }
 
     .sub-btn {
@@ -1405,9 +1456,14 @@
         border: 1px solid #d1d5db;
     }
 
-    .month-status-panel.registered {
+    .month-status-panel.confirmed {
         background: #f0fdf4;
         border-color: #bbf7d0;
+    }
+
+    .month-status-panel.draft {
+        background: #eff6ff;
+        border-color: #bfdbfe;
     }
 
     .month-status-panel.unregistered {
@@ -1441,9 +1497,14 @@
         font-weight: 700;
     }
 
-    .registration-badge.registered {
+    .registration-badge.confirmed {
         background: #dcfce7;
         color: #166534;
+    }
+
+    .registration-badge.draft {
+        background: #dbeafe;
+        color: #1d4ed8;
     }
 
     .registration-badge.unregistered {

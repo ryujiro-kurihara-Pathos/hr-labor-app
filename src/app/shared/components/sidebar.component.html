@@ -1,6 +1,6 @@
 <aside class="sidebar">
     <div class="sidebar-top">
-        <a routerLink="/home" class="brand" aria-label="ホームへ">
+        <a [routerLink]="homeRoute()" class="brand" aria-label="ホームへ">
             <span class="brand-icon">社保</span>
             <span class="brand-text">
                 <span class="brand-title">社会保険管理</span>
@@ -9,7 +9,7 @@
         </a>
 
         <nav class="nav" aria-label="メインメニュー">
-            @for (item of navItems; track item.route) {
+            @for (item of navItems(); track item.route) {
                 <a
                     class="nav-link"
                     [routerLink]="item.route"
@@ -24,7 +24,7 @@
     </div>
 
     <div class="sidebar-bottom">
-        <a routerLink="/profile" class="user-card" routerLinkActive="active">
+        <a [routerLink]="profileRoute()" class="user-card" routerLinkActive="active">
             <span class="user-avatar">{{ userInitial() }}</span>
             <span class="user-info">
                 <span class="user-name">{{ userDisplayName() }}</span>
