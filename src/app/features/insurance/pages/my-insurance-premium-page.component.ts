@@ -8,6 +8,9 @@ import { UserService } from '../../users/services/user.service';
 import { Employee } from '../../employee/models/employee.models';
 import { EmployeeService } from '../../employee/services/employee.service';
 import { Office } from '../../company/models/office.model';
+import { Company, InsurancePremiumCollectionTiming } from '../../company/models/company.model';
+import { CompanyService } from '../../company/services/company.service';
+import { formatPayrollDeductionNote } from '../../company/utils/company-payroll-settings.util';
 import { OfficeService } from '../../company/services/office.service';
 import { SocialInsuranceStatus } from '../../social-insurance/models/social-insurance-status.model';
 import { SocialInsuranceStatusService } from '../../social-insurance/services/social-insurance-status.service';
@@ -70,6 +73,7 @@ export class MyInsurancePremiumPageComponent implements OnInit {
     private readonly userService = inject(UserService);
     private readonly employeeService = inject(EmployeeService);
     private readonly officeService = inject(OfficeService);
+    private readonly companyService = inject(CompanyService);
     private readonly socialInsuranceStatusService = inject(SocialInsuranceStatusService);
     private readonly rewardService = inject(StandardMonthlyRewardService);
     private readonly determinationService = inject(StandardRemunerationDeterminationService);
@@ -78,6 +82,8 @@ export class MyInsurancePremiumPageComponent implements OnInit {
 
     employee = signal<Employee | null>(null);
     office = signal<Office | null>(null);
+    company = signal<Company | null>(null);
+    insurancePremiumCollectionTiming = signal<InsurancePremiumCollectionTiming>('next_month');
     insuranceStatus = signal<SocialInsuranceStatus | null>(null);
     standardReward = signal<StandardMonthlyReward | null>(null);
     allRewards = signal<StandardMonthlyReward[]>([]);
@@ -93,6 +99,12 @@ export class MyInsurancePremiumPageComponent implements OnInit {
     errorMessage = signal('');
 
     targetYearMonthLabel = computed(() => formatYearMonthLabel(this.targetYearMonth()));
+
+    payrollDeductionNote = computed(() => {
+        const targetYearMonth = this.targetYearMonth();
+        if (!targetYearMonth) return '';
+        return formatPayrollDeductionNote(targetYearMonth, this.insurancePremiumCollectionTiming());
+    });
 
     viewableMinYearMonth = computed(() => {
         const employee = this.employee();
@@ -417,15 +429,20 @@ export class MyInsurancePremiumPageComponent implements OnInit {
                 clampViewableYearMonth(employee, this.targetYearMonth(), this.currentYearMonth()),
             );
 
-            const [status, office, allBonuses] = await Promise.all([
+            const [status, office, allBonuses, company] = await Promise.all([
                 this.socialInsuranceStatusService.getInsuranceStatusByEmployeeId(employee.id),
                 this.officeService.getOfficeById(employee.officeId),
                 this.bonusRewardService.getBonusRewardsByEmployee(employee.companyId, employee.id),
+                this.companyService.getCompanyById(employee.companyId),
             ]);
 
             this.insuranceStatus.set(status);
             this.office.set(office);
             this.allBonuses.set(allBonuses);
+            this.company.set(company);
+            if (company) {
+                this.insurancePremiumCollectionTiming.set(company.insurancePremiumCollectionTiming);
+            }
 
             await this.loadMonthData();
         } catch (error) {

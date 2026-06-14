@@ -7,16 +7,23 @@ import {
     updateProfile,
     User,
     onAuthStateChanged,
+    sendSignInLinkToEmail,
+    isSignInWithEmailLink,
+    signInWithEmailLink,
+    ActionCodeSettings,
 } from 'firebase/auth';
 import { auth } from '../../../core/firebase';
 import { InitialAdminSignupInput } from '../models/auth.model';
+import {
+    EMAIL_FOR_SIGN_IN_KEY,
+    normalizeAuthEmail,
+} from '../utils/email-link-auth.util';
 
 @Injectable({
     providedIn: 'root',
 })
 
 export class AuthService {
-    // ログイン
     async login(email: string, password: string): Promise<User> {
         const userCredential = await signInWithEmailAndPassword(
             auth,
@@ -26,14 +33,11 @@ export class AuthService {
         return userCredential.user;
     }
 
-    // ログアウト
     async logout(): Promise<void> {
         await signOut(auth);
     }
 
-    // 初期管理者ユーザー作成
     async createInitialAdminUser(input: InitialAdminSignupInput): Promise<User> {
-        // Authenticationにユーザーを作成
         const userCredential = await createUserWithEmailAndPassword(
             auth,
             input.email,
@@ -41,7 +45,7 @@ export class AuthService {
         );
 
         const user = userCredential.user;
-        
+
         await updateProfile(user, {
             displayName: `${input.lastName} ${input.firstName}`,
         });
@@ -49,12 +53,36 @@ export class AuthService {
         return user;
     }
 
-    // Authユーザーの取得
+    async sendSignInLink(email: string, continueUrl: string): Promise<void> {
+        const normalizedEmail = normalizeAuthEmail(email);
+        const actionCodeSettings: ActionCodeSettings = {
+            url: continueUrl,
+            handleCodeInApp: true,
+        };
+
+        await sendSignInLinkToEmail(auth, normalizedEmail, actionCodeSettings);
+        window.localStorage.setItem(EMAIL_FOR_SIGN_IN_KEY, normalizedEmail);
+    }
+
+    isEmailSignInLink(href: string): boolean {
+        return isSignInWithEmailLink(auth, href);
+    }
+
+    async signInWithEmailLink(email: string, emailLink: string): Promise<User> {
+        const normalizedEmail = normalizeAuthEmail(email);
+        const userCredential = await signInWithEmailLink(auth, normalizedEmail, emailLink);
+        window.localStorage.removeItem(EMAIL_FOR_SIGN_IN_KEY);
+        return userCredential.user;
+    }
+
+    getStoredEmailForSignIn(): string {
+        return window.localStorage.getItem(EMAIL_FOR_SIGN_IN_KEY)?.trim() ?? '';
+    }
+
     getCurrentAuthUser(): User | null {
         return auth.currentUser;
     }
 
-    // ログイン状態の監視
     watchAuthState(callback: (user: User | null) => void) {
         return onAuthStateChanged(auth, callback);
     }

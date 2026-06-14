@@ -117,6 +117,11 @@
                     <h2 class="section-title">連絡先・住所</h2>
                     <div class="form-grid-two">
                         <div class="form-field">
+                            <label for="email">メールアドレス</label>
+                            <input id="email" type="email" name="email" [(ngModel)]="email" placeholder="example@example.com" />
+                            <p class="field-note">ユーザー招待メールの送信先として使用します</p>
+                        </div>
+                        <div class="form-field">
                             <label for="phone-number">電話番号</label>
                             <input id="phone-number" type="text" name="phoneNumber" [(ngModel)]="phoneNumber" />
                         </div>
@@ -173,6 +178,10 @@
                             </dd>
                         </div>
                         <div class="detail-row">
+                            <dt>メールアドレス</dt>
+                            <dd>{{ employee()!.email || '—' }}</dd>
+                        </div>
+                        <div class="detail-row">
                             <dt>電話番号</dt>
                             <dd>{{ employee()!.phoneNumber || '—' }}</dd>
                         </div>
@@ -186,6 +195,13 @@
                 <section class="profile-section">
                     <h2 class="section-title">住所</h2>
                     <p class="address-block">{{ formatAddress(employee()!) }}</p>
+                </section>
+
+                <section id="user-invite" class="profile-section">
+                    <app-employee-invite-panel
+                        [employee]="employee()!"
+                        [autoOpenForm]="openInviteOnInit()"
+                    />
                 </section>
 
                 <section class="profile-section">

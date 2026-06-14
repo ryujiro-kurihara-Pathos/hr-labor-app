@@ -1,0 +1,134 @@
+<div class="invite-page">
+    <div class="invite-card">
+        <h1>従業員招待</h1>
+
+        @if (isLoading() || isSigningIn()) {
+            <p class="muted">{{ isSigningIn() ? 'ログインしています...' : '読み込み中...' }}</p>
+        } @else if (errorMessage() && !invitation()) {
+            <p class="error-message">{{ errorMessage() }}</p>
+            <p class="login-link">
+                <a routerLink="/login">ログイン画面へ</a>
+            </p>
+        } @else if (invitation()) {
+            <p class="intro">
+                {{ companyName() || '会社' }} から招待されています。
+                @if (employee(); as emp) {
+                    <span class="employee-name">{{ emp.lastName }} {{ emp.firstName }}</span>
+                    さんとしてログインします。
+                }
+            </p>
+
+            <dl class="invite-meta">
+                <div class="meta-row">
+                    <dt>メールアドレス</dt>
+                    <dd>{{ invitation()!.email }}</dd>
+                </div>
+            </dl>
+
+            @if (infoMessage()) {
+                <p class="info-message">{{ infoMessage() }}</p>
+            }
+
+            @if (errorMessage()) {
+                <p class="error-message">{{ errorMessage() }}</p>
+            }
+
+            <p class="login-link">
+                <a routerLink="/login">ログイン画面へ</a>
+            </p>
+        }
+    </div>
+</div>
+
+<style>
+    .invite-page {
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: #f5f6f8;
+        padding: 24px 16px;
+    }
+
+    .invite-card {
+        width: min(480px, 100%);
+        padding: 32px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    }
+
+    h1 {
+        margin: 0 0 12px;
+        font-size: 22px;
+    }
+
+    .intro {
+        margin: 0 0 20px;
+        color: #4b5563;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    .employee-name {
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .invite-meta {
+        margin: 0 0 16px;
+    }
+
+    .meta-row {
+        display: flex;
+        gap: 12px;
+        font-size: 14px;
+    }
+
+    .meta-row dt {
+        width: 108px;
+        margin: 0;
+        color: #6b7280;
+        font-weight: 500;
+    }
+
+    .meta-row dd {
+        margin: 0;
+        color: #111827;
+        word-break: break-all;
+    }
+
+    .info-message {
+        margin: 0 0 16px;
+        padding: 12px;
+        border-radius: 8px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    .login-link {
+        margin-top: 16px;
+        text-align: center;
+        font-size: 14px;
+    }
+
+    .login-link a {
+        color: #2f6fed;
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .error-message {
+        color: #d93025;
+        font-size: 14px;
+        margin: 0 0 16px;
+        line-height: 1.5;
+    }
+
+    .muted {
+        color: #6b7280;
+        font-size: 14px;
+    }
+</style>

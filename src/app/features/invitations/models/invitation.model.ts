@@ -9,6 +9,7 @@ export type Invitation = {
     email: string;
 
     companyId: string;
+    employeeId: string;
     role: UserRole;
     status: InvitationStatus;
 

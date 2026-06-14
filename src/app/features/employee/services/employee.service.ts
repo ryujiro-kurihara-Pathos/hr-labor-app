@@ -12,7 +12,8 @@ import {
     where,
 } from 'firebase/firestore';
 import { db } from '../../../core/firebase';
-import { Dependent, DependentInput, Employee, EmployeeInput } from '../models/employee.models';
+import { Dependent, DependentInput, Employee, EmployeeInput, toEmployeeInput } from '../models/employee.models';
+import { nextInsuredPersonNumber } from '../utils/insured-person-number.util';
 
 @Injectable({
     providedIn: 'root',
@@ -38,10 +39,12 @@ export class EmployeeService {
             companyId: String(data['companyId'] ?? ''),
             officeId: String(data['officeId'] ?? ''),
             employeeNumber: String(data['employeeNumber'] ?? ''),
+            insuredPersonNumber: String(data['insuredPersonNumber'] ?? ''),
             lastName: String(data['lastName'] ?? ''),
             firstName: String(data['firstName'] ?? ''),
             lastNameKana: String(data['lastNameKana'] ?? ''),
             firstNameKana: String(data['firstNameKana'] ?? ''),
+            email: String(data['email'] ?? '').trim().toLowerCase(),
             myNumber: String(data['myNumber'] ?? ''),
             gender: gender === 'female' ? 'female' : 'male',
             postalCode: String(data['postalCode'] ?? ''),
@@ -123,6 +126,42 @@ export class EmployeeService {
         });
 
         return employees;
+    }
+
+    async getEmployeesByOfficeId(officeId: string): Promise<Employee[]> {
+        const docRef = collection(db, 'employees');
+        const q = query(docRef, where('officeId', '==', officeId));
+        const docSnap = await getDocs(q);
+
+        if (docSnap.empty) return [];
+
+        return docSnap.docs.map((snapshot) =>
+            this.toEmployee(snapshot.id, snapshot.data() as Record<string, unknown>),
+        );
+    }
+
+    /** 事業所内の既存番号から次の被保険者整理番号を採番する */
+    async generateNextInsuredPersonNumber(officeId: string): Promise<string> {
+        const employees = await this.getEmployeesByOfficeId(officeId);
+        return nextInsuredPersonNumber(employees.map((employee) => employee.insuredPersonNumber));
+    }
+
+    /** 未登録の場合のみ被保険者整理番号を採番して保存する */
+    async assignInsuredPersonNumberIfMissing(employeeId: string): Promise<string> {
+        const employee = await this.getEmployeeById(employeeId);
+        if (!employee) {
+            throw new Error('従業員が見つかりませんでした');
+        }
+
+        const existing = employee.insuredPersonNumber.trim();
+        if (existing) return existing;
+
+        const nextNumber = await this.generateNextInsuredPersonNumber(employee.officeId);
+        await this.updateEmployee(employeeId, {
+            ...toEmployeeInput(employee),
+            insuredPersonNumber: nextNumber,
+        });
+        return nextNumber;
     }
 
     // employeeIdから従業員を取得

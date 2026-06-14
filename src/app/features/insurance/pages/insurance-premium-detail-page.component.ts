@@ -42,6 +42,9 @@ import {
     formatRevisionGradeComparison,
 } from '../utils/determination-precedence.util';
 import { Office } from '../../company/models/office.model';
+import { Company, InsurancePremiumCollectionTiming } from '../../company/models/company.model';
+import { CompanyService } from '../../company/services/company.service';
+import { formatPayrollDeductionNote } from '../../company/utils/company-payroll-settings.util';
 import { OfficeService } from '../../company/services/office.service';
 import { findCareInsuranceRate, findHealthInsuranceRate } from '../../insurance-rate/utils/insurance-rate-lookup.util';
 import { KYOKAI_HEALTH_INSURANCE_RATE_FILES } from '../../insurance-rate/data/insurance-rates';
@@ -83,6 +86,7 @@ export class InsurancePremiumDetailPageComponent {
     private readonly employeeService = inject(EmployeeService);
     private readonly socialInsuranceStatusService = inject(SocialInsuranceStatusService);
     private readonly officeService = inject(OfficeService);
+    private readonly companyService = inject(CompanyService);
     private readonly bonusRewardService = inject(BonusRewardService);
     private readonly procedureService = inject(SocialInsuranceProcedureService);
 
@@ -136,9 +140,17 @@ export class InsurancePremiumDetailPageComponent {
     employee = signal<Employee | null>(null);
     // 事業所
     office = signal<Office | null>(null);
+    company = signal<Company | null>(null);
+    insurancePremiumCollectionTiming = signal<InsurancePremiumCollectionTiming>('next_month');
     // 対象年月
     targetYearMonth = signal<string>('');
     targetYearMonthLabel = computed(() => formatYearMonthLabel(this.targetYearMonth()));
+
+    payrollDeductionNote = computed(() => {
+        const targetYearMonth = this.targetYearMonth();
+        if (!targetYearMonth) return '';
+        return formatPayrollDeductionNote(targetYearMonth, this.insurancePremiumCollectionTiming());
+    });
 
     regularDecisionProcedure = signal<Procedure | null>(null);
     isCreatingRegularDecisionProcedure = signal(false);
@@ -586,7 +598,7 @@ export class InsurancePremiumDetailPageComponent {
                 await Promise.all([this.loadEmployeeRewards(), this.loadSocialInsuranceStatus()]);
                 await this.loadStandardReward();
                 await this.loadMonthBonuses();
-                await this.loadOffice();
+                await Promise.all([this.loadOffice(), this.loadCompany()]);
                 await Promise.all([
                     this.loadRegularDecisionProcedure(),
                     this.loadRevisionProcedure(),
@@ -623,6 +635,18 @@ export class InsurancePremiumDetailPageComponent {
             return;
         }
         this.office.set(office);
+    }
+
+    async loadCompany() {
+        const employee = this.employee();
+        const companyId = employee?.companyId;
+        if (!companyId) return;
+
+        const company = await this.companyService.getCompanyById(companyId);
+        if (!company) return;
+
+        this.company.set(company);
+        this.insurancePremiumCollectionTiming.set(company.insurancePremiumCollectionTiming);
     }
 
     // 社会保険情報の読み込み

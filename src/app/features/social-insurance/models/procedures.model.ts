@@ -45,6 +45,7 @@ export type QualificationProcedureData = {
     employeeFirstNameKana: string;
     birthDate: string;
     myNumber: string;
+    insuredPersonNumber: string;
     employeeAddress: string;
     qualificationDate: string;
     rewardTargetYearMonth: string | null;
@@ -138,6 +139,7 @@ export const EMPTY_QUALIFICATION_PROCEDURE_DATA: QualificationProcedureData = {
     employeeFirstNameKana: '',
     birthDate: '',
     myNumber: '',
+    insuredPersonNumber: '',
     employeeAddress: '',
     qualificationDate: '',
     rewardTargetYearMonth: null,

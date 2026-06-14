@@ -1,6 +1,7 @@
 import { Company } from '../../company/models/company.model';
 import { Office } from '../../company/models/office.model';
 import { Employee } from '../../employee/models/employee.models';
+import { resolveInsuredPersonNumberForExport } from '../../employee/utils/insured-person-number.util';
 import { Procedure } from '../models/procedures.model';
 
 export type QualificationAcquisitionCsvRow = {
@@ -48,7 +49,7 @@ export function createQualificationAcquisitionCsvRow(params: {
     事業主氏名: company.representativeName,
     電話番号: office.phoneNumber,
 
-    被保険者整理番号: employee.myNumber ?? '',
+    被保険者整理番号: resolveInsuredPersonNumberForExport(employee, procedure),
     氏名: employee.lastName + ' ' + employee.firstName,
     フリガナ: employee.lastNameKana + ' ' + employee.firstNameKana,
     生年月日: employee.birthDate,

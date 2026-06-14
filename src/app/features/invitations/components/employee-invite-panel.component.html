@@ -1,0 +1,222 @@
+<section class="invite-panel">
+    <h2 class="section-title">ユーザー招待</h2>
+
+    @if (isLoading()) {
+        <p class="muted">読み込み中...</p>
+    } @else if (linkedUser(); as user) {
+        <p class="section-note">この従業員はユーザーアカウントと紐づいています。</p>
+        <dl class="detail-grid">
+            <div class="detail-row">
+                <dt>ユーザー名</dt>
+                <dd>{{ user.lastName }} {{ user.firstName }}</dd>
+            </div>
+            <div class="detail-row">
+                <dt>メールアドレス</dt>
+                <dd>{{ user.email }}</dd>
+            </div>
+            <div class="detail-row">
+                <dt>権限</dt>
+                <dd>{{ roleLabel(user.role) }}</dd>
+            </div>
+        </dl>
+    } @else {
+        @if (pendingInvitation(); as invitation) {
+            <p class="section-note">
+                招待メール送信済み（{{ invitationStatusLabel(invitation.status) }}）·
+                {{ invitation.email }} · 権限: {{ roleLabel(invitation.role) }}
+            </p>
+            <p class="section-note">
+                従業員はメール内のログインリンクから、パスワードなしでアカウント登録・ログインできます。
+            </p>
+            <button
+                type="button"
+                class="btn sub-btn"
+                (click)="resendInvitation()"
+                [disabled]="isSending()"
+            >
+                @if (isSending()) {
+                    再送信中...
+                } @else {
+                    招待メールを再送信
+                }
+            </button>
+        } @else {
+            <p class="section-note">
+                従業員情報に登録されたメールアドレス宛に、ログイン用の招待メールを送信します（パスワード不要）。
+            </p>
+        }
+
+        @if (!employeeEmail()) {
+            <p class="warning-message">
+                メールアドレスが未登録のため招待できません。従業員情報の編集からメールアドレスを登録してください。
+            </p>
+        }
+
+        @if (!isFormOpen()) {
+            <button
+                type="button"
+                class="btn primary-btn"
+                (click)="openInviteForm()"
+                [disabled]="!employeeEmail()"
+            >
+                招待メールを送信
+            </button>
+        } @else {
+            <div class="invite-form">
+                <div class="form-field">
+                    <label for="invite-email">送信先メールアドレス</label>
+                    <input
+                        id="invite-email"
+                        type="email"
+                        name="inviteEmail"
+                        [ngModel]="employeeEmail()"
+                        readonly
+                    />
+                    <p class="field-note">従業員情報に登録されたメールアドレスに送信します</p>
+                </div>
+                <div class="form-field">
+                    <label for="invite-role">権限</label>
+                    <select id="invite-role" name="inviteRole" [(ngModel)]="inviteRole">
+                        @for (option of roleOptions; track option.value) {
+                            <option [ngValue]="option.value">{{ option.label }}</option>
+                        }
+                    </select>
+                </div>
+                <div class="button-row">
+                    <button type="button" class="btn sub-btn" (click)="closeInviteForm()" [disabled]="isSending()">
+                        キャンセル
+                    </button>
+                    <button type="button" class="btn primary-btn" (click)="sendInvitation()" [disabled]="isSending()">
+                        @if (isSending()) {
+                            送信中...
+                        } @else {
+                            招待メールを送信
+                        }
+                    </button>
+                </div>
+            </div>
+        }
+    }
+
+    @if (successMessage()) {
+        <p class="success-message">{{ successMessage() }}</p>
+    }
+    @if (errorMessage()) {
+        <p class="error-message">{{ errorMessage() }}</p>
+    }
+</section>
+
+<style>
+    .invite-panel {
+        margin-top: 0;
+    }
+
+    .section-note {
+        margin: 0 0 12px;
+        color: #6b7280;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    .muted {
+        color: #6b7280;
+        font-size: 14px;
+    }
+
+    .warning-message {
+        margin: 0 0 12px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        color: #92400e;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .invite-form {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #f3f4f6;
+    }
+
+    .form-field {
+        margin-bottom: 12px;
+    }
+
+    .form-field label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .field-note {
+        margin: 6px 0 0;
+        font-size: 12px;
+        color: #6b7280;
+    }
+
+    .form-field input,
+    .form-field select {
+        width: 100%;
+        height: 40px;
+        padding: 0 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 14px;
+        box-sizing: border-box;
+        background: #fff;
+    }
+
+    .form-field input[readonly] {
+        background: #f9fafb;
+        color: #374151;
+    }
+
+    .button-row {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+    }
+
+    .btn {
+        height: 40px;
+        padding: 0 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .primary-btn {
+        border: none;
+        background: #2563eb;
+        color: #fff;
+    }
+
+    .sub-btn {
+        border: 1px solid #d1d5db;
+        background: #fff;
+        color: #374151;
+    }
+
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .success-message {
+        margin: 12px 0 0;
+        color: #166534;
+        font-size: 14px;
+    }
+
+    .error-message {
+        margin: 12px 0 0;
+        color: #b91c1c;
+        font-size: 14px;
+        font-weight: 600;
+    }
+</style>

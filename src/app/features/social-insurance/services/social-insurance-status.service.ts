@@ -127,6 +127,10 @@ export class SocialInsuranceStatusService {
     }
 
     async syncQualificationDates(employeeId: string, qualificationDate: string): Promise<void> {
+        await this.syncQualificationCompletion(employeeId, qualificationDate);
+    }
+
+    async syncQualificationCompletion(employeeId: string, qualificationDate: string): Promise<void> {
         const date = qualificationDate.trim();
         if (!date) return;
 
@@ -135,6 +139,8 @@ export class SocialInsuranceStatusService {
 
         const nextInput: SocialInsuranceStatusInput = {
             ...this.toStatusInput(status),
+            healthInsuranceStatus: 'active',
+            pensionInsuranceStatus: 'active',
             healthInsuranceStartDate: date,
             pensionInsuranceStartDate: date,
         };

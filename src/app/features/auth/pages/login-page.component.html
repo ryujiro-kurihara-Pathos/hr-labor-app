@@ -2,47 +2,92 @@
     <div class="login-card">
         <h1>ログイン</h1>
 
-        <div class="form-field">
-            <label for="email">メールアドレス</label>
-            <input
-                id="email"
-                type="email"
-                name="email"
-                [(ngModel)]="email"
-                placeholder="example@example.com"
-            />
-        </div>
+        @if (isCompletingLink()) {
+            <p class="info-message">ログインリンクを確認しています...</p>
+        } @else {
+            <section class="login-section">
+                <h2 class="section-title">管理者ログイン</h2>
+                <p class="section-note">パスワードでログイン（初期登録した管理者向け）</p>
 
-        <div class="form-field">
-            <label for="password">パスワード</label>
-            <input
-                id="password"
-                type="password"
-                name="password"
-                [(ngModel)]="password"
-                placeholder="パスワード"
-            />
-        </div>
+                <div class="form-field">
+                    <label for="email">メールアドレス</label>
+                    <input
+                        id="email"
+                        type="email"
+                        name="email"
+                        [(ngModel)]="email"
+                        placeholder="example@example.com"
+                    />
+                </div>
 
-        @if(errorMessage) {
-            <p class="error-message">{{ errorMessage }}</p>
+                <div class="form-field">
+                    <label for="password">パスワード</label>
+                    <input
+                        id="password"
+                        type="password"
+                        name="password"
+                        [(ngModel)]="password"
+                        placeholder="パスワード"
+                    />
+                </div>
+
+                @if (errorMessage) {
+                    <p class="error-message">{{ errorMessage }}</p>
+                }
+
+                <button type="button" class="form-btn" (click)="onLogin()" [disabled]="isLoading">
+                    @if (isLoading) {
+                        <span class="loading-content">
+                            <span class="spinner"></span>
+                            ログイン中
+                        </span>
+                    } @else {
+                        ログイン
+                    }
+                </button>
+            </section>
+
+            <section class="login-section email-link-section">
+                <h2 class="section-title">従業員ログイン</h2>
+                <p class="section-note">パスワード不要。メール内のリンクからログインします。</p>
+
+                <div class="form-field">
+                    <label for="link-email">メールアドレス</label>
+                    <input
+                        id="link-email"
+                        type="email"
+                        name="linkEmail"
+                        [(ngModel)]="linkEmail"
+                        placeholder="example@example.com"
+                    />
+                </div>
+
+                @if (linkSuccessMessage) {
+                    <p class="success-message">{{ linkSuccessMessage }}</p>
+                }
+                @if (linkErrorMessage) {
+                    <p class="error-message">{{ linkErrorMessage }}</p>
+                }
+
+                <button
+                    type="button"
+                    class="form-btn secondary-btn"
+                    (click)="onSendLoginLink()"
+                    [disabled]="isSendingLink"
+                >
+                    @if (isSendingLink) {
+                        送信中...
+                    } @else {
+                        ログインリンクをメール送信
+                    }
+                </button>
+            </section>
+
+            <p class="signup-link">
+                初めて利用する場合は
+                <a routerLink="/signup">新規登録</a>
+            </p>
         }
-
-        <button type="button" class="form-btn" (click)="onLogin()" [disabled]="isLoading">
-            @if(isLoading) {
-                <span class="loading-content">
-                    <span class="spinner"></span>
-                    ログイン中
-                </span>
-            } @else {
-                ログイン
-            }
-        </button>
-
-        <p class="signup-link">
-            初めて利用する場合は
-            <a routerLink="/signup">新規登録</a>
-        </p>
     </div>
 </div>
 
@@ -53,10 +98,11 @@
         justify-content: center;
         align-items: center;
         background: #f5f6f8;
+        padding: 24px 16px;
     }
 
     .login-card {
-        width: 400px;
+        width: min(440px, 100%);
         padding: 32px;
         background: #fff;
         border-radius: 12px;
@@ -66,6 +112,24 @@
     h1 {
         margin: 0 0 24px;
         font-size: 24px;
+    }
+
+    .login-section + .login-section {
+        margin-top: 28px;
+        padding-top: 28px;
+        border-top: 1px solid #eef0f3;
+    }
+
+    .section-title {
+        margin: 0 0 6px;
+        font-size: 16px;
+    }
+
+    .section-note {
+        margin: 0 0 16px;
+        color: #6b7280;
+        font-size: 13px;
+        line-height: 1.5;
     }
 
     .form-field {
@@ -86,6 +150,7 @@
         border: 1px solid #d6d9de;
         border-radius: 8px;
         font-size: 14px;
+        box-sizing: border-box;
     }
 
     input:focus {
@@ -104,6 +169,12 @@
         font-size: 15px;
         font-weight: 600;
         cursor: pointer;
+    }
+
+    .secondary-btn {
+        background: #fff;
+        color: #2f6fed;
+        border: 1px solid #2f6fed;
     }
 
     .form-btn:disabled {
@@ -134,7 +205,7 @@
     }
 
     .signup-link {
-        margin-top: 16px;
+        margin-top: 20px;
         text-align: center;
         font-size: 14px;
     }
@@ -145,10 +216,21 @@
         font-weight: 600;
     }
 
-
     .error-message {
         color: #d93025;
         font-size: 14px;
         margin: 8px 0 16px;
+    }
+
+    .success-message,
+    .info-message {
+        color: #166534;
+        font-size: 14px;
+        margin: 0 0 16px;
+        line-height: 1.5;
+    }
+
+    .info-message {
+        color: #1d4ed8;
     }
 </style>

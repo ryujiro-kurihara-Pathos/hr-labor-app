@@ -61,10 +61,13 @@ export type Employee = {
 
     // 基本情報
     employeeNumber: string;         // 社員番号
+    /** 被保険者整理番号（事業所内連番。手続き表示・出力用） */
+    insuredPersonNumber: string;
     lastName: string;               // 姓
     firstName: string;              // 名
     lastNameKana: string;           // 姓（カナ）
     firstNameKana: string;          // 名（カナ）
+    email: string;                  // メールアドレス（ユーザー招待・ログイン用）
     myNumber: string;               // マイナンバー
     gender: 'male' | 'female';      // 性別
     postalCode: string;             // 郵便番号
@@ -103,10 +106,12 @@ export function createEmptyEmployeeInput(
         companyId: '',
         officeId: '',
         employeeNumber: '',
+        insuredPersonNumber: '',
         lastName: '',
         firstName: '',
         lastNameKana: '',
         firstNameKana: '',
+        email: '',
         myNumber: '',
         gender: 'male',
         postalCode: '',
@@ -134,10 +139,12 @@ export function toEmployeeInput(
         companyId: employee.companyId,
         officeId: employee.officeId,
         employeeNumber: employee.employeeNumber,
+        insuredPersonNumber: employee.insuredPersonNumber,
         lastName: employee.lastName,
         firstName: employee.firstName,
         lastNameKana: employee.lastNameKana,
         firstNameKana: employee.firstNameKana,
+        email: employee.email,
         myNumber: employee.myNumber,
         gender: employee.gender,
         postalCode: employee.postalCode,

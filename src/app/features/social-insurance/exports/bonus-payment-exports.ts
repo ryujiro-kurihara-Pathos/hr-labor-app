@@ -1,5 +1,6 @@
 import { Office } from '../../company/models/office.model';
 import { Employee } from '../../employee/models/employee.models';
+import { resolveInsuredPersonNumberForExport } from '../../employee/utils/insured-person-number.util';
 import { BonusReward } from '../../bonus/models/bonus-reward.model';
 import { Procedure } from '../models/procedures.model';
 
@@ -35,7 +36,7 @@ export function createBonusPaymentCsvRow(params: {
         事業所番号: office.officeNumber,
         事業所名称: office.name,
 
-        被保険者整理番号: employee.myNumber ?? '',
+        被保険者整理番号: resolveInsuredPersonNumberForExport(employee),
         氏名: `${employee.lastName} ${employee.firstName}`,
         生年月日: employee.birthDate,
 

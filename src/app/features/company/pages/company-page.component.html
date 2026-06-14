@@ -45,6 +45,73 @@
                             [(ngModel)]="companyAddress"
                         />
                     </div>
+
+                    <div class="payroll-settings-block">
+                        <h3 class="payroll-settings-title">給与・保険料設定</h3>
+                        <p class="payroll-settings-note">
+                            給与締日・支払日は任意です。保険料の給与控除表示に徴収タイミングを使用します。
+                        </p>
+                        <div class="form-field">
+                            <label for="payroll-closing-day">給与締日</label>
+                            <select
+                                id="payroll-closing-day"
+                                name="payrollClosingDay"
+                                [(ngModel)]="payrollClosingDay"
+                            >
+                                <option [ngValue]="''">未設定</option>
+                                @for (day of payrollDayOptions; track day) {
+                                    <option [ngValue]="day">
+                                        @if (day === 31) {
+                                            末日
+                                        } @else {
+                                            {{ day }}日
+                                        }
+                                    </option>
+                                }
+                            </select>
+                        </div>
+                        <div class="form-field">
+                            <label for="payroll-payment-day">給与支払日</label>
+                            <div class="inline-field-row">
+                                <select
+                                    id="payroll-payment-month-offset"
+                                    name="payrollPaymentMonthOffset"
+                                    [(ngModel)]="payrollPaymentMonthOffset"
+                                >
+                                    <option [ngValue]="0">当月</option>
+                                    <option [ngValue]="1">翌月</option>
+                                </select>
+                                <select
+                                    id="payroll-payment-day"
+                                    name="payrollPaymentDay"
+                                    [(ngModel)]="payrollPaymentDay"
+                                >
+                                    <option [ngValue]="''">未設定</option>
+                                    @for (day of payrollDayOptions; track day) {
+                                        <option [ngValue]="day">
+                                            @if (day === 31) {
+                                                末日
+                                            } @else {
+                                                {{ day }}日
+                                            }
+                                        </option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-field">
+                            <label for="insurance-collection-timing">保険料徴収タイミング</label>
+                            <select
+                                id="insurance-collection-timing"
+                                name="insurancePremiumCollectionTiming"
+                                [(ngModel)]="insurancePremiumCollectionTiming"
+                            >
+                                <option value="same_month">当月徴収（対象月の給与から控除）</option>
+                                <option value="next_month">翌月徴収（翌月の給与から控除）</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div class="form-actions">
                         <button
                             type="button"
@@ -77,6 +144,24 @@
                             <dd>{{ c.address || '—' }}</dd>
                         </div>
                     </dl>
+
+                    <div class="payroll-settings-view">
+                        <h3 class="payroll-settings-title">給与・保険料設定</h3>
+                        <dl class="info-meta">
+                            <div class="meta-row">
+                                <dt>給与締日</dt>
+                                <dd>{{ formatPayrollClosingDayLabel(c.payrollClosingDay) }}</dd>
+                            </div>
+                            <div class="meta-row">
+                                <dt>給与支払日</dt>
+                                <dd>{{ formatPayrollPaymentDayLabel(c.payrollPaymentDay, c.payrollPaymentMonthOffset) }}</dd>
+                            </div>
+                            <div class="meta-row">
+                                <dt>保険料徴収</dt>
+                                <dd>{{ insurancePremiumCollectionTimingLabel(c.insurancePremiumCollectionTiming) }}</dd>
+                            </div>
+                        </dl>
+                    </div>
                 }
             </article>
         </section>
@@ -213,7 +298,8 @@
         color: #374151;
     }
 
-    .form-field input {
+    .form-field input,
+    .form-field select {
         width: 100%;
         height: 40px;
         padding: 0 12px;
@@ -221,12 +307,41 @@
         border-radius: 8px;
         font-size: 14px;
         box-sizing: border-box;
+        background: #fff;
     }
 
-    .form-field input:focus {
+    .form-field input:focus,
+    .form-field select:focus {
         outline: none;
         border-color: #2563eb;
         box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    .payroll-settings-block,
+    .payroll-settings-view {
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid #f3f4f6;
+    }
+
+    .payroll-settings-title {
+        margin: 0 0 8px;
+        font-size: 15px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .payroll-settings-note {
+        margin: 0 0 16px;
+        color: #6b7280;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .inline-field-row {
+        display: grid;
+        grid-template-columns: 120px 1fr;
+        gap: 8px;
     }
 
     .form-actions {

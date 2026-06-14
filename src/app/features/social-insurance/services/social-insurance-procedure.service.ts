@@ -77,6 +77,7 @@ export class SocialInsuranceProcedureService {
             employeeFirstNameKana: String(data['employeeFirstNameKana'] ?? ''),
             birthDate: String(data['birthDate'] ?? ''),
             myNumber: String(data['myNumber'] ?? ''),
+            insuredPersonNumber: String(data['insuredPersonNumber'] ?? ''),
             employeeAddress: String(data['employeeAddress'] ?? ''),
             qualificationDate: String(data['qualificationDate'] ?? ''),
             rewardTargetYearMonth: (data['rewardTargetYearMonth'] as string | null) ?? null,
@@ -446,7 +447,8 @@ export class SocialInsuranceProcedureService {
         procedureData: QualificationProcedureData,
         completedDate: string,
         employeeId: string,
-    ): Promise<void> {
+    ): Promise<string> {
+        const insuredPersonNumber = await this.employeeService.assignInsuredPersonNumberIfMissing(employeeId);
         const docRef = doc(db, this.collectionName, procedureId);
 
         await updateDoc(docRef, {
@@ -454,15 +456,18 @@ export class SocialInsuranceProcedureService {
             completedDate,
             submittedDate: completedDate,
             ...procedureData,
+            insuredPersonNumber,
             updatedAt: serverTimestamp(),
         });
 
         const qualificationDate = procedureData.qualificationDate?.trim();
         if (qualificationDate) {
-            await this.socialInsuranceStatusService.syncQualificationDates(
+            await this.socialInsuranceStatusService.syncQualificationCompletion(
                 employeeId,
                 qualificationDate,
             );
         }
+
+        return insuredPersonNumber;
     }
 }

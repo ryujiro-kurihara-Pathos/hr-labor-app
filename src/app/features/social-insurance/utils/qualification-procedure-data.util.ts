@@ -53,6 +53,7 @@ export function buildQualificationProcedureData(params: {
         employeeFirstNameKana: employee.firstNameKana,
         birthDate: employee.birthDate,
         myNumber: employee.myNumber,
+        insuredPersonNumber: employee.insuredPersonNumber.trim(),
         employeeAddress: employeeAddressLabel(employee),
         qualificationDate: qualificationDate ?? '',
         rewardTargetYearMonth: monthlyReward?.targetYearMonth ?? null,

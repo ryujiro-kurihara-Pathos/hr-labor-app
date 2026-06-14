@@ -90,6 +90,18 @@
             <dd>{{ dateLabel(displayBirthDate()) }}</dd>
         </div>
         <div class="meta-row">
+            <dt>被保険者整理番号</dt>
+            <dd>
+                @if (displayInsuredPersonNumber()) {
+                    {{ displayInsuredPersonNumber() }}
+                } @else if (isCompleted()) {
+                    —
+                } @else {
+                    未登録（完了時に自動採番）
+                }
+            </dd>
+        </div>
+        <div class="meta-row">
             <dt>個人番号または基礎年金番号</dt>
             <dd>{{ displayMyNumber() || '—' }}</dd>
         </div>

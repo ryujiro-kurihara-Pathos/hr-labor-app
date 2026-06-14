@@ -9,6 +9,9 @@ import {
     getDoc,
     collection,
     Timestamp,
+    query,
+    where,
+    getDocs,
  } from 'firebase/firestore';
 
 @Injectable({
@@ -45,6 +48,7 @@ export class UserService {
         }
         await setDoc(docRef, {
             ...userInput,
+            email: userInput.email.trim().toLowerCase(),
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
         });
@@ -58,5 +62,28 @@ export class UserService {
         if(!docSnap.exists()) return null;
 
         return this.normalizeUser(uid, docSnap.data() as Record<string, unknown>);
+    }
+
+    async getUserByEmployeeId(employeeId: string): Promise<AppUser | null> {
+        const col = collection(db, 'users');
+        const q = query(col, where('employeeId', '==', employeeId));
+        const snap = await getDocs(q);
+        if (snap.empty) return null;
+
+        const docSnap = snap.docs[0];
+        return this.normalizeUser(docSnap.id, docSnap.data() as Record<string, unknown>);
+    }
+
+    async getUserByEmail(email: string): Promise<AppUser | null> {
+        const normalized = email.trim().toLowerCase();
+        if (!normalized) return null;
+
+        const col = collection(db, 'users');
+        const q = query(col, where('email', '==', normalized));
+        const snap = await getDocs(q);
+        if (snap.empty) return null;
+
+        const docSnap = snap.docs[0];
+        return this.normalizeUser(docSnap.id, docSnap.data() as Record<string, unknown>);
     }
 }

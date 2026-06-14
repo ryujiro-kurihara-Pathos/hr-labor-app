@@ -58,6 +58,11 @@
                             <input id="birth-date" type="date" name="birthDate" [(ngModel)]="employee.birthDate" required />
                         </div>
                         <div class="form-field">
+                            <label for="email">メールアドレス</label>
+                            <input id="email" type="email" name="email" [(ngModel)]="employee.email" placeholder="example@example.com" />
+                            <p class="field-note">ユーザー招待メールの送信先として使用します</p>
+                        </div>
+                        <div class="form-field">
                             <label for="my-number">マイナンバー</label>
                             <input id="my-number" type="text" name="myNumber" [(ngModel)]="employee.myNumber" readonly />
                             <p class="field-note">登録時に仮の番号を自動生成します</p>

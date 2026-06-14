@@ -10,6 +10,7 @@ import {
     Timestamp } from 'firebase/firestore';
 import { db } from '../../../core/firebase';
 import { Company, CompanyInput, CompanyUpdateInput } from '../models/company.model';
+import { normalizeCompany } from '../utils/company-payroll-settings.util';
 
 @Injectable({
     providedIn: 'root',
@@ -43,12 +44,10 @@ export class CompanyService {
         
         if(!docSnap.exists()) return null;
 
-        const company = {
+        return normalizeCompany({
             id: companyId,
             ...docSnap.data(),
-        } as Company;
-
-        return company;
+        });
     }
 
     async updateCompany(companyId: string, input: CompanyUpdateInput): Promise<void> {

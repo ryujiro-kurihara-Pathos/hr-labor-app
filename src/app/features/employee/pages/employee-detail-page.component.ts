@@ -31,6 +31,7 @@ import {
     lossDateFromRetirementDate,
 } from '../../social-insurance/utils/insurance-premium-period.util';
 import { formatYearMonthLabel } from '../../insurance/utils/standard-remuneration-determination.util';
+import { EmployeeInvitePanelComponent } from '../../invitations/components/employee-invite-panel.component';
 import {
     employeeDisplayStatusLabel,
     isEmployeeFullyRetired,
@@ -49,7 +50,7 @@ type SocialInsuranceDraft = {
 @Component({
     selector: 'app-employee-detail-page',
     standalone: true,
-    imports: [FormsModule, RouterLink, PartTimeInsuranceWarningComponent],
+    imports: [FormsModule, RouterLink, PartTimeInsuranceWarningComponent, EmployeeInvitePanelComponent],
     templateUrl: './employee-detail-page.component.html',
 })
 
@@ -77,6 +78,7 @@ export class EmployeeDetailPageComponent {
     isEditing = signal<boolean>(false);
     isRetireFormOpen = signal<boolean>(false);
     isCreatingQualificationProcedure = signal<boolean>(false);
+    openInviteOnInit = signal<boolean>(false);
     errorMessage = signal<string>('');
     age = computed(() => this.ageToday(this.birthDate));
 
@@ -115,6 +117,7 @@ export class EmployeeDetailPageComponent {
     streetAddress = '';
     buildingName = '';
     phoneNumber = '';
+    email = '';
     employeeNumber = '';
     birthDate = '';
     joinedDate = '';
@@ -151,9 +154,20 @@ export class EmployeeDetailPageComponent {
             return;
         }
 
+        if (this.route.snapshot.queryParamMap.get('invite') === '1') {
+            this.openInviteOnInit.set(true);
+            void this.router.navigate([], {
+                relativeTo: this.route,
+                queryParams: { invite: null },
+                queryParamsHandling: 'merge',
+                replaceUrl: true,
+            });
+        }
+
         await this.loadEmployee(employeeId);
         await this.loadDependents();
         this.scrollToSocialInsuranceFragment();
+        this.scrollToInvitePanel();
     }
 
     private scrollToSocialInsuranceFragment(): void {
@@ -162,6 +176,14 @@ export class EmployeeDetailPageComponent {
 
         queueMicrotask(() => {
             document.getElementById('social-insurance')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    }
+
+    private scrollToInvitePanel(): void {
+        if (!this.openInviteOnInit()) return;
+
+        queueMicrotask(() => {
+            document.getElementById('user-invite')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
     }
 
@@ -520,9 +542,7 @@ export class EmployeeDetailPageComponent {
         this.errorMessage.set('');
 
         // 更新：従業員情報
-        const input: EmployeeInput = {
-            companyId: employee.companyId,
-            officeId: employee.officeId,
+        const input: EmployeeInput = toEmployeeInput(employee, {
             employeeNumber: this.employeeNumber,
             lastName: this.lastName,
             firstName: this.firstName,
@@ -536,14 +556,13 @@ export class EmployeeDetailPageComponent {
             streetAddress: this.streetAddress,
             buildingName: this.buildingName,
             phoneNumber: this.phoneNumber,
+            email: this.email.trim().toLowerCase(),
             birthDate: this.birthDate,
             joinedDate: this.joinedDate,
             employmentType: this.employmentType,
             department: this.department,
             position: this.position,
-            status: employee.status,
-            retiredDate: employee.retiredDate,
-        };
+        });
 
         // 更新：社会保険情報
         const currentSocialInsuranceStatus = this.socialInsuranceStatus();
@@ -955,6 +974,7 @@ export class EmployeeDetailPageComponent {
         this.streetAddress = employee.streetAddress;
         this.buildingName = employee.buildingName;
         this.phoneNumber = employee.phoneNumber;
+        this.email = employee.email;
         this.employeeNumber = employee.employeeNumber;
         this.birthDate = employee.birthDate;
         this.joinedDate = employee.joinedDate;

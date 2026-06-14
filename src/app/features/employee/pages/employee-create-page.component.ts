@@ -7,6 +7,7 @@ import { EmployeeService } from '../services/employee.service';
 import { AuthService } from '../../auth/services/auth.service';
 import { UserService } from '../../users/services/user.service';
 import { SocialInsuranceStatusService } from '../../social-insurance/services/social-insurance-status.service';
+import { ConfirmService } from '../../../shared/services/confirm.service';
 import { OfficeService } from '../../company/services/office.service';
 import { Office } from '../../company/models/office.model';
 import { insuranceJoinStatus, SocialInsuranceStatusInput } from '../../social-insurance/models/social-insurance-status.model';
@@ -32,6 +33,7 @@ export class EmployeeCreatePageComponent {
     private readonly userService = inject(UserService);
     private readonly officeService = inject(OfficeService);
     private readonly socialInsuranceStatusService = inject(SocialInsuranceStatusService);
+    private readonly confirmService = inject(ConfirmService);
 
     isLoading = signal(false);
     isLoadingEmployee = signal(false);
@@ -110,7 +112,11 @@ export class EmployeeCreatePageComponent {
                 memo: '',
             };
             await this.socialInsuranceStatusService.createSocialInsuranceStatus(socialInsuranceStatusInput);
-            this.router.navigate(['/employees', employee.id]);
+
+            const sendInviteEmail = await this.confirmService.confirmInviteEmail();
+            await this.router.navigate(['/employees', employee.id], {
+                queryParams: sendInviteEmail ? { invite: '1' } : {},
+            });
         } catch (error) {
             this.errorMessage.set('従業員の追加に失敗しました。');
             console.error('従業員の追加に失敗しました。', error);

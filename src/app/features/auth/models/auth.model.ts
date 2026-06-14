@@ -17,4 +17,4 @@ export type SignupInput = {
     companyAddress: string; // 会社所在地
 };
 
-export type InitialAdminSignupInput = Omit<SignupInput, 'confirmPassword'>;
+export type InitialAdminSignupInput = Omit<SignupInput, 'confirmPassword' | 'companyName' | 'representativeName' | 'companyAddress'>;

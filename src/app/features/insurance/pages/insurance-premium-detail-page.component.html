@@ -864,6 +864,27 @@
                 }
             </div>
 
+            <div class="premium-subsection payroll-deduction-subsection">
+                <div class="premium-subsection-header">
+                    <span class="card-type-badge payroll">給与控除</span>
+                    <h3 class="premium-subsection-title">給与控除としての表示</h3>
+                </div>
+                <p class="premium-note">
+                    保険料は{{ targetYearMonthLabel() }}分として計算しています。
+                </p>
+                <p class="premium-note payroll-deduction-note">{{ payrollDeductionNote() }}</p>
+                <div class="payroll-deduction-amount">
+                    <span class="payroll-deduction-label">本人負担控除額</span>
+                    <span class="payroll-deduction-value">
+                        @if (socialInsuranceTotalPremium() !== null) {
+                            {{ socialInsuranceTotalPremium() | number }}円
+                        } @else {
+                            —
+                        }
+                    </span>
+                </div>
+            </div>
+
             <div class="premium-subsection total-premium-subsection">
                 <div class="premium-subsection-header">
                     <span class="card-type-badge total">合計</span>
@@ -1117,6 +1138,50 @@
     .card-type-badge.bonus {
         background: #ede9fe;
         color: #5b21b6;
+    }
+
+    .card-type-badge.payroll {
+        background: #f3e8ff;
+        color: #6d28d9;
+    }
+
+    .card-type-badge.total {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .payroll-deduction-subsection {
+        background: #faf5ff;
+        border: 1px solid #ddd6fe;
+        border-radius: 10px;
+        padding: 16px;
+    }
+
+    .payroll-deduction-note {
+        font-weight: 600;
+        color: #5b21b6;
+    }
+
+    .payroll-deduction-amount {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #ddd6fe;
+    }
+
+    .payroll-deduction-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .payroll-deduction-value {
+        font-size: 18px;
+        font-weight: 700;
+        color: #111827;
     }
 
     .monthly-reward-card {

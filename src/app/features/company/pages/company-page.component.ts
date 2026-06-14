@@ -2,10 +2,16 @@ import { Component, signal, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink, Router } from '@angular/router';
 
-import { Company } from '../models/company.model';
+import { Company, InsurancePremiumCollectionTiming } from '../models/company.model';
 import { AuthService } from '../../auth/services/auth.service';
 import { UserService } from '../../users/services/user.service';
 import { CompanyService } from '../services/company.service';
+import {
+    formatPayrollClosingDayLabel,
+    formatPayrollPaymentDayLabel,
+    insurancePremiumCollectionTimingLabel,
+    isValidPayrollDay,
+} from '../utils/company-payroll-settings.util';
 
 import { OfficeCreateModalComponent, OfficeFormData } from '../components/office-create-modal.component';
 import { OfficeService } from '../services/office.service';
@@ -37,6 +43,15 @@ export class CompanyPageComponent {
     companyName = '';
     representativeName = '';
     companyAddress = '';
+    payrollClosingDay: number | '' = '';
+    payrollPaymentDay: number | '' = '';
+    payrollPaymentMonthOffset: 0 | 1 = 1;
+    insurancePremiumCollectionTiming: InsurancePremiumCollectionTiming = 'next_month';
+
+    readonly payrollDayOptions = Array.from({ length: 31 }, (_, index) => index + 1);
+    readonly formatPayrollClosingDayLabel = formatPayrollClosingDayLabel;
+    readonly formatPayrollPaymentDayLabel = formatPayrollPaymentDayLabel;
+    readonly insurancePremiumCollectionTimingLabel = insurancePremiumCollectionTimingLabel;
 
     // 事業所一覧
     offices = signal<Office[]>([]);
@@ -108,9 +123,16 @@ export class CompanyPageComponent {
         const name = this.companyName.trim();
         const representativeName = this.representativeName.trim();
         const address = this.companyAddress.trim();
+        const payrollClosingDay = this.payrollClosingDay === '' ? null : this.payrollClosingDay;
+        const payrollPaymentDay = this.payrollPaymentDay === '' ? null : this.payrollPaymentDay;
 
         if (!name || !representativeName || !address) {
             this.errorMessage.set('会社名・代表者・所在地を入力してください');
+            return;
+        }
+
+        if (!isValidPayrollDay(payrollClosingDay) || !isValidPayrollDay(payrollPaymentDay)) {
+            this.errorMessage.set('給与締日・支払日は1〜31の範囲で入力してください');
             return;
         }
 
@@ -122,12 +144,20 @@ export class CompanyPageComponent {
                 name,
                 representativeName,
                 address,
+                payrollClosingDay,
+                payrollPaymentDay,
+                payrollPaymentMonthOffset: this.payrollPaymentMonthOffset,
+                insurancePremiumCollectionTiming: this.insurancePremiumCollectionTiming,
             });
             this.company.set({
                 ...company,
                 name,
                 representativeName,
                 address,
+                payrollClosingDay,
+                payrollPaymentDay,
+                payrollPaymentMonthOffset: this.payrollPaymentMonthOffset,
+                insurancePremiumCollectionTiming: this.insurancePremiumCollectionTiming,
             });
             this.isEditingCompany.set(false);
         } catch (error) {
@@ -142,6 +172,10 @@ export class CompanyPageComponent {
         this.companyName = company.name;
         this.representativeName = company.representativeName;
         this.companyAddress = company.address;
+        this.payrollClosingDay = company.payrollClosingDay ?? '';
+        this.payrollPaymentDay = company.payrollPaymentDay ?? '';
+        this.payrollPaymentMonthOffset = company.payrollPaymentMonthOffset;
+        this.insurancePremiumCollectionTiming = company.insurancePremiumCollectionTiming;
     }
 
     formatOfficeAddress(office: Office): string {

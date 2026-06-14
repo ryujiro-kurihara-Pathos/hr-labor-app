@@ -52,6 +52,13 @@ export class ConfirmService {
         });
     }
 
+    confirmInviteEmail(): Promise<boolean> {
+        return this.confirm('ユーザー招待メールを送信しますか？', {
+            confirmLabel: 'メールを送る',
+            cancelLabel: '後でにする',
+        });
+    }
+
     answer(value: boolean): void {
         const current = this.dialog();
         if (!current) return;

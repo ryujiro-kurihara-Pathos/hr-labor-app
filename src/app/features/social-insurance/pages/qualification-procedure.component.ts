@@ -178,6 +178,12 @@ export class QualificationProcedureComponent {
         return this.employee()?.myNumber ?? '';
     });
 
+    displayInsuredPersonNumber = computed((): string => {
+        const item = this.procedure();
+        if (this.useSavedData()) return item.insuredPersonNumber.trim();
+        return this.employee()?.insuredPersonNumber.trim() ?? '';
+    });
+
     displayEmployeeAddress = computed((): string => {
         const item = this.procedure();
         if (this.useSavedData()) return item.employeeAddress;
@@ -198,6 +204,7 @@ export class QualificationProcedureComponent {
         return {
             ...item,
             qualificationDate: this.displayQualificationDate() ?? '',
+            insuredPersonNumber: this.displayInsuredPersonNumber(),
             hasDependents: this.displayHasDependents(),
             rewardCashAmount: reward?.cashAmount ?? item.rewardCashAmount,
             rewardInKindAmount: reward?.inKindAmount ?? item.rewardInKindAmount,
@@ -248,7 +255,7 @@ export class QualificationProcedureComponent {
                 hasDependents: this.hasDependents(),
             });
 
-            await this.procedureService.completeQualificationProcedure(
+            const insuredPersonNumber = await this.procedureService.completeQualificationProcedure(
                 item.id,
                 procedureData,
                 submittedDate,
@@ -258,6 +265,7 @@ export class QualificationProcedureComponent {
             this.procedureUpdated.emit({
                 ...item,
                 ...procedureData,
+                insuredPersonNumber,
                 status: 'completed',
                 completedDate: submittedDate,
                 submittedDate,

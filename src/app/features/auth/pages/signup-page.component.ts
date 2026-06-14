@@ -8,7 +8,7 @@ import { CompanyService } from '../../company/services/company.service';
 
 import { SignupInput } from '../models/auth.model';
 import { AppUserInput } from '../../users/models/user.model';
-import { CompanyInput } from '../../company/models/company.model';
+import { CompanyInput, DEFAULT_COMPANY_PAYROLL_SETTINGS } from '../../company/models/company.model';
 
 @Component({
     selector: 'app-signup-page',
@@ -94,7 +94,8 @@ export class SignupPageComponent {
                 representativeName: this.representativeName,
                 address: this.companyAddress,
                 createdBy: user.uid,
-            }
+                ...DEFAULT_COMPANY_PAYROLL_SETTINGS,
+            };
             const company = await this.companyService.createCompany(companyInput);
             const companyId = company.id;
 

@@ -1,8 +1,15 @@
-import { Component,inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../services/auth.service';
+import { UserService } from '../../users/services/user.service';
+import { defaultRouteForRole } from '../../../guards/role.guard';
+import {
+    convertEmailLinkError,
+    isValidAuthEmail,
+    normalizeAuthEmail,
+} from '../utils/email-link-auth.util';
 
 @Component({
     selector: 'app-login-page',
@@ -13,37 +20,48 @@ import { AuthService } from '../services/auth.service';
 
 export class LoginPageComponent {
     private readonly router = inject(Router);
+    private readonly route = inject(ActivatedRoute);
     private readonly authService = inject(AuthService);
+    private readonly userService = inject(UserService);
 
-    // 新規登録ページに遷移
+    email = '';
+    password = '';
+    linkEmail = '';
+
+    errorMessage = '';
+    linkErrorMessage = '';
+    successMessage = '';
+    linkSuccessMessage = '';
+
+    isLoading = false;
+    isSendingLink = false;
+    isCompletingLink = signal(false);
+
+    async ngOnInit() {
+        if (this.authService.isEmailSignInLink(window.location.href)) {
+            await this.completeEmailLinkSignIn();
+            return;
+        }
+    }
+
     goToSignupPage() {
         this.router.navigate(['/signup']);
     }
 
-    // ログインに必要な情報
-    email = '';
-    password = '';
-
-    errorMessage = '';
-    isLoading = false;
-
-    // ログイン
     async onLogin() {
         this.errorMessage = '';
 
-        if(this.isFormEmpty(this.email) || this.isFormEmpty(this.password)) {
+        if (this.isFormEmpty(this.email) || this.isFormEmpty(this.password)) {
             this.errorMessage = 'メールアドレスとパスワードを入力してください';
             return;
         }
 
         try {
             this.isLoading = true;
-
-            // Authenticationでログイン
             await this.authService.login(this.email.trim(), this.password.trim());
 
-            // homeページに遷移
-            await this.router.navigate(['/home']);
+            const appUser = await this.userService.getUserByUid(this.authService.getCurrentAuthUser()!.uid);
+            await this.router.navigate([appUser ? defaultRouteForRole(appUser.role) : '/home']);
         } catch (error) {
             console.error('ログインに失敗しました。', error);
             this.errorMessage = this.convertLoginError(error);
@@ -52,7 +70,66 @@ export class LoginPageComponent {
         }
     }
 
-    // ログインエラーを変換
+    async onSendLoginLink() {
+        this.linkErrorMessage = '';
+        this.linkSuccessMessage = '';
+
+        const email = normalizeAuthEmail(this.linkEmail || this.email);
+        if (!email) {
+            this.linkErrorMessage = 'メールアドレスを入力してください';
+            return;
+        }
+        if (!isValidAuthEmail(email)) {
+            this.linkErrorMessage = 'メールアドレスの形式が正しくありません';
+            return;
+        }
+
+        this.isSendingLink = true;
+        try {
+            const continueUrl = `${window.location.origin}/login`;
+            await this.authService.sendSignInLink(email, continueUrl);
+            this.linkSuccessMessage = `${email} 宛にログインリンクを送信しました。メール内のリンクからログインしてください。`;
+        } catch (error) {
+            console.error('ログインリンクの送信に失敗しました', error);
+            this.linkErrorMessage = convertEmailLinkError(error);
+        } finally {
+            this.isSendingLink = false;
+        }
+    }
+
+    private async completeEmailLinkSignIn() {
+        this.isCompletingLink.set(true);
+        this.linkErrorMessage = '';
+
+        try {
+            let email =
+                this.authService.getStoredEmailForSignIn()
+                || normalizeAuthEmail(this.route.snapshot.queryParamMap.get('email') ?? '');
+
+            if (!email) {
+                this.linkErrorMessage =
+                    'ログインを完了するには、メールアドレスを入力して「ログインリンクを送信」を再度実行してください';
+                return;
+            }
+
+            const authUser = await this.authService.signInWithEmailLink(email, window.location.href);
+            const appUser = await this.userService.getUserByUid(authUser.uid);
+
+            if (!appUser) {
+                this.linkErrorMessage = 'アカウントが見つかりません。管理者から招待メールを受け取ってください';
+                await this.authService.logout();
+                return;
+            }
+
+            await this.router.navigate([defaultRouteForRole(appUser.role)]);
+        } catch (error) {
+            console.error('メールリンクでのログインに失敗しました', error);
+            this.linkErrorMessage = convertEmailLinkError(error);
+        } finally {
+            this.isCompletingLink.set(false);
+        }
+    }
+
     convertLoginError(error: unknown): string {
         const code =
             typeof error === 'object' &&
@@ -81,7 +158,6 @@ export class LoginPageComponent {
         return 'ログインに失敗しました。';
     }
 
-    // フォームが空白かどうか
     isFormEmpty(value: string): boolean {
         return value.trim() === '';
     }
