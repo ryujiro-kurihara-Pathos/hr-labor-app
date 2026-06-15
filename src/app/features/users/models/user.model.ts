@@ -12,6 +12,8 @@ export type AppUser = {
     lastNameKana: string; // 姓（カナ）
     firstNameKana: string; // 名（カナ）
     email: string; // メールアドレス
+    password: string; // パスワード（Firestore保存）
+    passwordSet: boolean; // パスワード設定済みか
 
     role: UserRole; // ユーザーの役割
     status: UserStatus; // ユーザーのステータス

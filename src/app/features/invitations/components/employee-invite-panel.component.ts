@@ -1,16 +1,13 @@
-import { Component, inject, input, signal } from '@angular/core';
+import { Component, effect, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { Employee } from '../../employee/models/employee.models';
 import { AppUser, UserRole } from '../../users/models/user.model';
 import { Invitation } from '../models/invitation.model';
 import { InvitationService } from '../services/invitation.service';
+import { EmployeeInviteService } from '../services/employee-invite.service';
 import { UserService } from '../../users/services/user.service';
-import { AuthService } from '../../auth/services/auth.service';
-import {
-    buildInvitationEmailLinkUrl,
-    invitationStatusLabel,
-} from '../utils/invitation.util';
+import { invitationStatusLabel } from '../utils/invitation.util';
 import { isValidAuthEmail, normalizeAuthEmail } from '../../auth/utils/email-link-auth.util';
 
 @Component({
@@ -21,23 +18,23 @@ import { isValidAuthEmail, normalizeAuthEmail } from '../../auth/utils/email-lin
 })
 export class EmployeeInvitePanelComponent {
     private readonly invitationService = inject(InvitationService);
+    private readonly employeeInviteService = inject(EmployeeInviteService);
     private readonly userService = inject(UserService);
-    private readonly authService = inject(AuthService);
 
     employee = input.required<Employee>();
-    autoOpenForm = input(false);
+    initialSuccessMessage = input('');
 
     readonly invitationStatusLabel = invitationStatusLabel;
 
     isLoading = signal(true);
     isSending = signal(false);
-    isFormOpen = signal(false);
     errorMessage = signal('');
     successMessage = signal('');
 
     linkedUser = signal<AppUser | null>(null);
     pendingInvitation = signal<Invitation | null>(null);
 
+    inviteEmail = '';
     inviteRole: UserRole = 'employee';
 
     roleOptions: { value: UserRole; label: string }[] = [
@@ -45,12 +42,22 @@ export class EmployeeInvitePanelComponent {
         { value: 'admin', label: '管理者' },
     ];
 
-    async ngOnInit() {
-        await this.loadInviteState();
+    constructor() {
+        effect(() => {
+            const employee = this.employee();
+            const email = normalizeAuthEmail(employee.email ?? '');
+            if (email) {
+                this.inviteEmail = email;
+            }
+        });
     }
 
-    employeeEmail(): string {
-        return normalizeAuthEmail(this.employee().email ?? '');
+    async ngOnInit() {
+        const initial = this.initialSuccessMessage().trim();
+        if (initial) {
+            this.successMessage.set(initial);
+        }
+        await this.loadInviteState();
     }
 
     async loadInviteState() {
@@ -65,46 +72,27 @@ export class EmployeeInvitePanelComponent {
             ]);
             this.linkedUser.set(linkedUser);
             this.pendingInvitation.set(pendingInvitation);
+            this.inviteEmail = normalizeAuthEmail(
+                employee.email || pendingInvitation?.email || '',
+            );
         } catch (error) {
             console.error('招待情報の取得に失敗しました', error);
             this.errorMessage.set('招待情報の取得に失敗しました');
         } finally {
             this.isLoading.set(false);
         }
-
-        if (this.autoOpenForm() && !this.linkedUser()) {
-            this.openInviteForm();
-        }
-    }
-
-    openInviteForm() {
-        this.isFormOpen.set(true);
-        this.errorMessage.set('');
-        this.successMessage.set('');
-        this.inviteRole = 'employee';
-    }
-
-    closeInviteForm() {
-        this.isFormOpen.set(false);
-        this.errorMessage.set('');
     }
 
     async sendInvitation() {
         const employee = this.employee();
-        const email = this.employeeEmail();
+        const email = normalizeAuthEmail(this.inviteEmail);
 
         if (!email) {
-            this.errorMessage.set('従業員情報にメールアドレスが登録されていません。先にメールアドレスを保存してください');
+            this.errorMessage.set('メールアドレスを入力してください');
             return;
         }
-
         if (!isValidAuthEmail(email)) {
-            this.errorMessage.set('従業員情報のメールアドレス形式が正しくありません');
-            return;
-        }
-
-        if (this.linkedUser()) {
-            this.errorMessage.set('この従業員にはすでにユーザーが紐づいています');
+            this.errorMessage.set('メールアドレスの形式が正しくありません');
             return;
         }
 
@@ -113,39 +101,16 @@ export class EmployeeInvitePanelComponent {
         this.successMessage.set('');
 
         try {
-            const authUser = this.authService.getCurrentAuthUser();
-            if (!authUser) {
-                this.errorMessage.set('ログイン情報を確認できませんでした');
-                return;
-            }
-
-            const existingUser = await this.userService.getUserByEmail(email);
-            if (existingUser) {
-                this.errorMessage.set('このメールアドレスはすでに登録されています');
-                return;
-            }
-
-            await this.invitationService.cancelPendingInvitationsForEmployee(employee.id);
-
-            const invitation = await this.invitationService.createInvitation({
+            const invitation = await this.employeeInviteService.sendInvitation(
+                employee,
                 email,
-                companyId: employee.companyId,
-                employeeId: employee.id,
-                role: this.inviteRole,
-                invitedBy: authUser.uid,
-            });
-
-            await this.authService.sendSignInLink(
-                email,
-                buildInvitationEmailLinkUrl(invitation.id),
+                this.inviteRole,
             );
-
             this.pendingInvitation.set(invitation);
-            this.isFormOpen.set(false);
-            this.successMessage.set(`${email} 宛にログイン用の招待メールを送信しました`);
+            this.successMessage.set(`${email} 宛に招待メールを送信しました`);
         } catch (error) {
             console.error('招待メールの送信に失敗しました', error);
-            this.errorMessage.set(this.convertSendError(error));
+            this.errorMessage.set(this.employeeInviteService.toUserMessage(error));
         } finally {
             this.isSending.set(false);
         }
@@ -153,46 +118,37 @@ export class EmployeeInvitePanelComponent {
 
     async resendInvitation() {
         const invitation = this.pendingInvitation();
+        const employee = this.employee();
         if (!invitation) return;
+
+        const email = normalizeAuthEmail(employee.email ?? '');
+        if (!email) {
+            this.errorMessage.set('従業員情報にメールアドレスが登録されていません。基本情報を保存してから再送信してください。');
+            return;
+        }
+        if (!isValidAuthEmail(email)) {
+            this.errorMessage.set('メールアドレスの形式が正しくありません。基本情報を修正して保存してください。');
+            return;
+        }
 
         this.isSending.set(true);
         this.errorMessage.set('');
         this.successMessage.set('');
 
         try {
-            await this.authService.sendSignInLink(
-                invitation.email,
-                buildInvitationEmailLinkUrl(invitation.id),
+            const updatedInvitation = await this.employeeInviteService.resendInvitation(
+                employee,
+                email,
+                invitation,
             );
-            this.successMessage.set(`${invitation.email} 宛に招待メールを再送信しました`);
+            this.pendingInvitation.set(updatedInvitation);
+            this.successMessage.set(`${email} 宛に招待メールを再送信しました`);
         } catch (error) {
             console.error('招待メールの再送信に失敗しました', error);
-            this.errorMessage.set(this.convertSendError(error));
+            this.errorMessage.set(this.employeeInviteService.toUserMessage(error));
         } finally {
             this.isSending.set(false);
         }
-    }
-
-    private convertSendError(error: unknown): string {
-        const code =
-            typeof error === 'object' &&
-            error !== null &&
-            'code' in error &&
-            typeof (error as { code: unknown }).code === 'string'
-                ? (error as { code: string }).code
-                : '';
-
-        if (code === 'auth/unauthorized-continue-uri') {
-            return 'メールリンクの送信設定が未完了です。Firebase Console で認証ドメインを確認してください';
-        }
-        if (code === 'auth/invalid-email') {
-            return 'メールアドレスの形式が正しくありません';
-        }
-        if (code === 'auth/operation-not-allowed') {
-            return 'メールリンク認証が有効になっていません。Firebase Console の Authentication 設定を確認してください';
-        }
-
-        return '招待メールの送信に失敗しました';
     }
 
     roleLabel(role: UserRole): string {

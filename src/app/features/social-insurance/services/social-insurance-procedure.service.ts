@@ -41,7 +41,14 @@ import {
     QualificationProcedureData,
 } from '../models/procedures.model';
 import { hasSavedQualificationData } from '../utils/qualification-procedure-data.util';
+import {
+    canAutoManageQualificationProcedure,
+    resolveQualificationProcedureDates,
+    shouldSyncQualificationProcedureDates,
+} from '../utils/qualification-procedure-data.util';
+import { Employee } from '../../employee/models/employee.models';
 import { EmployeeService } from '../../employee/services/employee.service';
+import { insuranceJoinStatus } from '../models/social-insurance-status.model';
 import { dateStringFromTimestamp } from '../utils/insurance-premium-period.util';
 import { resolveLossDate, todayDateString } from '../utils/procedure-display.util';
 import { SocialInsuranceStatusService } from './social-insurance-status.service';
@@ -280,6 +287,81 @@ export class SocialInsuranceProcedureService {
 
         return this.toProcedure(snapshot.docs[0].id, snapshot.docs[0].data() as Record<string, unknown>);
 
+    }
+
+    /** 入社日に合わせて資格取得届を自動作成、または未完了手続きの対象日を更新する */
+    async syncQualificationProcedureForEmployee(params: {
+        employee: Employee;
+        healthInsuranceStartDate?: string | null;
+        healthInsuranceStatus?: insuranceJoinStatus;
+        pensionInsuranceStatus?: insuranceJoinStatus;
+    }): Promise<Procedure | null> {
+        const { employee } = params;
+        const dates = resolveQualificationProcedureDates(
+            employee,
+            params.healthInsuranceStartDate ?? null,
+        );
+        if (!dates) return null;
+
+        const existing = await this.getQualificationProcedureByEmployeeId(
+            employee.id,
+            employee.companyId,
+        );
+
+        if (existing) {
+            if (
+                !shouldSyncQualificationProcedureDates(
+                    existing.status,
+                    params.healthInsuranceStartDate,
+                )
+            ) {
+                return existing;
+            }
+
+            const updated: Procedure = {
+                ...existing,
+                occurredDate: dates.occurredDate,
+                dueDate: dates.dueDate,
+                qualificationDate: dates.qualificationDate ?? '',
+            };
+
+            if (
+                updated.occurredDate === existing.occurredDate
+                && updated.dueDate === existing.dueDate
+                && updated.qualificationDate === existing.qualificationDate
+            ) {
+                return existing;
+            }
+
+            await this.updateProcedure(updated);
+            return updated;
+        }
+
+        if (
+            !canAutoManageQualificationProcedure(
+                params.healthInsuranceStatus,
+                params.pensionInsuranceStatus,
+            )
+        ) {
+            return null;
+        }
+
+        return this.createProcedure({
+            companyId: employee.companyId,
+            officeId: employee.officeId,
+            employeeId: employee.id,
+            procedureType: 'qualification',
+            status: 'notStarted',
+            occurredDate: dates.occurredDate,
+            dueDate: dates.dueDate,
+            completedDate: null,
+            submittedDate: null,
+            targetYearMonth: null,
+            memo: '',
+            lossReason: null,
+            dependentChanges: null,
+            qualificationDate: dates.qualificationDate ?? '',
+        });
     }
 
     // employeeIdから資格喪失手続きを取得

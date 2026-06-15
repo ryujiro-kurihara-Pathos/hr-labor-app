@@ -25,7 +25,7 @@ export function roleGuard(...allowedRoles: UserRole[]): CanActivateFn {
                 }
 
                 const appUser = await userService.getUserByUid(authUser.uid);
-                if (!appUser || appUser.status === 'inactive') {
+                if (!appUser || !appUser.passwordSet || appUser.status === 'inactive') {
                     resolve(router.createUrlTree(['/login']));
                     return;
                 }

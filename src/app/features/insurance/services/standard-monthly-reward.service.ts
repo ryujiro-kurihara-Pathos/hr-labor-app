@@ -92,7 +92,7 @@ export class StandardMonthlyRewardService {
         input: StandardMonthlyRewardInput,
         status: Extract<StandardMonthlyRewardStatus, 'draft' | 'confirmed'>,
     ): Promise<StandardMonthlyReward> {
-        const monthlyReward = this.sumRewardFields(input);
+        const monthlyReward = input.monthlyRewardAmount ?? this.sumRewardFields(input);
         const calc = monthlyReward > 0 ? this.calculator.calculate(monthlyReward) : null;
 
         if (status === 'confirmed') {

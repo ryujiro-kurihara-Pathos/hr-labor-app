@@ -45,6 +45,13 @@
                     </span>
                 }
             </p>
+            <div class="company-total-card">
+                <div class="company-total-label">会社負担合計（{{ targetYearMonthLabel() }}給与控除）</div>
+                <div class="company-total-value">{{ companyEmployerPremiumTotal() | number }} 円</div>
+                <p class="company-total-note">
+                    保存済みの報酬・賞与から計算 · 算出 {{ calculableEmployerPremiumRowCount() }} 名
+                </p>
+            </div>
         </section>
 
         <section class="list-section">
@@ -64,6 +71,7 @@
                                 <th>健康保険（標準報酬月額）</th>
                                 <th>厚生年金（等級）</th>
                                 <th>厚生年金（標準報酬月額）</th>
+                                <th>会社負担（保存済）</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -94,8 +102,15 @@
                                         <td class="num">{{ row.effective.calculation.health!.standardMonthlyAmount | number }} 円</td>
                                         <td class="num">{{ row.effective.calculation.pension!.grade }}</td>
                                         <td class="num">{{ row.effective.calculation.pension!.standardMonthlyAmount | number }} 円</td>
+                                        <td class="num">
+                                            @if (row.premiumResult; as premium) {
+                                                {{ premium.totalEmployerPremium | number }} 円
+                                            } @else {
+                                                <span class="unsaved-label">未保存</span>
+                                            }
+                                        </td>
                                     } @else {
-                                        <td colspan="5" class="incomplete-cell">{{ row.effective.description }}</td>
+                                        <td colspan="6" class="incomplete-cell">{{ row.effective.description }}</td>
                                     }
                                 </tr>
                             }
@@ -212,6 +227,35 @@
     }
     .summary-section {
         margin-bottom: 20px;
+        display: grid;
+        gap: 12px;
+    }
+    .company-total-card {
+        padding: 16px 20px;
+        border: 1px solid #bfdbfe;
+        border-radius: 12px;
+        background: #eff6ff;
+    }
+    .company-total-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #1d4ed8;
+        margin-bottom: 4px;
+    }
+    .company-total-value {
+        font-size: 28px;
+        font-weight: 700;
+        color: #1e3a8a;
+        line-height: 1.2;
+    }
+    .company-total-note {
+        margin: 8px 0 0;
+        font-size: 13px;
+        color: #3b82f6;
+    }
+    .unsaved-label {
+        color: #9ca3af;
+        font-size: 12px;
     }
     .summary {
         margin: 0;

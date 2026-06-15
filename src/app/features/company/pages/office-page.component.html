@@ -16,9 +16,14 @@
                         <span class="status-badge active">有効</span>
                     }
                 </div>
-                @if (!isEditing()) {
-                    <button type="button" class="btn edit-btn" (click)="startEdit()">編集</button>
-                }
+                <div class="page-header-actions">
+                    @if (!isEditing()) {
+                        <button type="button" class="btn edit-btn" (click)="startEdit()">編集</button>
+                    }
+                    @if (office()?.status === 'disabled') {
+                        <button type="button" class="btn enable-btn" (click)="enableOffice()">有効化</button>
+                    }
+                </div>
             </div>
 
             @if (isEditing()) {
@@ -35,13 +40,28 @@
 
                 <div class="form-field">
                     <label for="postal-code">郵便番号</label>
-                    <input
-                        id="postal-code"
-                        type="text"
-                        name="postalCode"
-                        [(ngModel)]="postalCode"
-                        placeholder="例: 1000001"
-                    />
+                    <div class="postal-code-row">
+                        <input
+                            id="postal-code"
+                            type="text"
+                            name="postalCode"
+                            [(ngModel)]="postalCode"
+                            placeholder="例: 1000001"
+                            inputmode="numeric"
+                            maxlength="8"
+                        />
+                        <button
+                            type="button"
+                            class="postal-search-btn"
+                            (click)="lookupAddressFromPostalCode()"
+                            [disabled]="isPostalLookupLoading()"
+                        >
+                            {{ isPostalLookupLoading() ? '検索中...' : '住所検索' }}
+                        </button>
+                    </div>
+                    @if (postalLookupError()) {
+                        <p class="field-note warn">{{ postalLookupError() }}</p>
+                    }
                 </div>
                 <div class="form-field">
                     <label for="prefecture">都道府県</label>
@@ -65,23 +85,26 @@
                 </div>
 
                 <div class="form-field">
-                    <label for="health-insurance-type">健康保険の種類</label>
-                    <select
-                        id="health-insurance-type"
-                        name="healthInsuranceType"
-                        [(ngModel)]="healthInsuranceType"
-                    >
-                        <option value="kyokai">協会けんぽ</option>
-                        <option value="union">組合健保</option>
-                    </select>
+                    <div class="label-row">
+                        <label>健康保険</label>
+                        <app-field-help-tooltip
+                            title="健康保険"
+                            [lines]="healthInsuranceHelpLines"
+                        />
+                    </div>
+                    <p class="fixed-value">協会けんぽ</p>
+                    <p class="field-note">組合健保には未対応です。保険料は協会けんぽの都道府県別料率で計算します。</p>
                 </div>
 
                 <h2 class="section-title">社会保険番号</h2>
-                <p class="section-note">
-                    納入告知書の形式どおり「事業所整理記号（2桁-カタカナ1～4桁）」「事業所番号（5桁）」で入力してください。未入力の場合は仮番号がランダムで自動割り当てされます。
-                </p>
                 <div class="form-field">
-                    <label for="health-insurance-office-symbol">事業所整理記号</label>
+                    <div class="label-row">
+                        <label for="health-insurance-office-symbol">事業所整理記号</label>
+                        <app-field-help-tooltip
+                            title="事業所整理記号"
+                            [lines]="officeSymbolHelpLines"
+                        />
+                    </div>
                     <input
                         id="health-insurance-office-symbol"
                         type="text"
@@ -92,7 +115,13 @@
                     />
                 </div>
                 <div class="form-field">
-                    <label for="pension-office-number">事業所番号</label>
+                    <div class="label-row">
+                        <label for="pension-office-number">事業所番号</label>
+                        <app-field-help-tooltip
+                            title="事業所番号"
+                            [lines]="officeNumberHelpLines"
+                        />
+                    </div>
                     <input
                         id="pension-office-number"
                         type="text"
@@ -105,12 +134,14 @@
                 </div>
 
                 <h2 class="section-title">社会保険（通常の労働者の基準）</h2>
-                <p class="section-note">
-                    パート・アルバイトの加入要件判定（4分の3ルール）で参照します。未入力の項目は絶対基準のみで判定します。
-                </p>
-
                 <div class="form-field">
-                    <label for="regular-weekly-hours">週の所定労働時間</label>
+                    <div class="label-row">
+                        <label for="regular-weekly-hours">週の所定労働時間</label>
+                        <app-field-help-tooltip
+                            title="通常の労働者の基準"
+                            [lines]="regularWorkerHelpLines"
+                        />
+                    </div>
                     <input
                         id="regular-weekly-hours"
                         type="number"
@@ -188,7 +219,7 @@
                         <dd>{{ displayValue(office()!.phoneNumber) }}</dd>
                     </div>
                     <div class="detail-row">
-                        <dt>健康保険の種類</dt>
+                        <dt>健康保険</dt>
                         <dd>{{ healthInsuranceLabel(office()!.healthInsuranceType) }}</dd>
                     </div>
                 </dl>
@@ -230,20 +261,45 @@
                 }
 
                 <div class="danger-zone">
-                    <h2 class="section-title danger-title">管理操作</h2>
-                    <p class="section-note">無効化すると新規の従業員割り当てなどで選択できなくなります。</p>
+                    <div class="danger-zone-header">
+                        <h2 class="section-title danger-title">管理操作</h2>
+                        <span class="help-mark" tabindex="0" aria-label="管理操作の説明">
+                            <span class="help-icon" aria-hidden="true">
+                                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="10" cy="10" r="8.25" stroke="currentColor" stroke-width="1.5" />
+                                    <path d="M10 9.2V14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                                    <circle cx="10" cy="6.4" r="0.9" fill="currentColor" />
+                                </svg>
+                            </span>
+                            <span class="help-tooltip" role="tooltip">
+                                <span class="help-tooltip-title">操作について</span>
+                                <ul class="help-tooltip-list">
+                                    @for (line of managementHelpLines(); track line) {
+                                        <li>{{ line }}</li>
+                                    }
+                                </ul>
+                            </span>
+                        </span>
+                    </div>
+
                     <div class="danger-actions">
-                        @if (office()?.status === 'disabled') {
-                            <button type="button" class="btn sub-btn" (click)="enableOffice()">
-                                事業所を有効化
-                            </button>
-                        } @else {
-                            <button type="button" class="btn sub-btn" (click)="disableOffice()">
-                                事業所を無効化
-                            </button>
-                        }
-                        <button type="button" class="btn delete-btn" (click)="deleteOffice()">
-                            事業所を削除する
+                        <button
+                            type="button"
+                            class="mgmt-btn mgmt-btn-disable"
+                            (click)="disableOffice()"
+                            [disabled]="office()?.status === 'disabled'"
+                        >
+                            <span class="mgmt-btn-label">事業所を無効化</span>
+                            <span class="mgmt-btn-note">新規登録・手続きで選択不可にします</span>
+                        </button>
+                        <button
+                            type="button"
+                            class="mgmt-btn mgmt-btn-delete"
+                            (click)="deleteOffice()"
+                            [disabled]="!deletionCheck()?.canDelete"
+                        >
+                            <span class="mgmt-btn-label">事業所を削除する</span>
+                            <span class="mgmt-btn-note">未使用の事業所のみ削除できます</span>
                         </button>
                     </div>
                 </div>
@@ -284,6 +340,7 @@
         border: 1px solid #e5e7eb;
         border-radius: 8px;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+        overflow: visible;
     }
 
     .page-header {
@@ -294,6 +351,13 @@
         margin-bottom: 24px;
         padding-bottom: 20px;
         border-bottom: 1px solid #f3f4f6;
+    }
+
+    .page-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
     }
 
     .page-header-title {
@@ -338,20 +402,200 @@
 
     .danger-zone {
         margin-top: 32px;
-        padding-top: 24px;
-        border-top: 1px solid #f3f4f6;
+        padding: 20px;
+        border-radius: 12px;
+        background: linear-gradient(180deg, #fafbfc 0%, #f8fafc 100%);
+        border: 1px solid #e8edf3;
+        overflow: visible;
     }
 
-    .danger-title {
-        margin-top: 0;
-        color: #991b1b;
+    .danger-zone-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 16px;
+        overflow: visible;
+    }
+
+    .danger-zone-header .danger-title {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 700;
+        color: #374151;
+    }
+
+    .help-mark {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        cursor: help;
+        outline: none;
+    }
+
+    .help-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #fff;
+        color: #64748b;
+        border: 1px solid #dbe3ee;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+        transition: border-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.15s;
+    }
+
+    .help-icon svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .help-mark:hover .help-icon,
+    .help-mark:focus-visible .help-icon {
+        border-color: #93c5fd;
+        color: #2563eb;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12);
+        transform: translateY(-1px);
+    }
+
+    .help-tooltip {
+        position: absolute;
+        bottom: calc(100% + 12px);
+        right: 0;
+        z-index: 20;
+        width: min(340px, 78vw);
+        padding: 14px 16px;
+        border-radius: 12px;
+        background: #fff;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+        box-shadow:
+            0 12px 28px rgba(15, 23, 42, 0.12),
+            0 2px 6px rgba(15, 23, 42, 0.06);
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(6px);
+        transition: opacity 0.18s ease, visibility 0.18s ease, transform 0.18s ease;
+        pointer-events: none;
+    }
+
+    .help-tooltip::after {
+        content: '';
+        position: absolute;
+        bottom: -7px;
+        right: 10px;
+        width: 12px;
+        height: 12px;
+        background: #fff;
+        border-right: 1px solid #e2e8f0;
+        border-bottom: 1px solid #e2e8f0;
+        transform: rotate(45deg);
+    }
+
+    .help-tooltip-title {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        color: #1e293b;
+    }
+
+    .help-tooltip-list {
+        margin: 0;
+        padding-left: 18px;
+        font-size: 12px;
+        line-height: 1.65;
+    }
+
+    .help-tooltip-list li + li {
+        margin-top: 6px;
+    }
+
+    .help-mark:hover .help-tooltip,
+    .help-mark:focus-visible .help-tooltip {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
     }
 
     .danger-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .mgmt-btn {
         display: flex;
         flex-direction: column;
-        gap: 10px;
-        margin-top: 12px;
+        align-items: flex-start;
+        gap: 4px;
+        min-height: 72px;
+        padding: 14px 16px;
+        border-radius: 10px;
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.15s;
+    }
+
+    .mgmt-btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+
+    .mgmt-btn:not(:disabled):hover {
+        transform: translateY(-1px);
+    }
+
+    .mgmt-btn-label {
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.3;
+    }
+
+    .mgmt-btn-note {
+        font-size: 11px;
+        font-weight: 500;
+        line-height: 1.45;
+        opacity: 0.82;
+    }
+
+    .mgmt-btn-disable {
+        border: 1px solid #fcd34d;
+        background: #fffbeb;
+        color: #92400e;
+        box-shadow: 0 1px 2px rgba(146, 64, 14, 0.06);
+    }
+
+    .mgmt-btn-disable:not(:disabled):hover {
+        border-color: #f59e0b;
+        background: #fef3c7;
+        box-shadow: 0 6px 16px rgba(245, 158, 11, 0.12);
+    }
+
+    .mgmt-btn-delete {
+        border: 1px solid #fecaca;
+        background: #fff;
+        color: #b91c1c;
+        box-shadow: 0 1px 2px rgba(185, 28, 28, 0.05);
+    }
+
+    .mgmt-btn-delete:not(:disabled):hover {
+        border-color: #f87171;
+        background: #fef2f2;
+        box-shadow: 0 6px 16px rgba(239, 68, 68, 0.12);
+    }
+
+    @media (max-width: 560px) {
+        .danger-actions {
+            grid-template-columns: 1fr;
+        }
     }
 
     .section-note {
@@ -402,6 +646,70 @@
         font-weight: 600;
     }
 
+    .label-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .fixed-value {
+        margin: 0;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        font-size: 14px;
+        font-weight: 600;
+        color: #1e293b;
+    }
+
+    .field-note {
+        margin: 6px 0 0;
+        color: #6b7280;
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
+    .field-note.warn {
+        color: #b45309;
+    }
+
+    .postal-code-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .postal-code-row input {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .postal-search-btn {
+        flex-shrink: 0;
+        height: 40px;
+        padding: 0 14px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: #fff;
+        color: #374151;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+
+    .postal-search-btn:hover:not(:disabled) {
+        background: #f9fafb;
+        border-color: #93c5fd;
+        color: #2563eb;
+    }
+
+    .postal-search-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
     input,
     select {
         height: 40px;
@@ -448,6 +756,11 @@
         color: #333;
     }
 
+    .enable-btn {
+        background: #dcfce7;
+        color: #166534;
+    }
+
     .primary-btn {
         flex: 1;
         background: #2563eb;
@@ -458,16 +771,5 @@
         flex: 1;
         background: #e5e7eb;
         color: #333;
-    }
-
-    .delete-btn {
-        width: 100%;
-        background: #fff;
-        color: #dc2626;
-        border: 1px solid #fecaca;
-    }
-
-    .delete-btn:hover:not(:disabled) {
-        background: #fef2f2;
     }
 </style>

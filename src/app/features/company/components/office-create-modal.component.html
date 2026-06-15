@@ -26,15 +26,14 @@
         </div>
 
         <div class="form-field">
-            <label for="health-insurance-type">健康保険の種類</label>
-            <select
-                id="health-insurance-type"
-                name="healthInsuranceType"
-                [(ngModel)]="healthInsuranceType"
-            >
-                <option value="kyokai">協会けんぽ</option>
-                <option value="union">組合健保</option>
-            </select>
+            <div class="label-row">
+                <label>健康保険</label>
+                <app-field-help-tooltip
+                    title="健康保険"
+                    [lines]="healthInsuranceHelpLines"
+                />
+            </div>
+            <p class="fixed-value">協会けんぽ</p>
         </div>
 
         @if(errorMessage()) {
@@ -78,6 +77,7 @@
         background: #fff;
         border-radius: 12px;
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        overflow: visible;
     }
 
     h1 {
@@ -99,23 +99,34 @@
         margin-bottom: 16px;
     }
 
+    .label-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
     label {
         font-size: 14px;
         font-weight: 600;
     }
 
-    input,
-    select {
+    .fixed-value {
+        margin: 0;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        font-size: 14px;
+        font-weight: 600;
+        color: #1e293b;
+    }
+
+    input {
         height: 40px;
         padding: 0 12px;
         border: 1px solid #d1d5db;
         border-radius: 8px;
         font-size: 14px;
-    }
-
-    select {
-        cursor: pointer;
-        background: #fff;
     }
 
     .error-message {

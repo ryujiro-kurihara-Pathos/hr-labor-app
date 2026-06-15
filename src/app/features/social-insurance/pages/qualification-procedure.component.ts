@@ -77,6 +77,7 @@ export class QualificationProcedureComponent {
             employee.joinedDate,
             this.joinMonthReward(),
             this.employeeBonuses(),
+            employee.employmentType,
         );
     });
 
@@ -87,7 +88,10 @@ export class QualificationProcedureComponent {
     });
 
     displayMonthlyReward = computed((): QualificationMonthlyReward | null => {
-        if (this.useSavedData()) return monthlyRewardFromProcedure(this.procedure());
+        const employee = this.employee();
+        if (this.useSavedData()) {
+            return monthlyRewardFromProcedure(this.procedure(), employee?.employmentType ?? null);
+        }
         return this.liveMonthlyReward();
     });
 

@@ -2,15 +2,20 @@ import { Component, signal, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
-import { EmployeeInput, EmploymentType, createEmptyEmployeeInput } from '../models/employee.models';
+import { EmployeeInput, EmploymentType, createEmptyEmployeeInput, toEmployeeInput } from '../models/employee.models';
 import { EmployeeService } from '../services/employee.service';
 import { AuthService } from '../../auth/services/auth.service';
 import { UserService } from '../../users/services/user.service';
 import { SocialInsuranceStatusService } from '../../social-insurance/services/social-insurance-status.service';
+import { SocialInsuranceProcedureService } from '../../social-insurance/services/social-insurance-procedure.service';
 import { ConfirmService } from '../../../shared/services/confirm.service';
 import { OfficeService } from '../../company/services/office.service';
 import { Office } from '../../company/models/office.model';
 import { insuranceJoinStatus, SocialInsuranceStatusInput } from '../../social-insurance/models/social-insurance-status.model';
+import { EmployeeInviteService } from '../../invitations/services/employee-invite.service';
+import { normalizeAuthEmail } from '../../auth/utils/email-link-auth.util';
+import { PostalCodeLookupService } from '../../../shared/services/postal-code-lookup.service';
+import { applyPostalLookupResult } from '../../../shared/utils/postal-code-lookup.util';
 
 const PREFECTURES = [
     '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県', '茨城県', '栃木県', '群馬県',
@@ -33,10 +38,15 @@ export class EmployeeCreatePageComponent {
     private readonly userService = inject(UserService);
     private readonly officeService = inject(OfficeService);
     private readonly socialInsuranceStatusService = inject(SocialInsuranceStatusService);
+    private readonly procedureService = inject(SocialInsuranceProcedureService);
     private readonly confirmService = inject(ConfirmService);
+    private readonly employeeInviteService = inject(EmployeeInviteService);
+    private readonly postalCodeLookupService = inject(PostalCodeLookupService);
 
     isLoading = signal(false);
     isLoadingEmployee = signal(false);
+    isPostalLookupLoading = signal(false);
+    postalLookupError = signal('');
     errorMessage = signal('');
     nextEmployeeNumber = signal('');
     offices = signal<Office[]>([]);
@@ -73,6 +83,20 @@ export class EmployeeCreatePageComponent {
         this.isLoading.set(false);
     }
 
+    async lookupAddressFromPostalCode(): Promise<void> {
+        this.postalLookupError.set('');
+        this.isPostalLookupLoading.set(true);
+
+        try {
+            const result = await this.postalCodeLookupService.lookup(this.employee.postalCode);
+            applyPostalLookupResult(this.employee, result);
+        } catch (error) {
+            this.postalLookupError.set(this.postalCodeLookupService.toUserMessage(error));
+        } finally {
+            this.isPostalLookupLoading.set(false);
+        }
+    }
+
     async onCreateEmployee(): Promise<void> {
         this.isLoadingEmployee.set(true);
         this.errorMessage.set('');
@@ -90,6 +114,7 @@ export class EmployeeCreatePageComponent {
         }
 
         try {
+            this.employee.email = normalizeAuthEmail(this.employee.email);
             const employee = await this.employeeService.createEmployee(this.employee);
             if (!employee) return;
 
@@ -113,9 +138,37 @@ export class EmployeeCreatePageComponent {
             };
             await this.socialInsuranceStatusService.createSocialInsuranceStatus(socialInsuranceStatusInput);
 
-            const sendInviteEmail = await this.confirmService.confirmInviteEmail();
+            await this.procedureService.syncQualificationProcedureForEmployee({
+                employee,
+                healthInsuranceStartDate: null,
+                healthInsuranceStatus: socialInsuranceStatusInput.healthInsuranceStatus,
+                pensionInsuranceStatus: socialInsuranceStatusInput.pensionInsuranceStatus,
+            });
+
+            const inviteEmail = await this.confirmService.confirmInviteEmail(this.employee.email);
+            let inviteSuccessMessage = '';
+
+            if (inviteEmail) {
+                let employeeForInvite = employee;
+                if (employee.email !== inviteEmail) {
+                    await this.employeeService.updateEmployee(
+                        employee.id,
+                        toEmployeeInput(employee, { email: inviteEmail }),
+                    );
+                    employeeForInvite = { ...employee, email: inviteEmail };
+                }
+
+                try {
+                    await this.employeeInviteService.sendInvitation(employeeForInvite, inviteEmail);
+                    inviteSuccessMessage = `${inviteEmail} 宛に招待メールを送信しました`;
+                } catch (error) {
+                    console.error('招待メールの送信に失敗しました', error);
+                    inviteSuccessMessage = this.employeeInviteService.toUserMessage(error);
+                }
+            }
+
             await this.router.navigate(['/employees', employee.id], {
-                queryParams: sendInviteEmail ? { invite: '1' } : {},
+                queryParams: inviteSuccessMessage ? { inviteMsg: inviteSuccessMessage } : {},
             });
         } catch (error) {
             this.errorMessage.set('従業員の追加に失敗しました。');
@@ -127,7 +180,7 @@ export class EmployeeCreatePageComponent {
 
     private async loadOffices(companyId: string): Promise<void> {
         try {
-            const offices = await this.officeService.getOfficesByCompanyId(companyId);
+            const offices = await this.officeService.getActiveOfficesByCompanyId(companyId);
             this.offices.set(offices);
             if (offices.length > 0 && !this.employee.officeId) {
                 this.employee.officeId = offices[0].id;

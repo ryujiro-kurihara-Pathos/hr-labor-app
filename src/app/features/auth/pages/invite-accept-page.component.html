@@ -2,8 +2,8 @@
     <div class="invite-card">
         <h1>従業員招待</h1>
 
-        @if (isLoading() || isSigningIn()) {
-            <p class="muted">{{ isSigningIn() ? 'ログインしています...' : '読み込み中...' }}</p>
+        @if (step() === 'loading' || isProcessing()) {
+            <p class="muted">{{ isProcessing() ? '処理中...' : '読み込み中...' }}</p>
         } @else if (errorMessage() && !invitation()) {
             <p class="error-message">{{ errorMessage() }}</p>
             <p class="login-link">
@@ -11,10 +11,10 @@
             </p>
         } @else if (invitation()) {
             <p class="intro">
-                {{ companyName() || '会社' }} から招待されています。
-                @if (employee(); as emp) {
-                    <span class="employee-name">{{ emp.lastName }} {{ emp.firstName }}</span>
-                    さんとしてログインします。
+                {{ inviteCompanyName() }} から招待されています。
+                @if (inviteEmployeeName(); as name) {
+                    <span class="employee-name">{{ name }}</span>
+                    さんとして登録します。
                 }
             </p>
 
@@ -29,13 +29,55 @@
                 <p class="info-message">{{ infoMessage() }}</p>
             }
 
-            @if (errorMessage()) {
-                <p class="error-message">{{ errorMessage() }}</p>
-            }
+            @if (step() === 'setting-password') {
+                <section class="password-section">
+                    <h2 class="section-title">パスワード設定</h2>
+                    <p class="section-note">ログイン時に使用するパスワードを設定してください。</p>
 
-            <p class="login-link">
-                <a routerLink="/login">ログイン画面へ</a>
-            </p>
+                    <div class="form-field">
+                        <label for="password">パスワード</label>
+                        <input
+                            id="password"
+                            type="password"
+                            name="password"
+                            [(ngModel)]="password"
+                            placeholder="6文字以上"
+                        />
+                    </div>
+
+                    <div class="form-field">
+                        <label for="confirmPassword">パスワード（確認）</label>
+                        <input
+                            id="confirmPassword"
+                            type="password"
+                            name="confirmPassword"
+                            [(ngModel)]="confirmPassword"
+                            placeholder="もう一度入力"
+                        />
+                    </div>
+
+                    @if (errorMessage()) {
+                        <p class="error-message">{{ errorMessage() }}</p>
+                    }
+
+                    <button
+                        type="button"
+                        class="form-btn"
+                        (click)="onSetPassword()"
+                        [disabled]="isProcessing()"
+                    >
+                        パスワードを設定して登録完了
+                    </button>
+                </section>
+            } @else {
+                @if (errorMessage()) {
+                    <p class="error-message">{{ errorMessage() }}</p>
+                }
+
+                <p class="login-link">
+                    <a routerLink="/login">ログイン画面へ</a>
+                </p>
+            }
         }
     </div>
 </div>
@@ -96,6 +138,66 @@
         margin: 0;
         color: #111827;
         word-break: break-all;
+    }
+
+    .password-section {
+        margin-top: 8px;
+    }
+
+    .section-title {
+        margin: 0 0 6px;
+        font-size: 16px;
+    }
+
+    .section-note {
+        margin: 0 0 16px;
+        color: #6b7280;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .form-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 16px;
+    }
+
+    .form-field label {
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .form-field input {
+        height: 40px;
+        padding: 0 12px;
+        border: 1px solid #d6d9de;
+        border-radius: 8px;
+        font-size: 14px;
+        box-sizing: border-box;
+    }
+
+    .form-field input:focus {
+        outline: none;
+        border-color: #2f6fed;
+    }
+
+    .form-btn {
+        width: 100%;
+        height: 42px;
+        margin-top: 8px;
+        border: none;
+        border-radius: 8px;
+        background: #2f6fed;
+        color: #fff;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .form-btn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
     }
 
     .info-message {

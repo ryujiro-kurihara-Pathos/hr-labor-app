@@ -10,8 +10,9 @@ import { EmployeeService } from '../../employee/services/employee.service';
 import { Office } from '../../company/models/office.model';
 import { Company, InsurancePremiumCollectionTiming } from '../../company/models/company.model';
 import { CompanyService } from '../../company/services/company.service';
-import { formatPayrollDeductionNote } from '../../company/utils/company-payroll-settings.util';
+import { formatPayrollDeductionNote, formatPremiumCollectionSummary, resolvePremiumLiabilityYearMonth } from '../../company/utils/company-payroll-settings.util';
 import { OfficeService } from '../../company/services/office.service';
+import { resolveOfficePrefecture } from '../../company/utils/office-prefecture.util';
 import { SocialInsuranceStatus } from '../../social-insurance/models/social-insurance-status.model';
 import { SocialInsuranceStatusService } from '../../social-insurance/services/social-insurance-status.service';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
@@ -51,7 +52,10 @@ import {
     isCareInsurancePremiumTargetMonth,
     judgeCareInsuranceStatus,
 } from '../../social-insurance/utils/care-insurance-period.util';
-import { isInsurancePremiumTargetMonth } from '../../social-insurance/utils/insurance-premium-period.util';
+import {
+    isHealthInsurancePremiumTargetMonth,
+    isPensionInsurancePremiumTargetMonth,
+} from '../../social-insurance/utils/age-premium-period.util';
 
 const PENSION_RATE = 0.0915;
 
@@ -105,6 +109,30 @@ export class MyInsurancePremiumPageComponent implements OnInit {
         if (!targetYearMonth) return '';
         return formatPayrollDeductionNote(targetYearMonth, this.insurancePremiumCollectionTiming());
     });
+
+    premiumCollectionSummary = computed(() => {
+        const targetYearMonth = this.targetYearMonth();
+        if (!targetYearMonth) return '';
+        return formatPremiumCollectionSummary(targetYearMonth, this.insurancePremiumCollectionTiming());
+    });
+
+    premiumLiabilityYearMonth = computed((): string | null => {
+        const displayYearMonth = this.targetYearMonth();
+        if (!displayYearMonth) return null;
+        return resolvePremiumLiabilityYearMonth(
+            displayYearMonth,
+            this.insurancePremiumCollectionTiming(),
+        );
+    });
+
+    premiumLiabilityYearMonthLabel = computed(() => {
+        const ym = this.premiumLiabilityYearMonth();
+        return ym ? formatYearMonthLabel(ym) : '';
+    });
+
+    isNextMonthCollection = computed(
+        () => this.insurancePremiumCollectionTiming() === 'next_month',
+    );
 
     viewableMinYearMonth = computed(() => {
         const employee = this.employee();
@@ -174,15 +202,45 @@ export class MyInsurancePremiumPageComponent implements OnInit {
     });
 
     bonusesForPremium = computed(() => {
-        const ym = this.targetYearMonth();
-        if (!ym) return [];
-        return bonusesForStandardBonusPremium(this.monthBonuses(), ym, this.allBonuses());
+        const liabilityYearMonth = this.premiumLiabilityYearMonth();
+        if (!liabilityYearMonth) return [];
+        const bonusesInLiabilityMonth = this.allBonuses().filter(
+            (bonus) => bonus.targetYearMonth === liabilityYearMonth,
+        );
+        return bonusesForStandardBonusPremium(
+            bonusesInLiabilityMonth,
+            liabilityYearMonth,
+            this.allBonuses(),
+        );
     });
 
     standardAmount = computed((): number | null => {
-        const effective = this.effectiveStandard();
+        const effective = this.effectiveStandardForPremium();
         if (!effective?.isComplete || !effective.calculation?.health) return null;
         return effective.calculation.health.standardMonthlyAmount;
+    });
+
+    effectiveStandardForPremium = computed(() => {
+        const employee = this.employee();
+        const liabilityYearMonth = this.premiumLiabilityYearMonth();
+        if (!employee || !liabilityYearMonth) return null;
+
+        const rewardsByYearMonth = confirmedRewardsByYearMonth(
+            Object.fromEntries(this.allRewards().map((item) => [item.targetYearMonth, item])),
+        );
+
+        return this.determinationService.resolve(
+            employee,
+            rewardsByYearMonth,
+            liabilityYearMonth,
+            this.insuranceStatus()?.healthInsuranceStartDate ?? null,
+            this.allBonuses(),
+        );
+    });
+
+    hasMonthlyPremiumDisplay = computed((): boolean => {
+        if (this.standardAmount() === null) return false;
+        return this.isHealthPremiumMonth() || this.isPensionPremiumMonth() || this.isCarePremiumMonth();
     });
 
     healthGrade = computed((): number | null => {
@@ -195,12 +253,29 @@ export class MyInsurancePremiumPageComponent implements OnInit {
 
     isHealthPremiumMonth = computed(() => {
         const status = this.insuranceStatus();
-        const ym = this.targetYearMonth();
+        const employee = this.employee();
+        const ym = this.premiumLiabilityYearMonth();
         if (!status || !ym) return false;
-        return isInsurancePremiumTargetMonth(
+        return isHealthInsurancePremiumTargetMonth(
             ym,
             status.healthInsuranceStartDate,
             status.healthInsuranceEndDate,
+            employee?.birthDate ?? null,
+        );
+    });
+
+    isPensionPremiumMonth = computed(() => {
+        const status = this.insuranceStatus();
+        const employee = this.employee();
+        const ym = this.premiumLiabilityYearMonth();
+        if (!status || !ym) return false;
+        return isPensionInsurancePremiumTargetMonth(
+            ym,
+            status.healthInsuranceStartDate,
+            status.healthInsuranceEndDate,
+            status.pensionInsuranceStartDate,
+            status.pensionInsuranceEndDate,
+            employee?.birthDate ?? null,
         );
     });
 
@@ -210,14 +285,14 @@ export class MyInsurancePremiumPageComponent implements OnInit {
     });
 
     pensionPremium = computed(() => {
-        if (!this.isHealthPremiumMonth()) return null;
+        if (!this.isPensionPremiumMonth()) return null;
         return this.calculatePremium(this.standardAmount(), PENSION_RATE);
     });
 
     isCarePremiumMonth = computed(() => {
         const status = this.insuranceStatus();
         const employee = this.employee();
-        const ym = this.targetYearMonth();
+        const ym = this.premiumLiabilityYearMonth();
         if (!status || !employee || !ym) return false;
         return isCareInsurancePremiumTargetMonth(
             ym,
@@ -260,7 +335,7 @@ export class MyInsurancePremiumPageComponent implements OnInit {
             const health = this.isHealthPremiumMonth()
                 ? this.calculatePremium(amount, this.healthRateRow()?.employeeRate ?? null) ?? 0
                 : 0;
-            const pension = this.isHealthPremiumMonth()
+            const pension = this.isPensionPremiumMonth()
                 ? this.calculatePremium(amount, PENSION_RATE) ?? 0
                 : 0;
             const care = this.isCarePremiumMonth()
@@ -474,6 +549,11 @@ export class MyInsurancePremiumPageComponent implements OnInit {
                 .sort((a, b) => a.paymentDate.localeCompare(b.paymentDate));
             this.monthBonuses.set(monthBonuses);
 
+            const liabilityYearMonth = resolvePremiumLiabilityYearMonth(
+                targetYearMonth,
+                this.insurancePremiumCollectionTiming(),
+            );
+
             const rewardsByYearMonth = confirmedRewardsByYearMonth(
                 Object.fromEntries(allRewards.map((item) => [item.targetYearMonth, item])),
             );
@@ -489,7 +569,7 @@ export class MyInsurancePremiumPageComponent implements OnInit {
 
             const office = this.office();
             if (office) {
-                const fiscalYear = this.healthInsuranceFiscalYear(targetYearMonth);
+                const fiscalYear = this.healthInsuranceFiscalYear(liabilityYearMonth);
                 const fileName = `kyokai-health-insurance-rates-${fiscalYear}-03.ts`;
                 const rates =
                     KYOKAI_HEALTH_INSURANCE_RATE_FILES.find((file) => file.fileName === fileName)?.rates ?? [];
@@ -497,12 +577,12 @@ export class MyInsurancePremiumPageComponent implements OnInit {
                 this.healthRateRow.set(
                     findHealthInsuranceRate({
                         rates,
-                        targetYearMonth,
+                        targetYearMonth: liabilityYearMonth,
                         providerType: office.healthInsuranceType ?? 'kyokai',
-                        prefecture: office.prefecture ?? null,
+                        prefecture: resolveOfficePrefecture(office, this.employee()?.prefecture),
                     }),
                 );
-                this.careRateRow.set(findCareInsuranceRate(targetYearMonth));
+                this.careRateRow.set(findCareInsuranceRate(liabilityYearMonth));
             } else {
                 this.healthRateRow.set(null);
                 this.careRateRow.set(null);

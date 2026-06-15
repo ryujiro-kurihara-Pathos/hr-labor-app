@@ -15,6 +15,8 @@ import { BonusRewardService } from '../../bonus/services/bonus-reward.service';
 import { StandardMonthlyRewardService } from '../services/standard-monthly-reward.service';
 import { StandardRemunerationDeterminationService } from '../services/standard-remuneration-determination.service';
 import { SocialInsuranceStatusService } from '../../social-insurance/services/social-insurance-status.service';
+import { InsurancePremiumResultService } from '../services/insurance-premium-result.service';
+import { InsurancePremiumResult } from '../models/insurance-premium-result.model';
 import { addMonthsToYearMonth, isRewardTargetMonth } from '../utils/reward-target-month.util';
 import { isRewardConfirmed } from '../utils/reward-status.util';
 
@@ -25,6 +27,7 @@ export type InsurancePremiumListRow = {
     /** 対象年月の月次報酬が入力済みか */
     isRegistered: boolean;
     isTargetMonth: boolean;
+    premiumResult: InsurancePremiumResult | null;
 };
 
 @Component({
@@ -42,15 +45,18 @@ export class InsurancePremiumPageComponent {
     private readonly determinationService = inject(StandardRemunerationDeterminationService);
     private readonly bonusRewardService = inject(BonusRewardService);
     private readonly socialInsuranceStatusService = inject(SocialInsuranceStatusService);
+    private readonly premiumResultService = inject(InsurancePremiumResultService);
 
     isLoading = signal(false);
     errorMessage = signal('');
+    companyId = signal('');
 
     employees = signal<Employee[]>([]);
     officeNameById = signal<Record<string, string>>({});
     rewardsByEmployeeId = signal<Record<string, Record<string, StandardMonthlyReward>>>({});
     bonusesByEmployeeId = signal<Record<string, BonusReward[]>>({});
     healthInsuranceStartDateByEmployeeId = signal<Record<string, string | null>>({});
+    premiumResultsByEmployeeId = signal<Record<string, InsurancePremiumResult>>({});
 
     targetYearMonth = signal(this.currentYearMonth());
 
@@ -66,6 +72,23 @@ export class InsurancePremiumPageComponent {
 
     excludedRowCount = computed(() =>
         this.buildRows().filter((row) => !row.isTargetMonth).length,
+    );
+
+    savedPremiumRows = computed(() =>
+        this.buildRows().filter((row) => row.isTargetMonth && row.premiumResult !== null),
+    );
+
+    companyEmployerPremiumTotal = computed(() =>
+        this.premiumResultService.sumEmployerPremium(
+            this.savedPremiumRows().map((row) => row.premiumResult!),
+        ),
+    );
+
+    /** 会社負担合計に含めた従業員数（保存済み保険料がある行） */
+    calculableEmployerPremiumRowCount = computed(() => this.savedPremiumRows().length);
+
+    unsavedTargetRowCount = computed(() =>
+        this.buildRows().filter((row) => row.isTargetMonth && row.premiumResult === null).length,
     );
 
     async ngOnInit() {
@@ -89,6 +112,7 @@ export class InsurancePremiumPageComponent {
             if (!authUser) return;
             const appUser = await this.userService.getUserByUid(authUser.uid);
             if (!appUser) return;
+            this.companyId.set(appUser.companyId);
 
             const [employees, offices] = await Promise.all([
                 this.employeeService.getEmployeesByCompanyId(appUser.companyId),
@@ -117,10 +141,13 @@ export class InsurancePremiumPageComponent {
         if (employees.length === 0) {
             this.rewardsByEmployeeId.set({});
             this.bonusesByEmployeeId.set({});
+            this.premiumResultsByEmployeeId.set({});
             return;
         }
 
-        const [rewardLists, bonusLists] = await Promise.all([
+        const companyId = this.companyId();
+        const targetYearMonth = this.targetYearMonth();
+        const [rewardLists, bonusLists, premiumResults] = await Promise.all([
             Promise.all(employees.map((employee) => this.rewardService.listByEmployee(employee.id))),
             Promise.all(
                 employees.map((employee) =>
@@ -130,6 +157,9 @@ export class InsurancePremiumPageComponent {
                     ),
                 ),
             ),
+            companyId
+                ? this.premiumResultService.listByCompanyAndMonth(companyId, targetYearMonth)
+                : Promise.resolve([]),
         ]);
 
         const byEmployee: Record<string, Record<string, StandardMonthlyReward>> = {};
@@ -144,6 +174,12 @@ export class InsurancePremiumPageComponent {
         }
         this.rewardsByEmployeeId.set(byEmployee);
         this.bonusesByEmployeeId.set(bonusesByEmployee);
+
+        const premiumByEmployee: Record<string, InsurancePremiumResult> = {};
+        for (const result of premiumResults) {
+            premiumByEmployee[result.employeeId] = result;
+        }
+        this.premiumResultsByEmployeeId.set(premiumByEmployee);
     }
 
     private async loadHealthInsuranceStartDates(employees: Employee[]) {
@@ -159,6 +195,7 @@ export class InsurancePremiumPageComponent {
     private buildRows(): InsurancePremiumListRow[] {
         const byEmployee = this.rewardsByEmployeeId();
         const bonusesByEmployee = this.bonusesByEmployeeId();
+        const premiumByEmployee = this.premiumResultsByEmployeeId();
         const ym = this.targetYearMonth();
         const healthDates = this.healthInsuranceStartDateByEmployeeId();
         return this.employees().map((employee) => {
@@ -178,6 +215,7 @@ export class InsurancePremiumPageComponent {
                 effective,
                 isRegistered: isRewardConfirmed(reward),
                 isTargetMonth,
+                premiumResult: premiumByEmployee[employee.id] ?? null,
             };
         });
     }

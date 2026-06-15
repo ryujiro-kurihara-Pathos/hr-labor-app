@@ -32,3 +32,10 @@ export function confirmedRewardsByYearMonth(
     }
     return result;
 }
+
+/** 保険料表示・算定に使う確定済み報酬のみ */
+export function savedRewardsForPremiumCalculation(
+    rewardsByYearMonth: Record<string, StandardMonthlyReward>,
+): Record<string, StandardMonthlyReward> {
+    return confirmedRewardsByYearMonth(rewardsByYearMonth);
+}

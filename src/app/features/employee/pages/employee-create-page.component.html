@@ -17,12 +17,21 @@
                     <div class="form-grid">
                         <div class="form-field">
                             <label for="office-id">事業所 <span class="required">必須</span></label>
-                            <select id="office-id" name="officeId" [(ngModel)]="employee.officeId" required>
+                            <select
+                                id="office-id"
+                                name="officeId"
+                                [(ngModel)]="employee.officeId"
+                                required
+                                [disabled]="offices().length === 0"
+                            >
                                 <option value="" disabled>選択してください</option>
                                 @for (office of offices(); track office.id) {
                                     <option [value]="office.id">{{ office.name }}</option>
                                 }
                             </select>
+                            @if (offices().length === 0) {
+                                <p class="field-note warn">有効な事業所がありません。会社設定で事業所を登録または有効化してください。</p>
+                            }
                         </div>
                         <div class="form-field">
                             <label for="joined-date">入社日 <span class="required">必須</span></label>
@@ -37,7 +46,7 @@
                                 readonly
                                 placeholder="00000001"
                             />
-                            <p class="field-note">登録時に8桁の連番を自動付与します</p>
+                            <p class="field-note">登録時に8桁の連番を自動付与します。変更できません。</p>
                         </div>
                     </div>
                 </section>
@@ -58,14 +67,27 @@
                             <input id="birth-date" type="date" name="birthDate" [(ngModel)]="employee.birthDate" required />
                         </div>
                         <div class="form-field">
-                            <label for="email">メールアドレス</label>
-                            <input id="email" type="email" name="email" [(ngModel)]="employee.email" placeholder="example@example.com" />
-                            <p class="field-note">ユーザー招待メールの送信先として使用します</p>
-                        </div>
-                        <div class="form-field">
                             <label for="my-number">マイナンバー</label>
                             <input id="my-number" type="text" name="myNumber" [(ngModel)]="employee.myNumber" readonly />
-                            <p class="field-note">登録時に仮の番号を自動生成します</p>
+                            <p class="field-note">登録時に仮の番号を自動生成します。変更できません。</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="form-section invite-section">
+                    <h2 class="section-title">ログイン招待</h2>
+                    <p class="section-lead">任意。登録後に招待メールを送る場合の送信先です。</p>
+                    <div class="form-grid">
+                        <div class="form-field form-field-wide">
+                            <label for="email">メールアドレス</label>
+                            <input
+                                id="email"
+                                type="email"
+                                name="email"
+                                [(ngModel)]="employee.email"
+                                placeholder="example@company.com"
+                                autocomplete="email"
+                            />
                         </div>
                     </div>
                 </section>
@@ -73,9 +95,30 @@
                 <section class="form-section">
                     <h2 class="section-title">住所</h2>
                     <div class="form-grid">
-                        <div class="form-field">
+                        <div class="form-field form-field-wide">
                             <label for="postal-code">郵便番号</label>
-                            <input id="postal-code" type="text" name="postalCode" [(ngModel)]="employee.postalCode" placeholder="1000001" inputmode="numeric" />
+                            <div class="postal-code-row">
+                                <input
+                                    id="postal-code"
+                                    type="text"
+                                    name="postalCode"
+                                    [(ngModel)]="employee.postalCode"
+                                    placeholder="1000001"
+                                    inputmode="numeric"
+                                    maxlength="8"
+                                />
+                                <button
+                                    type="button"
+                                    class="postal-search-btn"
+                                    (click)="lookupAddressFromPostalCode()"
+                                    [disabled]="isPostalLookupLoading()"
+                                >
+                                    {{ isPostalLookupLoading() ? '検索中...' : '住所検索' }}
+                                </button>
+                            </div>
+                            @if (postalLookupError()) {
+                                <p class="field-note warn">{{ postalLookupError() }}</p>
+                            }
                         </div>
                         <div class="form-field">
                             <label for="prefecture">都道府県</label>
@@ -176,6 +219,24 @@
         color: #374151;
     }
 
+    .section-lead {
+        margin: -8px 0 14px;
+        font-size: 13px;
+        color: #6b7280;
+        line-height: 1.5;
+    }
+
+    .invite-section {
+        padding: 16px;
+        border-radius: 10px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+    }
+
+    .invite-section .section-title {
+        margin-bottom: 4px;
+    }
+
     .form-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -233,6 +294,46 @@
         margin: 0;
         font-size: 12px;
         color: #9ca3af;
+    }
+
+    .field-note.warn {
+        color: #b45309;
+    }
+
+    .postal-code-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .postal-code-row input {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .postal-search-btn {
+        flex-shrink: 0;
+        height: 40px;
+        padding: 0 14px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: #fff;
+        color: #374151;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+
+    .postal-search-btn:hover:not(:disabled) {
+        background: #f9fafb;
+        border-color: #93c5fd;
+        color: #2563eb;
+    }
+
+    .postal-search-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
     }
 
     .error-message {

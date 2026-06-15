@@ -1,10 +1,19 @@
 import { Company } from '../../company/models/company.model';
 import { Office } from '../../company/models/office.model';
 import { formatOfficeAddress } from '../../company/utils/office-format.util';
-import { Employee } from '../../employee/models/employee.models';
-import { Procedure, QualificationProcedureData } from '../models/procedures.model';
+import { Employee, EmploymentType } from '../../employee/models/employee.models';
+import { getQualificationDate } from '../../insurance/utils/standard-remuneration-determination.util';
+import { shouldProrateMonthlyRewardByPaymentBaseDays } from '../../insurance/utils/monthly-reward-proration.util';
+import { Procedure, ProcedureStatus, QualificationProcedureData } from '../models/procedures.model';
+import { insuranceJoinStatus } from '../models/social-insurance-status.model';
 import { employeeAddressLabel } from './procedure-display.util';
 import { QualificationMonthlyReward } from './qualification-reward.util';
+
+export type QualificationProcedureDates = {
+    qualificationDate: string | null;
+    occurredDate: string;
+    dueDate: string;
+};
 
 export function todayDateString(): string {
     const date = new Date();
@@ -27,6 +36,34 @@ export function addDaysToDateString(dateString: string, days: number): string {
 /** 資格取得届の対応期限（資格取得日から5日後） */
 export function qualificationProcedureDueDate(qualificationDate: string): string {
     return addDaysToDateString(qualificationDate, 5);
+}
+
+export function resolveQualificationProcedureDates(
+    employee: Employee,
+    healthInsuranceStartDate: string | null | undefined,
+): QualificationProcedureDates | null {
+    const qualificationDate = getQualificationDate(employee, healthInsuranceStartDate);
+    const joinedDate = employee.joinedDate?.trim();
+    if (!qualificationDate && !joinedDate) return null;
+
+    const occurredDate = qualificationDate ?? joinedDate;
+    const dueDate = qualificationDate ? qualificationProcedureDueDate(qualificationDate) : '';
+
+    return { qualificationDate, occurredDate, dueDate };
+}
+
+export function canAutoManageQualificationProcedure(
+    healthInsuranceStatus: insuranceJoinStatus | undefined,
+    pensionInsuranceStatus: insuranceJoinStatus | undefined,
+): boolean {
+    return healthInsuranceStatus !== 'inactive' && pensionInsuranceStatus !== 'inactive';
+}
+
+export function shouldSyncQualificationProcedureDates(
+    procedureStatus: ProcedureStatus,
+    healthInsuranceStartDate: string | null | undefined,
+): boolean {
+    return procedureStatus !== 'completed' && !healthInsuranceStartDate?.trim();
 }
 
 export function buildQualificationProcedureData(params: {
@@ -73,16 +110,23 @@ export function hasSavedQualificationData(procedure: Procedure): boolean {
     );
 }
 
-export function monthlyRewardFromProcedure(procedure: Procedure): QualificationMonthlyReward | null {
+export function monthlyRewardFromProcedure(
+    procedure: Procedure,
+    employmentType: EmploymentType = null,
+): QualificationMonthlyReward | null {
     if (procedure.rewardTotalAmount === null || procedure.rewardTargetYearMonth === null) {
         return null;
     }
+
+    const usesDirectMonthlyRewardEntry =
+        !shouldProrateMonthlyRewardByPaymentBaseDays(employmentType);
 
     return {
         targetYearMonth: procedure.rewardTargetYearMonth,
         cashAmount: procedure.rewardCashAmount ?? 0,
         inKindAmount: procedure.rewardInKindAmount ?? 0,
         totalAmount: procedure.rewardTotalAmount,
-        isMidMonthJoin: procedure.rewardIsMidMonthJoin,
+        isMidMonthJoin: !usesDirectMonthlyRewardEntry && procedure.rewardIsMidMonthJoin,
+        usesDirectMonthlyRewardEntry,
     };
 }

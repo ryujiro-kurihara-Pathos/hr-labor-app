@@ -29,19 +29,34 @@ export class SignupPageComponent {
 
     // フォームページ遷移
     goToCompanyForm() {
-        if(this.isFormEmpty(this.lastName) 
+        if (
+            this.isFormEmpty(this.lastName)
             || this.isFormEmpty(this.firstName)
-            || this.isFormEmpty(this.email) 
-            || this.isFormEmpty(this.password) 
-            || this.isFormEmpty(this.confirmPassword)) {
-                this.errorMessage = 'ユーザー情報を入力してください';
-                return;
-            }
+            || this.isFormEmpty(this.email)
+            || this.isFormEmpty(this.password)
+            || this.isFormEmpty(this.confirmPassword)
+        ) {
+            this.errorMessage = '必須項目を入力してください';
+            return;
+        }
+
+        if (this.password !== this.confirmPassword) {
+            this.errorMessage = 'パスワードが一致しません';
+            return;
+        }
+
+        if (this.password.length < 6) {
+            this.errorMessage = 'パスワードは6文字以上で入力してください';
+            return;
+        }
+
         this.currentStep = 2;
         this.errorMessage = '';
     }
+
     backToUserForm() {
         this.currentStep = 1;
+        this.errorMessage = '';
     }
 
     // ユーザー情報
@@ -107,7 +122,9 @@ export class SignupPageComponent {
                 lastNameKana: this.lastNameKana.trim(),
                 firstNameKana: this.firstNameKana.trim(),
                 email: input.email,
-                
+                password: input.password,
+                passwordSet: true,
+
                 role: 'admin',
                 status: 'active',
 
@@ -120,6 +137,9 @@ export class SignupPageComponent {
             await this.router.navigate(['/login']);
         } catch (error) {
             console.error('サインインに失敗しました。', error);
+            this.errorMessage = '登録に失敗しました。入力内容を確認して再度お試しください';
+        } finally {
+            this.isLoading = false;
         }
     }
 

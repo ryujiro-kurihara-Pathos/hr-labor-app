@@ -57,22 +57,50 @@ export function insurancePremiumCollectionTimingLabel(
     return timing === 'same_month' ? '当月徴収' : '翌月徴収';
 }
 
-export function resolvePayrollDeductionYearMonth(
-    targetYearMonth: string,
+/**
+ * 保険料画面で選択中の年月（給与控除月）から、保険料の対象月（何月分か）を返す。
+ * 翌月徴収の場合、5月表示 → 4月分の保険料。
+ */
+export function resolvePremiumLiabilityYearMonth(
+    displayYearMonth: string,
     timing: InsurancePremiumCollectionTiming,
 ): string {
     return timing === 'next_month'
-        ? addMonthsToYearMonth(targetYearMonth, 1)
-        : targetYearMonth;
+        ? addMonthsToYearMonth(displayYearMonth, -1)
+        : displayYearMonth;
+}
+
+/** 給与控除を行う年月（画面の選択月） */
+export function resolvePayrollDeductionYearMonth(
+    displayYearMonth: string,
+    _timing: InsurancePremiumCollectionTiming,
+): string {
+    return displayYearMonth;
 }
 
 export function formatPayrollDeductionNote(
-    targetYearMonth: string,
+    displayYearMonth: string,
     timing: InsurancePremiumCollectionTiming,
 ): string {
-    const deductionYearMonth = resolvePayrollDeductionYearMonth(targetYearMonth, timing);
+    const deductionYearMonth = resolvePayrollDeductionYearMonth(displayYearMonth, timing);
     const timingLabel = insurancePremiumCollectionTimingLabel(timing);
     return `${formatYearMonthLabel(deductionYearMonth)}の給与から控除（${timingLabel}）`;
+}
+
+/** 対象月の保険料を何月の給与から控除するかを説明する */
+export function formatPremiumCollectionSummary(
+    displayYearMonth: string,
+    timing: InsurancePremiumCollectionTiming,
+): string {
+    const deductionLabel = formatYearMonthLabel(displayYearMonth);
+    if (timing === 'same_month') {
+        return `${deductionLabel}分の保険料を、${deductionLabel}の給与から控除します（当月徴収）。`;
+    }
+
+    const liabilityLabel = formatYearMonthLabel(
+        resolvePremiumLiabilityYearMonth(displayYearMonth, timing),
+    );
+    return `${liabilityLabel}分の保険料を、${deductionLabel}の給与から控除します（翌月徴収）。`;
 }
 
 export function isValidPayrollDay(day: number | null): boolean {

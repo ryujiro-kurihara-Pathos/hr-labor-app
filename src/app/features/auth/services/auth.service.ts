@@ -5,6 +5,7 @@ import {
     signOut,
     createUserWithEmailAndPassword,
     updateProfile,
+    updatePassword,
     User,
     onAuthStateChanged,
     sendSignInLinkToEmail,
@@ -73,6 +74,15 @@ export class AuthService {
         const userCredential = await signInWithEmailLink(auth, normalizedEmail, emailLink);
         window.localStorage.removeItem(EMAIL_FOR_SIGN_IN_KEY);
         return userCredential.user;
+    }
+
+    async setPassword(password: string): Promise<void> {
+        const user = auth.currentUser;
+        if (!user) {
+            throw new Error('NOT_AUTHENTICATED');
+        }
+
+        await updatePassword(user, password);
     }
 
     getStoredEmailForSignIn(): string {

@@ -2,11 +2,13 @@ import { Injectable } from '@angular/core';
 import {
     collection,
     doc,
+    getDoc,
     getDocs,
     query,
     serverTimestamp,
     setDoc,
     Timestamp,
+    updateDoc,
     where,
 } from 'firebase/firestore';
 
@@ -14,46 +16,74 @@ import { db } from '../../../core/firebase';
 import {
     BonusReward,
     BonusRewardInput,
+    BonusRewardStatus,
 } from '../models/bonus-reward.model';
 
 @Injectable({
     providedIn: 'root',
 })
-
 export class BonusRewardService {
     private readonly collectionName = 'bonusRewards';
 
-    // 賞与を登録・更新
-    async upsertBonusReward(input: BonusRewardInput): Promise<BonusReward> {
+    async saveDraft(input: BonusRewardInput): Promise<BonusReward> {
+        return this.upsertBonusReward(input, 'draft');
+    }
+
+    async confirm(input: BonusRewardInput): Promise<BonusReward> {
+        return this.upsertBonusReward(input, 'confirmed');
+    }
+
+    async upsertBonusReward(
+        input: BonusRewardInput,
+        status: Extract<BonusRewardStatus, 'draft' | 'confirmed'>,
+    ): Promise<BonusReward> {
+        if (status === 'confirmed' && input.bonusAmount <= 0) {
+            throw new Error('賞与額を入力してください');
+        }
+
         const standardBonusAmount = this.calculateStandardBonusAmount(input.bonusAmount);
         const docId = `${input.companyId}_${input.employeeId}_${input.paymentDate}`;
         const docRef = doc(db, this.collectionName, docId);
+        const existing = await getDoc(docRef);
 
-        const bonusReward: BonusReward = {
-            id: docId,
+        const payload = {
             companyId: input.companyId,
             employeeId: input.employeeId,
             paymentDate: input.paymentDate,
             targetYearMonth: input.targetYearMonth,
             bonusAmount: input.bonusAmount,
-            standardBonusAmount: standardBonusAmount,
-            createdAt: serverTimestamp() as Timestamp,
-            updatedAt: serverTimestamp() as Timestamp,
+            standardBonusAmount,
+            status,
         };
 
-        await setDoc(docRef, bonusReward);
-        return bonusReward;
+        if (!existing.exists()) {
+            const createdAt = serverTimestamp() as Timestamp;
+            const bonusReward: BonusReward = {
+                id: docId,
+                ...payload,
+                createdAt,
+                updatedAt: createdAt,
+            };
+            await setDoc(docRef, bonusReward);
+            return bonusReward;
+        }
+
+        await updateDoc(docRef, {
+            ...payload,
+            updatedAt: serverTimestamp(),
+        });
+        const after = await getDoc(docRef);
+        return { id: after.id, ...after.data() } as BonusReward;
     }
 
-    // 会社IDと対象年月で賞与を取得
     async getBonusRewardsByCompanyAndYearMonth(
         companyId: string,
-        targetYearMonth: string
+        targetYearMonth: string,
     ): Promise<BonusReward[]> {
         const q = query(
             collection(db, this.collectionName),
             where('companyId', '==', companyId),
-            where('targetYearMonth', '==', targetYearMonth)
+            where('targetYearMonth', '==', targetYearMonth),
         );
 
         const snapshot = await getDocs(q);
@@ -63,15 +93,14 @@ export class BonusRewardService {
         });
     }
 
-    // 会社IDと従業員IDで賞与を取得
     async getBonusRewardsByEmployee(
         companyId: string,
-        employeeId: string
+        employeeId: string,
     ): Promise<BonusReward[]> {
         const q = query(
             collection(db, this.collectionName),
             where('companyId', '==', companyId),
-            where('employeeId', '==', employeeId)
+            where('employeeId', '==', employeeId),
         );
 
         const snapshot = await getDocs(q);
@@ -81,7 +110,6 @@ export class BonusRewardService {
         });
     }
 
-    // 賞与額から標準賞与額を計算（1000円未満切り捨て）
     calculateStandardBonusAmount(bonusAmount: number): number {
         return Math.floor(bonusAmount / 1000) * 1000;
     }

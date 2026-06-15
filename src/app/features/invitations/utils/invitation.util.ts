@@ -1,5 +1,6 @@
 import { Timestamp } from 'firebase/firestore';
 
+import { normalizeAuthEmail } from '../../auth/utils/email-link-auth.util';
 import { Invitation } from '../models/invitation.model';
 
 export function buildInvitationAcceptUrl(invitationId: string): string {
@@ -7,8 +8,9 @@ export function buildInvitationAcceptUrl(invitationId: string): string {
     return `${origin}/invite/${invitationId}`;
 }
 
-export function buildInvitationEmailLinkUrl(invitationId: string): string {
-    return buildInvitationAcceptUrl(invitationId);
+export function buildInvitationEmailLinkUrl(invitationId: string, email: string): string {
+    const params = new URLSearchParams({ email: normalizeAuthEmail(email) });
+    return `${buildInvitationAcceptUrl(invitationId)}?${params.toString()}`;
 }
 
 export function isInvitationExpired(invitation: Invitation, now = new Date()): boolean {

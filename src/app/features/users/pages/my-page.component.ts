@@ -17,6 +17,7 @@ import { SocialInsuranceStatusService } from '../../social-insurance/services/so
 import { SocialInsuranceProcedureService } from '../../social-insurance/services/social-insurance-procedure.service';
 import { CompanyService } from '../../company/services/company.service';
 import { OfficeService } from '../../company/services/office.service';
+import { resolveOfficePrefecture } from '../../company/utils/office-prefecture.util';
 import { StandardMonthlyRewardService } from '../../insurance/services/standard-monthly-reward.service';
 import { StandardRemunerationDeterminationService } from '../../insurance/services/standard-remuneration-determination.service';
 import { BonusRewardService } from '../../bonus/services/bonus-reward.service';
@@ -37,7 +38,10 @@ import { KYOKAI_HEALTH_INSURANCE_RATE_FILES } from '../../insurance-rate/data/in
 import { roundInsurancePremium } from '../../insurance/utils/insurance-premium-rounding.util';
 import { formatYearMonthLabel } from '../../insurance/utils/standard-remuneration-determination.util';
 import { isCareInsurancePremiumTargetMonth } from '../../social-insurance/utils/care-insurance-period.util';
-import { isInsurancePremiumTargetMonth } from '../../social-insurance/utils/insurance-premium-period.util';
+import {
+    isHealthInsurancePremiumTargetMonth,
+    isPensionInsurancePremiumTargetMonth,
+} from '../../social-insurance/utils/age-premium-period.util';
 
 type MyPageProcedureItem = {
     id: string;
@@ -345,13 +349,24 @@ export class MyPageComponent implements OnInit {
         const insuranceStatus = this.insuranceStatus();
         const isHealthPremiumMonth =
             insuranceStatus &&
-            isInsurancePremiumTargetMonth(
+            isHealthInsurancePremiumTargetMonth(
                 targetYearMonth,
                 insuranceStatus.healthInsuranceStartDate,
                 insuranceStatus.healthInsuranceEndDate,
+                employee.birthDate,
+            );
+        const isPensionPremiumMonth =
+            insuranceStatus &&
+            isPensionInsurancePremiumTargetMonth(
+                targetYearMonth,
+                insuranceStatus.healthInsuranceStartDate,
+                insuranceStatus.healthInsuranceEndDate,
+                insuranceStatus.pensionInsuranceStartDate,
+                insuranceStatus.pensionInsuranceEndDate,
+                employee.birthDate,
             );
 
-        if (standardAmount && office && isHealthPremiumMonth) {
+        if (standardAmount && office && (isHealthPremiumMonth || isPensionPremiumMonth)) {
             const fiscalYear = this.healthInsuranceFiscalYear(targetYearMonth);
             const fileName = `kyokai-health-insurance-rates-${fiscalYear}-03.ts`;
             const rates =
@@ -360,14 +375,16 @@ export class MyPageComponent implements OnInit {
                 rates,
                 targetYearMonth,
                 providerType: office.healthInsuranceType ?? 'kyokai',
-                prefecture: office.prefecture ?? null,
+                prefecture: resolveOfficePrefecture(office, employee.prefecture),
             });
             const careRate = findCareInsuranceRate(targetYearMonth);
 
-            if (healthRate) {
+            if (healthRate && isHealthPremiumMonth) {
                 healthPremium = roundInsurancePremium(standardAmount * healthRate.employeeRate);
             }
-            pensionPremium = roundInsurancePremium(standardAmount * 0.0915);
+            if (isPensionPremiumMonth) {
+                pensionPremium = roundInsurancePremium(standardAmount * 0.0915);
+            }
             if (
                 careRate &&
                 employee &&

@@ -13,9 +13,9 @@ import { Dependent, Employee, EmployeeInput, EmploymentType, toEmployeeInput } f
 import { insuranceJoinStatus, SocialInsuranceStatus, SocialInsuranceStatusInput } from '../../social-insurance/models/social-insurance-status.model';
 import { formatInsuranceDate } from '../../social-insurance/utils/social-insurance-status-display.util';
 import { Procedure, ProcedureStatus } from '../../social-insurance/models/procedures.model';
-import { getQualificationDate } from '../../insurance/utils/standard-remuneration-determination.util';
-import { qualificationProcedureDueDate } from '../../social-insurance/utils/qualification-procedure-data.util';
 import { ConfirmService } from '../../../shared/services/confirm.service';
+import { PostalCodeLookupService } from '../../../shared/services/postal-code-lookup.service';
+import { applyPostalLookupResult } from '../../../shared/utils/postal-code-lookup.util';
 import { PartTimeInsuranceWarningComponent } from '../../social-insurance/components/part-time-insurance-warning.component';
 import {
     parseJudgmentNumber,
@@ -62,6 +62,7 @@ export class EmployeeDetailPageComponent {
     private readonly insuranceStatusService = inject(SocialInsuranceStatusService);
     private readonly procedureService = inject(SocialInsuranceProcedureService);
     private readonly confirmService = inject(ConfirmService);
+    private readonly postalCodeLookupService = inject(PostalCodeLookupService);
 
     // 従業員情報
     employee = signal<Employee | null>(null);
@@ -78,7 +79,9 @@ export class EmployeeDetailPageComponent {
     isEditing = signal<boolean>(false);
     isRetireFormOpen = signal<boolean>(false);
     isCreatingQualificationProcedure = signal<boolean>(false);
-    openInviteOnInit = signal<boolean>(false);
+    isPostalLookupLoading = signal(false);
+    postalLookupError = signal('');
+    inviteMessage = signal('');
     errorMessage = signal<string>('');
     age = computed(() => this.ageToday(this.birthDate));
 
@@ -154,11 +157,12 @@ export class EmployeeDetailPageComponent {
             return;
         }
 
-        if (this.route.snapshot.queryParamMap.get('invite') === '1') {
-            this.openInviteOnInit.set(true);
+        const inviteMsg = this.route.snapshot.queryParamMap.get('inviteMsg');
+        if (inviteMsg) {
+            this.inviteMessage.set(inviteMsg);
             void this.router.navigate([], {
                 relativeTo: this.route,
-                queryParams: { invite: null },
+                queryParams: { inviteMsg: null },
                 queryParamsHandling: 'merge',
                 replaceUrl: true,
             });
@@ -167,7 +171,11 @@ export class EmployeeDetailPageComponent {
         await this.loadEmployee(employeeId);
         await this.loadDependents();
         this.scrollToSocialInsuranceFragment();
-        this.scrollToInvitePanel();
+        if (inviteMsg) {
+            queueMicrotask(() => {
+                document.getElementById('user-invite')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        }
     }
 
     private scrollToSocialInsuranceFragment(): void {
@@ -176,14 +184,6 @@ export class EmployeeDetailPageComponent {
 
         queueMicrotask(() => {
             document.getElementById('social-insurance')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
-    }
-
-    private scrollToInvitePanel(): void {
-        if (!this.openInviteOnInit()) return;
-
-        queueMicrotask(() => {
-            document.getElementById('user-invite')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
     }
 
@@ -313,42 +313,27 @@ export class EmployeeDetailPageComponent {
         const employee = this.employee();
         if (!employee || !this.isHealthInsuranceEligible()) return;
 
-        // 既存の資格取得手続きがある場合はそれを開く
         const existing = this.qualificationProcedure();
         if (existing) {
             this.router.navigate(['/procedures', existing.id]);
             return;
         }
 
-        // 資格取得手続きの作成
         this.isCreatingQualificationProcedure.set(true);
         this.errorMessage.set('');
 
         try {
-            const qualificationDate = getQualificationDate(
+            const status = this.socialInsuranceStatus();
+            const procedure = await this.procedureService.syncQualificationProcedureForEmployee({
                 employee,
-                this.socialInsuranceStatus()?.healthInsuranceStartDate ?? null,
-            );
-            const occurredDate = qualificationDate ?? employee.joinedDate;
-            const dueDate = qualificationDate
-                ? qualificationProcedureDueDate(qualificationDate)
-                : '';
-
-            const procedure = await this.procedureService.createProcedure({
-                companyId: employee.companyId,
-                officeId: employee.officeId,
-                employeeId: employee.id,
-                procedureType: 'qualification',
-                status: 'notStarted',
-                occurredDate,
-                dueDate,
-                completedDate: null,
-                submittedDate: null,
-                targetYearMonth: null,
-                memo: '',
-                lossReason: null,
-                dependentChanges: null,
+                healthInsuranceStartDate: status?.healthInsuranceStartDate ?? null,
+                healthInsuranceStatus: status?.healthInsuranceStatus,
+                pensionInsuranceStatus: status?.pensionInsuranceStatus,
             });
+            if (!procedure) {
+                this.errorMessage.set('資格取得手続きを作成できませんでした');
+                return;
+            }
             this.qualificationProcedure.set(procedure);
             this.router.navigate(['/procedures', procedure.id]);
         } catch (error) {
@@ -519,6 +504,7 @@ export class EmployeeDetailPageComponent {
         this.syncFormFromEmployee(employee);
         this.socialInsuranceSnapshot = this.captureSocialInsuranceDraft();
         this.errorMessage.set('');
+        this.postalLookupError.set('');
         this.isEditing.set(true);
     }
 
@@ -530,7 +516,22 @@ export class EmployeeDetailPageComponent {
         this.applySocialInsuranceDraft(this.socialInsuranceSnapshot);
         this.syncFormFromSocialInsuranceStatus(this.socialInsuranceStatus());
         this.errorMessage.set('');
+        this.postalLookupError.set('');
         this.isEditing.set(false);
+    }
+
+    async lookupAddressFromPostalCode(): Promise<void> {
+        this.postalLookupError.set('');
+        this.isPostalLookupLoading.set(true);
+
+        try {
+            const result = await this.postalCodeLookupService.lookup(this.postalCode);
+            applyPostalLookupResult(this, result);
+        } catch (error) {
+            this.postalLookupError.set(this.postalCodeLookupService.toUserMessage(error));
+        } finally {
+            this.isPostalLookupLoading.set(false);
+        }
     }
 
     async saveEmployee(): Promise<void> {
@@ -543,12 +544,12 @@ export class EmployeeDetailPageComponent {
 
         // 更新：従業員情報
         const input: EmployeeInput = toEmployeeInput(employee, {
-            employeeNumber: this.employeeNumber,
+            employeeNumber: employee.employeeNumber,
             lastName: this.lastName,
             firstName: this.firstName,
             lastNameKana: this.lastNameKana,
             firstNameKana: this.firstNameKana,
-            myNumber: this.myNumber,
+            myNumber: employee.myNumber,
             gender: this.gender,
             postalCode: this.postalCode,
             prefecture: this.prefecture,
@@ -606,7 +607,19 @@ export class EmployeeDetailPageComponent {
                 syncedSocialInsuranceStatusInput,
             );
 
-            this.employee.set({ ...employee, ...input });
+            const updatedEmployee = { ...employee, ...input };
+            const qualificationProcedure = await this.procedureService.syncQualificationProcedureForEmployee({
+                employee: updatedEmployee,
+                healthInsuranceStartDate: syncedSocialInsuranceStatusInput.healthInsuranceStartDate,
+                healthInsuranceStatus: syncedSocialInsuranceStatusInput.healthInsuranceStatus,
+                pensionInsuranceStatus: syncedSocialInsuranceStatusInput.pensionInsuranceStatus,
+            });
+            if (qualificationProcedure) {
+                this.qualificationProcedure.set(qualificationProcedure);
+            } else {
+                await this.loadQualificationProcedure();
+            }
+            this.employee.set(updatedEmployee);
             this.socialInsuranceStatus.set({
                 ...currentSocialInsuranceStatus,
                 ...syncedSocialInsuranceStatusInput,

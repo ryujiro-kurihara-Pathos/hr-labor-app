@@ -45,6 +45,9 @@ export type StandardMonthlyReward = {
     commissionPay: number;                           // インセンティブ
     otherVariablePay: number;                        // その他変動手当
 
+    /** 保存時に算定した報酬月額（パートは月額報酬＋通勤手当＋その他手当） */
+    monthlyReward?: number;
+
   /** 前月と比較して固定的賃金に変更があったか（月額変更改定の判定材料） */
     fixedWageChanged?: boolean;
     /** 前月から変更のあった項目名 */
@@ -60,10 +63,12 @@ export type StandardMonthlyReward = {
 export type StandardMonthlyRewardInput = Omit<
     StandardMonthlyReward,
     | 'id'
-    | 'monthlyReward'
     | 'createdAt'
     | 'updatedAt'
->;
+> & {
+    /** パート・アルバイト: 月額報酬＋通勤手当＋その他手当を社会保険の報酬月額として保存 */
+    monthlyRewardAmount?: number;
+};
 
 export type RewardFormFieldValue = number | '';
 

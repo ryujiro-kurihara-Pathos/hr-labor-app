@@ -30,6 +30,10 @@ export function getRevisionApplyFromMonth(originMonth: string): string {
 }
 
 export function monthlyRewardTotal(reward: StandardMonthlyReward): number {
+    if (reward.monthlyReward != null && reward.monthlyReward >= 0) {
+        return reward.monthlyReward;
+    }
+
     return (
         reward.basicSalary +
         reward.commutingAllowance +

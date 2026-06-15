@@ -20,7 +20,21 @@ import {
     normalizeOfficeNumber,
     normalizeOfficeSymbol,
 } from '../utils/office-format.util';
+import { normalizeHealthInsuranceType } from '../utils/office-health-insurance.util';
+import {
+    buildOfficeDeletionCheck,
+    filterActiveOffices,
+    OfficeBusinessLinkCounts,
+    OfficeDeletionCheck,
+} from '../utils/office-usage.util';
 import { db } from '../../../core/firebase';
+
+export class OfficeDeletionError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'OfficeDeletionError';
+    }
+}
 
 @Injectable({ providedIn: 'root' })
 
@@ -41,7 +55,7 @@ export class OfficeService {
             streetAddress: officeInput.streetAddress,
             buildingName: officeInput.buildingName,
             phoneNumber: officeInput.phoneNumber,
-            healthInsuranceType: officeInput.healthInsuranceType,
+            healthInsuranceType: normalizeHealthInsuranceType(officeInput.healthInsuranceType),
             officeSymbol: normalizeOfficeSymbol(
                 officeInput.officeSymbol?.trim() || assigned.officeSymbol,
             ),
@@ -76,6 +90,25 @@ export class OfficeService {
         return offices;
     }
 
+    async getActiveOfficesByCompanyId(companyId: string): Promise<Office[]> {
+        const offices = await this.getOfficesByCompanyId(companyId);
+        return filterActiveOffices(offices);
+    }
+
+    async getOfficeBusinessLinks(officeId: string): Promise<OfficeBusinessLinkCounts> {
+        const [employeeCount, procedureCount] = await Promise.all([
+            this.countLinkedEmployees(officeId),
+            this.countLinkedProcedures(officeId),
+        ]);
+
+        return { employeeCount, procedureCount };
+    }
+
+    async getOfficeDeletionCheck(officeId: string): Promise<OfficeDeletionCheck> {
+        const counts = await this.getOfficeBusinessLinks(officeId);
+        return buildOfficeDeletionCheck(counts);
+    }
+
     // officeIdから事業所を取得
     async getOfficeById(officeId: string): Promise<Office | null> {
         const docRef = doc(db, 'offices', officeId);
@@ -91,12 +124,20 @@ export class OfficeService {
         const docRef = doc(db, 'offices', officeId);
         await updateDoc(docRef, {
             ...officeInput,
+            healthInsuranceType: normalizeHealthInsuranceType(officeInput.healthInsuranceType),
             updatedAt: serverTimestamp(),
         });
     }
 
-    // 事業所の削除
+    // 事業所の削除（業務データ未紐づけのみ）
     async deleteOffice(officeId: string): Promise<void> {
+        const check = await this.getOfficeDeletionCheck(officeId);
+        if (!check.canDelete) {
+            throw new OfficeDeletionError(
+                '従業員・届出手続き等の業務データに紐づいている事業所は削除できません。無効化してください。',
+            );
+        }
+
         const docRef = doc(db, 'offices', officeId);
         await deleteDoc(docRef);
     }
@@ -160,7 +201,9 @@ export class OfficeService {
             streetAddress: streetAddress || legacyAddress,
             buildingName: String(data['buildingName'] ?? ''),
             phoneNumber: String(data['phoneNumber'] ?? ''),
-            healthInsuranceType: (data['healthInsuranceType'] as Office['healthInsuranceType']) ?? 'kyokai',
+            healthInsuranceType: normalizeHealthInsuranceType(
+                data['healthInsuranceType'] as Office['healthInsuranceType'],
+            ),
             officeSymbol: normalizeOfficeSymbol(rawSymbol),
             officeNumber: normalizeOfficeNumber(
                 String(data['officeNumber'] ?? data['pensionOfficeNumber'] ?? ''),
@@ -179,6 +222,20 @@ export class OfficeService {
         if (value === null || value === undefined || value === '') return null;
         const num = Number(value);
         return Number.isFinite(num) ? num : null;
+    }
+
+    private async countLinkedEmployees(officeId: string): Promise<number> {
+        const col = collection(db, 'employees');
+        const q = query(col, where('officeId', '==', officeId));
+        const snap = await getDocs(q);
+        return snap.size;
+    }
+
+    private async countLinkedProcedures(officeId: string): Promise<number> {
+        const col = collection(db, 'socialInsuranceProcedures');
+        const q = query(col, where('officeId', '==', officeId));
+        const snap = await getDocs(q);
+        return snap.size;
     }
 }
 

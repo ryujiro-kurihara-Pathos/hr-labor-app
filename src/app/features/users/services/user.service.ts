@@ -6,6 +6,7 @@ import {
     doc,
     serverTimestamp,
     setDoc,
+    updateDoc,
     getDoc,
     collection,
     Timestamp,
@@ -28,6 +29,8 @@ export class UserService {
             lastNameKana: String(data['lastNameKana'] ?? ''),
             firstNameKana: String(data['firstNameKana'] ?? ''),
             email: String(data['email'] ?? ''),
+            password: String(data['password'] ?? ''),
+            passwordSet: Boolean(data['passwordSet'] ?? false),
             role: (data['role'] as AppUser['role']) ?? 'employee',
             status: (data['status'] as AppUser['status']) ?? 'active',
             companyId: String(data['companyId'] ?? ''),
@@ -49,7 +52,18 @@ export class UserService {
         await setDoc(docRef, {
             ...userInput,
             email: userInput.email.trim().toLowerCase(),
+            password: userInput.password ?? '',
+            passwordSet: userInput.passwordSet ?? false,
             createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+        });
+    }
+
+    async setUserPassword(uid: string, password: string): Promise<void> {
+        const docRef = doc(db, 'users', uid);
+        await updateDoc(docRef, {
+            password,
+            passwordSet: true,
             updatedAt: serverTimestamp(),
         });
     }

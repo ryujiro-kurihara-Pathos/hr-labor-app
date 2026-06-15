@@ -14,13 +14,25 @@ export const guestGuard: CanActivateFn = () => {
         const unsub = onAuthStateChanged(auth, async (user) => {
             unsub();
 
-            if (user) {
-                const appUser = await userService.getUserByUid(user.uid);
-                await router.navigate([appUser ? defaultRouteForRole(appUser.role) : '/home']);
-                resolve(false);
-            } else {
+            if (!user) {
                 resolve(true);
+                return;
             }
+
+            const appUser = await userService.getUserByUid(user.uid);
+
+            if (appUser && !appUser.passwordSet && router.url.startsWith('/invite/')) {
+                resolve(true);
+                return;
+            }
+
+            if (appUser?.passwordSet) {
+                await router.navigate([defaultRouteForRole(appUser.role)]);
+                resolve(false);
+                return;
+            }
+
+            resolve(true);
         });
     });
 };

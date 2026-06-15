@@ -1,18 +1,17 @@
 import { Component, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { HealthInsuranceType } from '../models/office.model';
+import { FieldHelpTooltipComponent } from '../../../shared/components/field-help-tooltip.component';
 
 export type OfficeFormData = {
     name: string;
     address: string;
-    healthInsuranceType: HealthInsuranceType;
 };
 
 @Component({
     selector: 'app-office-create-modal',
     standalone: true,
-    imports: [FormsModule],
+    imports: [FormsModule, FieldHelpTooltipComponent],
     templateUrl: './office-create-modal.component.html',
 })
 
@@ -31,7 +30,11 @@ export class OfficeCreateModalComponent {
     // フォームデータ
     name = '';
     address = '';
-    healthInsuranceType: HealthInsuranceType = 'kyokai';
+
+    readonly healthInsuranceHelpLines = [
+        '本アプリは協会けんぽのみに対応しています。',
+        '事業所の都道府県に応じた協会けんぽ料率で保険料を計算します。',
+    ];
 
     // エラーメッセージ
     errorMessage = signal('');
@@ -59,7 +62,6 @@ export class OfficeCreateModalComponent {
         this.submit.emit({
             name: this.name.trim(),
             address: this.address.trim(),
-            healthInsuranceType: this.healthInsuranceType,
         });
     }
 }

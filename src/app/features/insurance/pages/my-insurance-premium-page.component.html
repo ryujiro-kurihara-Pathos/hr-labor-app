@@ -58,31 +58,33 @@
         } @else {
             <section class="summary-card">
                 <div class="summary-main">
-                    <p class="summary-kicker">{{ targetYearMonthLabel() }}の本人負担</p>
+                    <p class="summary-kicker">{{ targetYearMonthLabel() }}給与控除</p>
                     <p class="summary-total">
                         @if (totalSocialInsurancePremium() !== null) {
                             {{ totalSocialInsurancePremium() | number }}<span class="summary-unit">円</span>
+                        } @else if (isNextMonthCollection()) {
+                            0<span class="summary-unit">円</span>
                         } @else {
                             —<span class="summary-unit">円</span>
                         }
                     </p>
                     <p class="summary-sub">
-                        @if (totalSocialInsurancePremium() !== null) {
+                        @if (hasMonthlyPremiumDisplay()) {
                             @if (bonusSocialInsurancePremium() !== null && standardAmount() !== null) {
-                                月次報酬（標準報酬月額 {{ standardAmount() | number }}円）＋賞与分
+                                {{ premiumLiabilityYearMonthLabel() }}分（標準報酬月額 {{ standardAmount() | number }}円）＋賞与分
                             } @else if (bonusSocialInsurancePremium() !== null) {
-                                月次報酬＋賞与分
+                                {{ premiumLiabilityYearMonthLabel() }}分＋賞与分
                             } @else if (standardAmount() !== null) {
-                                標準報酬月額 {{ standardAmount() | number }}円をもとに計算
-                            } @else {
-                                月次報酬＋賞与分
+                                {{ premiumLiabilityYearMonthLabel() }}分・標準報酬月額 {{ standardAmount() | number }}円
                             }
+                        } @else if (isNextMonthCollection()) {
+                            翌月徴収のため、この月の給与から控除される月次保険料はありません
                         } @else {
                             標準報酬月額が未確定のため、保険料を表示できません
                         }
                     </p>
-                    @if (totalSocialInsurancePremium() !== null) {
-                        <p class="summary-deduction">{{ payrollDeductionNote() }}</p>
+                    @if (totalSocialInsurancePremium() !== null || isNextMonthCollection()) {
+                        <p class="summary-deduction">{{ premiumCollectionSummary() }}</p>
                     }
                 </div>
                 <div class="summary-badges">

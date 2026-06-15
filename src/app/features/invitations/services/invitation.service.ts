@@ -27,6 +27,9 @@ export class InvitationService {
             email: String(data['email'] ?? ''),
             companyId: String(data['companyId'] ?? ''),
             employeeId: String(data['employeeId'] ?? ''),
+            employeeLastName: String(data['employeeLastName'] ?? ''),
+            employeeFirstName: String(data['employeeFirstName'] ?? ''),
+            companyName: String(data['companyName'] ?? ''),
             role: (data['role'] as Invitation['role']) ?? 'employee',
             status: (data['status'] as Invitation['status']) ?? 'pending',
             invitedBy: String(data['invitedBy'] ?? ''),
@@ -85,6 +88,18 @@ export class InvitationService {
         const docRef = doc(db, 'invitations', invitationId);
         await updateDoc(docRef, {
             status: 'accepted',
+            updatedAt: serverTimestamp(),
+        });
+    }
+
+    async updatePendingInvitationForResend(invitationId: string, email: string): Promise<void> {
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7);
+
+        const docRef = doc(db, 'invitations', invitationId);
+        await updateDoc(docRef, {
+            email: email.trim().toLowerCase(),
+            expiresAt: Timestamp.fromDate(expiresAt),
             updatedAt: serverTimestamp(),
         });
     }

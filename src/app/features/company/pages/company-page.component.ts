@@ -15,13 +15,16 @@ import {
 
 import { OfficeCreateModalComponent, OfficeFormData } from '../components/office-create-modal.component';
 import { OfficeService } from '../services/office.service';
-import { HealthInsuranceType, Office, OfficeCreateInput } from '../models/office.model';
+import { Office, OfficeCreateInput } from '../models/office.model';
 import { formatOfficeAddress } from '../utils/office-format.util';
+import { healthInsuranceTypeLabel } from '../utils/office-health-insurance.util';
+import { extractPrefectureFromAddress } from '../utils/office-prefecture.util';
+import { FieldHelpTooltipComponent } from '../../../shared/components/field-help-tooltip.component';
 
 @Component({
     selector: 'app-company-page',
     standalone: true,
-    imports: [RouterLink, FormsModule, OfficeCreateModalComponent],
+    imports: [RouterLink, FormsModule, OfficeCreateModalComponent, FieldHelpTooltipComponent],
     templateUrl: './company-page.component.html',
 })
 
@@ -52,6 +55,21 @@ export class CompanyPageComponent {
     readonly formatPayrollClosingDayLabel = formatPayrollClosingDayLabel;
     readonly formatPayrollPaymentDayLabel = formatPayrollPaymentDayLabel;
     readonly insurancePremiumCollectionTimingLabel = insurancePremiumCollectionTimingLabel;
+
+    readonly payrollClosingHelpLines = [
+        '毎月の給与計算の締め日です。未設定でも利用できます。',
+    ];
+
+    readonly payrollPaymentHelpLines = [
+        '報酬確定の社内期限として使用します。',
+        'ホームの「期限が近い業務」にも反映されます。',
+    ];
+
+    readonly insuranceCollectionHelpLines = [
+        '社会保険料を何月の給与から控除するかを指定します。',
+        '翌月徴収の場合、4月分の保険料は5月の給与から控除され、4月の保険料画面では0円です。',
+        '保険料計算画面の控除月表示に使用します。',
+    ];
 
     // 事業所一覧
     offices = signal<Office[]>([]);
@@ -182,8 +200,8 @@ export class CompanyPageComponent {
         return formatOfficeAddress(office);
     }
 
-    healthInsuranceLabel(type: HealthInsuranceType): string {
-        return type === 'kyokai' ? '協会けんぽ' : '組合健保';
+    healthInsuranceLabel(type: Office['healthInsuranceType']): string {
+        return healthInsuranceTypeLabel(type);
     }
 
     //// 事業所
@@ -213,17 +231,20 @@ export class CompanyPageComponent {
         this.errorMessage.set('');
 
         try {
+            const address = form.address.trim();
+            const prefecture = extractPrefectureFromAddress(address) ?? '';
+
             // 事業所の作成
             const office: OfficeCreateInput = {
                 companyId: company.id,
                 name: form.name,
                 postalCode: '',
-                prefecture: '',
+                prefecture,
                 city: '',
-                streetAddress: form.address,
+                streetAddress: address,
                 buildingName: '',
                 phoneNumber: '',
-                healthInsuranceType: form.healthInsuranceType,
+                healthInsuranceType: 'kyokai',
                 regularWeeklyScheduledWorkHours: null,
                 regularMonthlyScheduledWorkHours: null,
                 regularWeeklyScheduledWorkDays: null,

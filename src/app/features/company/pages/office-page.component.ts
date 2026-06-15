@@ -2,19 +2,24 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
-import { HealthInsuranceType, Office } from '../models/office.model';
-import { OfficeService } from '../services/office.service';
+import { Office } from '../models/office.model';
+import { OfficeDeletionError, OfficeService } from '../services/office.service';
 import { ConfirmService } from '../../../shared/services/confirm.service';
+import { FieldHelpTooltipComponent } from '../../../shared/components/field-help-tooltip.component';
 import {
     formatOfficeAddress,
     normalizeOfficeNumber,
     normalizeOfficeSymbol,
 } from '../utils/office-format.util';
+import { healthInsuranceTypeLabel } from '../utils/office-health-insurance.util';
+import { OfficeDeletionCheck, officeDeletionBlockedMessage } from '../utils/office-usage.util';
+import { PostalCodeLookupService } from '../../../shared/services/postal-code-lookup.service';
+import { applyPostalLookupResult } from '../../../shared/utils/postal-code-lookup.util';
 
 @Component({
     selector: 'app-office-page',
     standalone: true,
-    imports: [FormsModule, RouterLink],
+    imports: [FormsModule, RouterLink, FieldHelpTooltipComponent],
     templateUrl: './office-page.component.html',
 })
 
@@ -23,13 +28,17 @@ export class OfficePageComponent {
     private readonly officeService = inject(OfficeService);
     private readonly router = inject(Router);
     private readonly confirmService = inject(ConfirmService);
+    private readonly postalCodeLookupService = inject(PostalCodeLookupService);
 
     // 事業所
     office = signal<Office | null>(null);
+    deletionCheck = signal<OfficeDeletionCheck | null>(null);
 
     isLoading = signal<boolean>(false);
     isSaving = signal<boolean>(false);
     isEditing = signal<boolean>(false);
+    isPostalLookupLoading = signal(false);
+    postalLookupError = signal('');
     errorMessage = signal<string>('');
 
     name = '';
@@ -39,13 +48,32 @@ export class OfficePageComponent {
     streetAddress = '';
     buildingName = '';
     phoneNumber = '';
-    healthInsuranceType: HealthInsuranceType = 'kyokai';
     officeSymbol = '';
     officeNumber = '';
     regularWeeklyScheduledWorkHours = '';
     regularMonthlyScheduledWorkHours = '';
     regularWeeklyScheduledWorkDays = '';
     regularMonthlyScheduledWorkDays = '';
+
+    readonly healthInsuranceHelpLines = [
+        '本アプリは協会けんぽのみに対応しています。',
+        '事業所の都道府県に応じた協会けんぽ料率で保険料を計算します。',
+    ];
+
+    readonly officeSymbolHelpLines = [
+        '納入告知書の形式どおり「2桁-カタカナ1～4桁」で入力してください。',
+        '未入力の場合は登録時に仮番号が自動で割り当てられます。',
+    ];
+
+    readonly officeNumberHelpLines = [
+        '厚生年金の事業所番号（5桁）です。',
+        '未入力の場合は登録時に仮番号が自動で割り当てられます。',
+    ];
+
+    readonly regularWorkerHelpLines = [
+        'パート・アルバイトの加入要件判定（4分の3ルール）で参照します。',
+        '未入力の項目は絶対基準のみで判定します。',
+    ];
 
     // 初期処理
     async ngOnInit() {
@@ -72,6 +100,10 @@ export class OfficePageComponent {
             this.office.set(office);
             if (office) {
                 this.syncFormFromOffice(office);
+                const check = await this.officeService.getOfficeDeletionCheck(office.id);
+                this.deletionCheck.set(check);
+            } else {
+                this.deletionCheck.set(null);
             }
         } catch (error) {
             console.error('事業所の取得に失敗しました', error);
@@ -82,8 +114,8 @@ export class OfficePageComponent {
     }
 
     // 健康保険の種類のラベル
-    healthInsuranceLabel(type: HealthInsuranceType): string {
-        return type === 'kyokai' ? '協会けんぽ' : '組合健保';
+    healthInsuranceLabel(type: Office['healthInsuranceType']): string {
+        return healthInsuranceTypeLabel(type);
     }
 
     displayValue(value: string): string {
@@ -105,6 +137,7 @@ export class OfficePageComponent {
 
         this.syncFormFromOffice(office);
         this.errorMessage.set('');
+        this.postalLookupError.set('');
         this.isEditing.set(true);
     }
 
@@ -115,7 +148,22 @@ export class OfficePageComponent {
             this.syncFormFromOffice(office);
         }
         this.errorMessage.set('');
+        this.postalLookupError.set('');
         this.isEditing.set(false);
+    }
+
+    async lookupAddressFromPostalCode(): Promise<void> {
+        this.postalLookupError.set('');
+        this.isPostalLookupLoading.set(true);
+
+        try {
+            const result = await this.postalCodeLookupService.lookup(this.postalCode);
+            applyPostalLookupResult(this, result);
+        } catch (error) {
+            this.postalLookupError.set(this.postalCodeLookupService.toUserMessage(error));
+        } finally {
+            this.isPostalLookupLoading.set(false);
+        }
     }
 
     // 保存
@@ -143,7 +191,7 @@ export class OfficePageComponent {
                 streetAddress: this.streetAddress,
                 buildingName: this.buildingName,
                 phoneNumber: this.phoneNumber,
-                healthInsuranceType: this.healthInsuranceType,
+                healthInsuranceType: 'kyokai',
                 officeSymbol,
                 officeNumber: normalizeOfficeNumber(this.officeNumber),
                 regularWeeklyScheduledWorkHours,
@@ -161,7 +209,7 @@ export class OfficePageComponent {
                 streetAddress: this.streetAddress,
                 buildingName: this.buildingName,
                 phoneNumber: this.phoneNumber,
-                healthInsuranceType: this.healthInsuranceType,
+                healthInsuranceType: 'kyokai',
                 officeSymbol,
                 officeNumber: normalizeOfficeNumber(this.officeNumber),
                 regularWeeklyScheduledWorkHours,
@@ -178,22 +226,66 @@ export class OfficePageComponent {
         }
     }
 
+    deletionBlockedMessage(): string {
+        const check = this.deletionCheck();
+        return check ? officeDeletionBlockedMessage(check) : '';
+    }
+
+    managementHelpLines(): string[] {
+        const check = this.deletionCheck();
+        const isDisabled = this.office()?.status === 'disabled';
+        const lines = [
+            '事業所は従業員・社会保険・保険料計算・届出手続きに紐づくため、原則として物理削除は行いません。',
+            '使用しなくなった場合は無効化してください。無効化された事業所は新規登録や新規手続きでは選択できませんが、過去データの参照には残ります。',
+        ];
+
+        if (isDisabled) {
+            lines.push('この事業所は無効化済みです。再度使う場合はページ上部の「有効化」から戻せます。');
+        }
+
+        if (check?.canDelete) {
+            lines.push('この事業所はまだ業務データに紐づいていないため、削除できます。');
+        } else if (check) {
+            lines.push(this.deletionBlockedMessage());
+        }
+
+        return lines;
+    }
+
     // 事業所の削除
     async deleteOffice(): Promise<void> {
-        const officeId = this.office()?.id;
-        if (!officeId) return;
+        const office = this.office();
+        const check = this.deletionCheck();
+        if (!office || !check) return;
 
-        const confirmed = await this.confirmService.confirmDelete();
+        if (!check.canDelete) {
+            this.errorMessage.set(this.deletionBlockedMessage());
+            return;
+        }
+
+        const confirmed = await this.confirmService.confirm(
+            'この事業所はまだ業務データに紐づいていません。削除すると元に戻せません。本当に削除しますか？',
+            {
+                confirmLabel: '削除する',
+                cancelLabel: 'キャンセル',
+                danger: true,
+            },
+        );
         if (!confirmed) return;
 
         this.isLoading.set(true);
+        this.errorMessage.set('');
 
         try {
-            await this.officeService.deleteOffice(officeId);
+            await this.officeService.deleteOffice(office.id);
             this.router.navigate(['/company']);
         } catch (error) {
             console.error('事業所の削除に失敗しました', error);
-            this.errorMessage.set('事業所の削除に失敗しました');
+            if (error instanceof OfficeDeletionError) {
+                this.errorMessage.set(error.message);
+            } else {
+                this.errorMessage.set('事業所の削除に失敗しました');
+            }
         } finally {
             this.isLoading.set(false);
         }
@@ -202,12 +294,23 @@ export class OfficePageComponent {
     // 事業所の無効化
     async disableOffice(): Promise<void> {
         const office = this.office();
-        if(!office) return;
+        if (!office) return;
+
+        const confirmed = await this.confirmService.confirm(
+            'この事業所を無効化しますか？無効化すると新規の従業員登録や新規手続きでは選択できなくなります。過去データの参照は引き続き可能です。',
+            {
+                confirmLabel: '無効化する',
+                cancelLabel: 'キャンセル',
+                danger: true,
+            },
+        );
+        if (!confirmed) return;
+
+        this.isLoading.set(true);
+        this.errorMessage.set('');
 
         try {
-            // Firestoreの更新
             await this.officeService.disableOffice(office.id);
-            // ページの更新
             this.office.set({
                 ...office,
                 status: 'disabled',
@@ -223,7 +326,19 @@ export class OfficePageComponent {
     // 事業所の有効化
     async enableOffice(): Promise<void> {
         const office = this.office();
-        if(!office) return;
+        if (!office) return;
+
+        const confirmed = await this.confirmService.confirm(
+            'この事業所を有効化しますか？新規の従業員登録や新規手続きで再び選択できるようになります。',
+            {
+                confirmLabel: '有効化する',
+                cancelLabel: 'キャンセル',
+            },
+        );
+        if (!confirmed) return;
+
+        this.isLoading.set(true);
+        this.errorMessage.set('');
 
         try {
             await this.officeService.enableOffice(office.id);
@@ -231,7 +346,7 @@ export class OfficePageComponent {
                 ...office,
                 status: 'active',
             });
-        } catch (error) {   
+        } catch (error) {
             console.error('事業所の有効化に失敗しました', error);
             this.errorMessage.set('事業所の有効化に失敗しました');
         } finally {
@@ -247,7 +362,6 @@ export class OfficePageComponent {
         this.streetAddress = office.streetAddress;
         this.buildingName = office.buildingName;
         this.phoneNumber = office.phoneNumber;
-        this.healthInsuranceType = office.healthInsuranceType;
         this.officeSymbol = office.officeSymbol;
         this.officeNumber = office.officeNumber;
         this.regularWeeklyScheduledWorkHours = this.numberToFormValue(office.regularWeeklyScheduledWorkHours);

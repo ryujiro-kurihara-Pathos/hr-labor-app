@@ -118,7 +118,12 @@
                 <dt>対象年月</dt>
                 <dd>{{ reward.targetYearMonth }}（入社月）</dd>
             </div>
-            @if (reward.isMidMonthJoin) {
+            @if (reward.usesDirectMonthlyRewardEntry) {
+                <div class="meta-row note-row">
+                    <dt></dt>
+                    <dd class="field-note">シフト制のため、入力した報酬月額をそのまま表示しています。</dd>
+                </div>
+            } @else if (reward.isMidMonthJoin) {
                 <div class="meta-row note-row">
                     <dt></dt>
                     <dd class="field-note">途中入社のため、1か月分として計算した報酬月額を表示しています。</dd>

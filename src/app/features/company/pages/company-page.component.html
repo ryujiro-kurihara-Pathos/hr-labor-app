@@ -52,7 +52,13 @@
                             給与締日・支払日は任意です。保険料の給与控除表示に徴収タイミングを使用します。
                         </p>
                         <div class="form-field">
-                            <label for="payroll-closing-day">給与締日</label>
+                            <div class="label-row">
+                                <label for="payroll-closing-day">給与締日</label>
+                                <app-field-help-tooltip
+                                    title="給与締日"
+                                    [lines]="payrollClosingHelpLines"
+                                />
+                            </div>
                             <select
                                 id="payroll-closing-day"
                                 name="payrollClosingDay"
@@ -71,7 +77,13 @@
                             </select>
                         </div>
                         <div class="form-field">
-                            <label for="payroll-payment-day">給与支払日</label>
+                            <div class="label-row">
+                                <label for="payroll-payment-day">給与支払日</label>
+                                <app-field-help-tooltip
+                                    title="給与支払日"
+                                    [lines]="payrollPaymentHelpLines"
+                                />
+                            </div>
                             <div class="inline-field-row">
                                 <select
                                     id="payroll-payment-month-offset"
@@ -100,7 +112,13 @@
                             </div>
                         </div>
                         <div class="form-field">
-                            <label for="insurance-collection-timing">保険料徴収タイミング</label>
+                            <div class="label-row">
+                                <label for="insurance-collection-timing">保険料徴収タイミング</label>
+                                <app-field-help-tooltip
+                                    title="保険料徴収タイミング"
+                                    [lines]="insuranceCollectionHelpLines"
+                                />
+                            </div>
                             <select
                                 id="insurance-collection-timing"
                                 name="insurancePremiumCollectionTiming"
@@ -396,6 +414,18 @@
         border: 1px solid #e5e7eb;
         border-radius: 8px;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+        overflow: visible;
+    }
+
+    .label-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 6px;
+    }
+
+    .label-row label {
+        margin-bottom: 0;
     }
 
     .company-name-row {

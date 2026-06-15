@@ -2,8 +2,115 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return isSignedIn()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid))
+        : null;
+    }
+
+    function userExists() {
+      return userDoc() != null;
+    }
+
+    function userCompanyId() {
+      return userDoc().data.companyId;
+    }
+
+    function isCompanyMember(companyId) {
+      return isSignedIn() && userExists() && userCompanyId() == companyId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && userExists() && userDoc().data.role == 'admin';
+    }
+
+    function authEmail() {
+      return isSignedIn() && request.auth.token.email != null
+        ? request.auth.token.email
+        : '';
+    }
+
+    function isPendingInvitation() {
+      return resource.data.status == 'pending'
+        && resource.data.expiresAt > request.time;
+    }
+
+    function inviteEmailMatchesAuth() {
+      return authEmail() != '' && resource.data.email == authEmail();
+    }
+
     match /users/{userId} {
-      allow create, read, update: if request.auth != null && request.auth.uid == userId;
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow get, update: if isSignedIn() && request.auth.uid == userId;
+      allow list: if isSignedIn();
+    }
+
+    match /invitations/{invitationId} {
+      allow get: if isPendingInvitation();
+      allow list, create: if isSignedIn();
+      allow update: if isSignedIn() && (
+        isAdmin()
+        || (
+          isPendingInvitation()
+          && inviteEmailMatchesAuth()
+          && request.resource.data.status == 'accepted'
+        )
+        || resource.data.status == 'pending'
+      );
+    }
+
+    match /employees/{employeeId} {
+      allow get: if isSignedIn() && (
+        isCompanyMember(resource.data.companyId)
+        || resource.data.email == authEmail()
+      );
+      allow list: if isSignedIn() && userExists();
+      allow create, update: if isSignedIn() && isCompanyMember(request.resource.data.companyId);
+
+      match /dependents/{dependentId} {
+        allow read, write: if isSignedIn()
+          && isCompanyMember(
+            get(/databases/$(database)/documents/employees/$(employeeId)).data.companyId
+          );
+      }
+    }
+
+    match /companies/{companyId} {
+      allow get: if isSignedIn() && isCompanyMember(companyId);
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && isAdmin() && isCompanyMember(companyId);
+    }
+
+    match /offices/{officeId} {
+      allow get, list: if isSignedIn() && isCompanyMember(resource.data.companyId);
+      allow create: if isSignedIn()
+        && isCompanyMember(request.resource.data.companyId);
+      allow update: if isSignedIn()
+        && isCompanyMember(resource.data.companyId);
+    }
+
+    match /socialInsuranceStatuses/{statusId} {
+      allow read, write: if isSignedIn() && userExists();
+    }
+
+    match /socialInsuranceProcedures/{procedureId} {
+      allow read, write: if isSignedIn() && userExists();
+    }
+
+    match /standardMonthlyRewards/{rewardId} {
+      allow read, write: if isSignedIn() && userExists();
+    }
+
+    match /insurancePremiumResults/{resultId} {
+      allow read, write: if isSignedIn() && userExists();
+    }
+
+    match /bonusRewards/{bonusId} {
+      allow read, write: if isSignedIn() && userExists();
     }
   }
 }

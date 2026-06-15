@@ -1,6 +1,6 @@
 import { Timestamp } from 'firebase/firestore';
 
-export type HealthInsuranceType = 'kyokai' | 'union'; // 健康保険の種類
+export type HealthInsuranceType = 'kyokai' | 'union'; // 本アプリは kyokai のみ利用（union は後方互換）
 export type OfficeStatus = 'active' | 'disabled'; // 事業所のステータス
 
 export type Office = {
