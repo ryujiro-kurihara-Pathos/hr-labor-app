@@ -30,13 +30,21 @@ import {
     computeInsurancePremiumPeriod,
     lossDateFromRetirementDate,
 } from '../../social-insurance/utils/insurance-premium-period.util';
+import {
+    judgeHealthInsuranceJoinStatus,
+    judgePensionInsuranceJoinStatus,
+} from '../../social-insurance/utils/age-premium-period.util';
 import { formatYearMonthLabel } from '../../insurance/utils/standard-remuneration-determination.util';
 import { EmployeeInvitePanelComponent } from '../../invitations/components/employee-invite-panel.component';
 import {
     employeeDisplayStatusLabel,
+    isEmployeeBeforeJoin,
+    isEmployeeActive,
     isEmployeeFullyRetired,
     isEmployeePendingRetirement,
     resolveEmployeeDisplayStatus,
+    resolveEmployeeStoredStatus,
+    retiredDateFromInput,
 } from '../utils/employee-status-display.util';
 
 type SocialInsuranceDraft = {
@@ -83,21 +91,55 @@ export class EmployeeDetailPageComponent {
     postalLookupError = signal('');
     inviteMessage = signal('');
     errorMessage = signal<string>('');
-    age = computed(() => this.ageToday(this.birthDate));
+    age = computed(() => {
+        const employee = this.employee();
+        return employee ? this.ageToday(employee.birthDate) : null;
+    });
+
+    /** 編集中はフォームの生年月日、閲覧時は保存済みの生年月日 */
+    birthDateForInsuranceJudgment(): string | null {
+        if (this.isEditing()) {
+            return this.birthDate || null;
+        }
+        return this.employee()?.birthDate ?? null;
+    }
+
+    careInsurancePeriodForDisplay() {
+        return computeCareInsurancePeriod(
+            this.emptyToNullDate(this.healthInsuranceStartDate),
+            this.emptyToNullDate(this.healthInsuranceEndDate),
+            this.birthDateForInsuranceJudgment(),
+        );
+    }
+
+    healthInsuranceJoinStatus(): insuranceJoinStatus {
+        return judgeHealthInsuranceJoinStatus(
+            this.judgeSocialInsuranceEmployment(),
+            this.birthDateForInsuranceJudgment(),
+        );
+    }
+
+    pensionInsuranceJoinStatus(): insuranceJoinStatus {
+        return judgePensionInsuranceJoinStatus(
+            this.judgeSocialInsuranceEmployment(),
+            this.birthDateForInsuranceJudgment(),
+        );
+    }
+
+    careInsuranceJoinStatus(): insuranceJoinStatus {
+        return judgeCareInsuranceStatus(
+            currentYearMonth(),
+            this.emptyToNullDate(this.healthInsuranceStartDate),
+            this.emptyToNullDate(this.healthInsuranceEndDate),
+            this.birthDateForInsuranceJudgment(),
+        );
+    }
 
     partTimeJudgmentInput = computed((): PartTimeInsuranceJudgmentInput => ({
         weeklyScheduledWorkHours: parseJudgmentNumber(this.weeklyScheduledWorkHours),
         monthlyScheduledWorkDays: parseJudgmentNumber(this.monthlyScheduledWorkDays),
         prescribedWage: parseJudgmentNumber(this.prescribedWage),
     }));
-
-    careInsurancePeriod = computed(() =>
-        computeCareInsurancePeriod(
-            this.emptyToNullDate(this.healthInsuranceStartDate),
-            this.emptyToNullDate(this.healthInsuranceEndDate),
-            this.birthDate || null,
-        ),
-    );
 
     healthPensionPremiumPeriod = computed(() =>
         computeInsurancePremiumPeriod(
@@ -287,15 +329,24 @@ export class EmployeeDetailPageComponent {
     isHealthInsuranceEligible(): boolean {
         if (this.isEditing()) {
             return (
-                this.judgeHealthInsurance() === 'active' &&
-                this.judgePensionInsurance() === 'active'
+                this.healthInsuranceJoinStatus() === 'active' &&
+                this.pensionInsuranceJoinStatus() === 'active'
             );
         }
 
         const status = this.socialInsuranceStatus();
+        if (!status) return false;
+
+        if (status.healthInsuranceStatus === 'active' && status.pensionInsuranceStatus === 'active') {
+            return true;
+        }
+        if (status.healthInsuranceStatus === 'inactive' || status.pensionInsuranceStatus === 'inactive') {
+            return false;
+        }
+
         return (
-            status?.healthInsuranceStatus === 'active' &&
-            status?.pensionInsuranceStatus === 'active'
+            this.healthInsuranceJoinStatus() === 'active' &&
+            this.pensionInsuranceJoinStatus() === 'active'
         );
     }
 
@@ -563,43 +614,65 @@ export class EmployeeDetailPageComponent {
             employmentType: this.employmentType,
             department: this.department,
             position: this.position,
+            status: resolveEmployeeStoredStatus({
+                joinedDate: this.joinedDate,
+                retiredDate: employee.retiredDate,
+            }),
         });
 
-        // 更新：社会保険情報
         const currentSocialInsuranceStatus = this.socialInsuranceStatus();
-        if (!currentSocialInsuranceStatus?.id) {
-            this.errorMessage.set('社会保険情報が見つかりません');
-            this.isSaving.set(false);
-            return;
-        }
-
-        const socialInsuranceStatusInput: SocialInsuranceStatusInput = {
-            employeeId: employee.id,
-            weeklyScheduledWorkHours: this.toNumberOrNull(this.weeklyScheduledWorkHours),
-            monthlyScheduledWorkDays: this.toNumberOrNull(this.monthlyScheduledWorkDays),
-            prescribedWage: this.toNumberOrNull(this.prescribedWage),
-            isStudent: this.isStudent,
-            expectedEmploymentOver2Months: this.expectedEmploymentOver2Months,
-            healthInsuranceStatus: this.judgeHealthInsurance(),
-            pensionInsuranceStatus: this.judgePensionInsurance(),
-            careInsuranceStatus: this.careInsuranceJudge(),
-            healthInsuranceStartDate: currentSocialInsuranceStatus.healthInsuranceStartDate,
-            healthInsuranceEndDate: currentSocialInsuranceStatus.healthInsuranceEndDate,
-            pensionInsuranceStartDate: currentSocialInsuranceStatus.pensionInsuranceStartDate,
-            pensionInsuranceEndDate: currentSocialInsuranceStatus.pensionInsuranceEndDate,
-            careInsuranceStartDate: this.careInsurancePeriod().startDate,
-            careInsuranceEndDate: this.careInsurancePeriod().endDate,
-            memo: this.insuranceMemo.trim(),
-        };
+        const employmentStatus = this.judgeSocialInsuranceEmployment();
+        const carePeriod = computeCareInsurancePeriod(
+            this.emptyToNullDate(this.healthInsuranceStartDate),
+            this.emptyToNullDate(this.healthInsuranceEndDate),
+            input.birthDate || null,
+        );
 
         try {
-            // 更新：従業員情報
             await this.employeeService.updateEmployee(employee.id, input);
+
+            const refreshedEmployee = await this.employeeService.getEmployeeById(employee.id);
+            if (refreshedEmployee) {
+                this.employee.set(refreshedEmployee);
+                this.syncFormFromEmployee(refreshedEmployee);
+            }
+
+            if (!currentSocialInsuranceStatus?.id) {
+                this.errorMessage.set('従業員情報は保存しましたが、社会保険情報が見つかりません');
+                this.isEditing.set(false);
+                return;
+            }
+
+            const socialInsuranceStatusInput: SocialInsuranceStatusInput = {
+                employeeId: employee.id,
+                weeklyScheduledWorkHours: this.toNumberOrNull(this.weeklyScheduledWorkHours),
+                monthlyScheduledWorkDays: this.toNumberOrNull(this.monthlyScheduledWorkDays),
+                prescribedWage: this.toNumberOrNull(this.prescribedWage),
+                isStudent: this.isStudent,
+                expectedEmploymentOver2Months: this.expectedEmploymentOver2Months,
+                healthInsuranceStatus: judgeHealthInsuranceJoinStatus(employmentStatus, input.birthDate),
+                pensionInsuranceStatus: judgePensionInsuranceJoinStatus(employmentStatus, input.birthDate),
+                careInsuranceStatus: judgeCareInsuranceStatus(
+                    currentYearMonth(),
+                    currentSocialInsuranceStatus.healthInsuranceStartDate,
+                    currentSocialInsuranceStatus.healthInsuranceEndDate,
+                    input.birthDate,
+                ),
+                healthInsuranceStartDate: currentSocialInsuranceStatus.healthInsuranceStartDate,
+                healthInsuranceEndDate: currentSocialInsuranceStatus.healthInsuranceEndDate,
+                pensionInsuranceStartDate: currentSocialInsuranceStatus.pensionInsuranceStartDate,
+                pensionInsuranceEndDate: currentSocialInsuranceStatus.pensionInsuranceEndDate,
+                careInsuranceStartDate: carePeriod.startDate,
+                careInsuranceEndDate: carePeriod.endDate,
+                memo: this.insuranceMemo.trim(),
+            };
 
             const syncedSocialInsuranceStatusInput =
                 await this.insuranceStatusService.withSyncedCareInsuranceDates(
                     employee.id,
                     socialInsuranceStatusInput,
+                    input.birthDate,
+                    employmentStatus,
                 );
 
             await this.insuranceStatusService.updateSocialInsuranceStatus(
@@ -607,7 +680,7 @@ export class EmployeeDetailPageComponent {
                 syncedSocialInsuranceStatusInput,
             );
 
-            const updatedEmployee = { ...employee, ...input };
+            const updatedEmployee = refreshedEmployee ?? { ...employee, ...input };
             const qualificationProcedure = await this.procedureService.syncQualificationProcedureForEmployee({
                 employee: updatedEmployee,
                 healthInsuranceStartDate: syncedSocialInsuranceStatusInput.healthInsuranceStartDate,
@@ -620,10 +693,14 @@ export class EmployeeDetailPageComponent {
                 await this.loadQualificationProcedure();
             }
             this.employee.set(updatedEmployee);
-            this.socialInsuranceStatus.set({
-                ...currentSocialInsuranceStatus,
-                ...syncedSocialInsuranceStatusInput,
-            });
+            const refreshedSocialInsuranceStatus =
+                await this.insuranceStatusService.getInsuranceStatusByEmployeeId(employee.id);
+            this.socialInsuranceStatus.set(
+                refreshedSocialInsuranceStatus ?? {
+                    ...currentSocialInsuranceStatus,
+                    ...syncedSocialInsuranceStatusInput,
+                },
+            );
             this.syncFormFromSocialInsuranceStatus(this.socialInsuranceStatus());
             this.isEditing.set(false);
         } catch (error) {
@@ -638,8 +715,22 @@ export class EmployeeDetailPageComponent {
         return employeeDisplayStatusLabel(employee);
     }
 
+    editingEmploymentStatusLabel(): string {
+        const employee = this.employee();
+        if (!employee) return '—';
+        return employeeDisplayStatusLabel({
+            status: employee.status,
+            retiredDate: employee.retiredDate,
+            joinedDate: this.joinedDate || employee.joinedDate,
+        });
+    }
+
     employeeDisplayStatus(employee: Employee) {
         return resolveEmployeeDisplayStatus(employee);
+    }
+
+    isBeforeJoin(employee: Employee): boolean {
+        return isEmployeeBeforeJoin(employee);
     }
 
     isPendingRetirement(employee: Employee): boolean {
@@ -666,7 +757,23 @@ export class EmployeeDetailPageComponent {
     }
 
     isActiveEmployee(): boolean {
-        return this.employee()?.status === 'active';
+        const employee = this.employee();
+        if (!employee) return false;
+        const status = resolveEmployeeDisplayStatus(employee);
+        return status === 'active' || status === 'before-join';
+    }
+
+    canRetireEmployee(): boolean {
+        const employee = this.employee();
+        if (!employee) return false;
+        return isEmployeeActive(employee);
+    }
+
+    canReactivateEmployee(): boolean {
+        const employee = this.employee();
+        if (!employee) return false;
+        const status = resolveEmployeeDisplayStatus(employee);
+        return status === 'pending-retirement' || status === 'retired';
     }
 
     formatRetiredDate(retiredDate: Timestamp | null | undefined): string {
@@ -692,7 +799,7 @@ export class EmployeeDetailPageComponent {
 
     async retireEmployee(): Promise<void> {
         const employee = this.employee();
-        if (!employee || employee.status !== 'active') return;
+        if (!employee || !this.canRetireEmployee()) return;
 
         const retiredDateInput = this.retiredDateInput.trim();
         if (!retiredDateInput) {
@@ -700,8 +807,8 @@ export class EmployeeDetailPageComponent {
             return;
         }
 
-        const retiredDate = new Date(retiredDateInput);
-        if (Number.isNaN(retiredDate.getTime())) {
+        const retiredDate = retiredDateFromInput(retiredDateInput);
+        if (!retiredDate) {
             this.errorMessage.set('退職日の形式が正しくありません');
             return;
         }
@@ -711,7 +818,7 @@ export class EmployeeDetailPageComponent {
 
         const input: EmployeeInput = toEmployeeInput(employee, {
             status: 'retired',
-            retiredDate: Timestamp.fromDate(retiredDate),
+            retiredDate,
         });
 
         try {
@@ -723,7 +830,7 @@ export class EmployeeDetailPageComponent {
                 this.syncFormFromEmployee(updatedEmployee);
             }
 
-            const retiredDateStr = this.retiredDateString(Timestamp.fromDate(retiredDate));
+            const retiredDateStr = this.retiredDateString(retiredDate);
             const lossDate = lossDateFromRetirementDate(retiredDateStr);
             if (lossDate) {
                 await this.insuranceStatusService.syncLossDates(employee.id, lossDate);
@@ -743,7 +850,7 @@ export class EmployeeDetailPageComponent {
 
     async reactivateEmployee(): Promise<void> {
         const employee = this.employee();
-        if (!employee || employee.status !== 'retired') return;
+        if (!employee || !this.canReactivateEmployee()) return;
 
         const confirmed = await this.confirmService.confirm('在籍に戻しますか？退職日はクリアされます。', {
             confirmLabel: '在籍に戻す',
@@ -822,7 +929,8 @@ export class EmployeeDetailPageComponent {
     // 2. パート・アルバイト → 4分の3基準 → 満たせば対象
     // 3. 4分の3を満たさない → 短時間労働者の条件 → すべて満たせば対象
     // 4. どちらも満たさない → 対象外
-    judgeHealthInsurance(): insuranceJoinStatus {
+    /** 雇用形態・労働時間に基づく社会保険の加入要件（年齢は含まない） */
+    private judgeSocialInsuranceEmployment(): insuranceJoinStatus {
         // 雇用区分がない場合は判定不可
         if (!this.hasEmploymentType()) return 'unknown';
         // 正社員は原則対象
@@ -878,17 +986,19 @@ export class EmployeeDetailPageComponent {
     }
 
     formatCareStartDateLabel(): string {
+        const period = this.careInsurancePeriodForDisplay();
         return this.formatDateWithPremiumMonth(
-            this.careInsurancePeriod().startDate,
-            this.careInsurancePeriod().premiumStartYearMonth,
+            period.startDate,
+            period.premiumStartYearMonth,
             '開始月',
         );
     }
 
     formatCareEndDateLabel(): string {
+        const period = this.careInsurancePeriodForDisplay();
         return this.formatDateWithPremiumMonth(
-            this.careInsurancePeriod().endDate,
-            this.careInsurancePeriod().premiumEndYearMonth,
+            period.endDate,
+            period.premiumEndYearMonth,
             '終了月',
         );
     }
@@ -937,19 +1047,6 @@ export class EmployeeDetailPageComponent {
             !this.isStudent
         );
     }
-
-    judgePensionInsurance(): insuranceJoinStatus {
-        return this.judgeHealthInsurance();
-    }
-
-    careInsuranceJudge = computed(() =>
-        judgeCareInsuranceStatus(
-            currentYearMonth(),
-            this.emptyToNullDate(this.healthInsuranceStartDate),
-            this.emptyToNullDate(this.healthInsuranceEndDate),
-            this.birthDate || null,
-        ),
-    );
 
     // 文字列・数値入力を数値に変換する（type="number" の ngModel は number になる）
     private toNumberOrNull(value: string | number | null | undefined): number | null {

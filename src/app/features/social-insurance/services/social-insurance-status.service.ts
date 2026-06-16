@@ -14,7 +14,11 @@ import {
 import { db } from '../../../core/firebase';
 
 import { EmployeeService } from '../../employee/services/employee.service';
-import { SocialInsuranceStatus, SocialInsuranceStatusInput } from '../models/social-insurance-status.model';
+import { insuranceJoinStatus, SocialInsuranceStatus, SocialInsuranceStatusInput } from '../models/social-insurance-status.model';
+import {
+    judgeHealthInsuranceJoinStatus,
+    judgePensionInsuranceJoinStatus,
+} from '../utils/age-premium-period.util';
 import {
     computeCareInsurancePeriod,
     currentYearMonth,
@@ -190,17 +194,22 @@ export class SocialInsuranceStatusService {
     async withSyncedCareInsuranceDates(
         employeeId: string,
         input: SocialInsuranceStatusInput,
+        birthDateOverride?: string | null,
+        employmentStatusForJudgment?: insuranceJoinStatus,
     ): Promise<SocialInsuranceStatusInput> {
         const employee = await this.employeeService.getEmployeeById(employeeId);
-        if (!employee) return input;
+        const birthDate = birthDateOverride?.trim()
+            ? birthDateOverride
+            : (employee?.birthDate ?? null);
+        if (!birthDate) return input;
 
         const period = computeCareInsurancePeriod(
             input.healthInsuranceStartDate,
             input.healthInsuranceEndDate,
-            employee.birthDate,
+            birthDate,
         );
 
-        return {
+        const nextInput: SocialInsuranceStatusInput = {
             ...input,
             careInsuranceStartDate: period.startDate,
             careInsuranceEndDate: period.endDate,
@@ -208,9 +217,22 @@ export class SocialInsuranceStatusService {
                 currentYearMonth(),
                 input.healthInsuranceStartDate,
                 input.healthInsuranceEndDate,
-                employee.birthDate,
+                birthDate,
             ),
         };
+
+        if (employmentStatusForJudgment) {
+            nextInput.healthInsuranceStatus = judgeHealthInsuranceJoinStatus(
+                employmentStatusForJudgment,
+                birthDate,
+            );
+            nextInput.pensionInsuranceStatus = judgePensionInsuranceJoinStatus(
+                employmentStatusForJudgment,
+                birthDate,
+            );
+        }
+
+        return nextInput;
     }
 
     // 社会保険情報を取得

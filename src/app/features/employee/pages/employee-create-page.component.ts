@@ -12,6 +12,10 @@ import { ConfirmService } from '../../../shared/services/confirm.service';
 import { OfficeService } from '../../company/services/office.service';
 import { Office } from '../../company/models/office.model';
 import { insuranceJoinStatus, SocialInsuranceStatusInput } from '../../social-insurance/models/social-insurance-status.model';
+import {
+    judgeHealthInsuranceJoinStatus,
+    judgePensionInsuranceJoinStatus,
+} from '../../social-insurance/utils/age-premium-period.util';
 import { EmployeeInviteService } from '../../invitations/services/employee-invite.service';
 import { normalizeAuthEmail } from '../../auth/utils/email-link-auth.util';
 import { PostalCodeLookupService } from '../../../shared/services/postal-code-lookup.service';
@@ -107,6 +111,7 @@ export class EmployeeCreatePageComponent {
             || this.isFormEmpty(this.employee.birthDate)
             || this.isFormEmpty(this.employee.joinedDate)
             || this.isFormEmpty(this.employee.officeId)
+            || this.employee.employmentType === null
         ) {
             this.errorMessage.set('必須項目を入力してください。');
             this.isLoadingEmployee.set(false);
@@ -118,6 +123,7 @@ export class EmployeeCreatePageComponent {
             const employee = await this.employeeService.createEmployee(this.employee);
             if (!employee) return;
 
+            const employmentStatus = this.resolveEmploymentJoinStatus(employee.employmentType);
             const socialInsuranceStatusInput: SocialInsuranceStatusInput = {
                 employeeId: employee.id,
                 weeklyScheduledWorkHours: null,
@@ -125,9 +131,9 @@ export class EmployeeCreatePageComponent {
                 prescribedWage: null,
                 isStudent: false,
                 expectedEmploymentOver2Months: false,
-                healthInsuranceStatus: 'unknown',
-                pensionInsuranceStatus: 'unknown',
-                careInsuranceStatus: this.judgeCareInsurance(this.employee.birthDate, employee.employmentType),
+                healthInsuranceStatus: judgeHealthInsuranceJoinStatus(employmentStatus, employee.birthDate),
+                pensionInsuranceStatus: judgePensionInsuranceJoinStatus(employmentStatus, employee.birthDate),
+                careInsuranceStatus: 'unknown',
                 healthInsuranceStartDate: null,
                 healthInsuranceEndDate: null,
                 pensionInsuranceStartDate: null,
@@ -136,13 +142,19 @@ export class EmployeeCreatePageComponent {
                 careInsuranceEndDate: null,
                 memo: '',
             };
-            await this.socialInsuranceStatusService.createSocialInsuranceStatus(socialInsuranceStatusInput);
+            const syncedSocialInsuranceInput = await this.socialInsuranceStatusService.withSyncedCareInsuranceDates(
+                employee.id,
+                socialInsuranceStatusInput,
+                employee.birthDate,
+                employmentStatus,
+            );
+            await this.socialInsuranceStatusService.createSocialInsuranceStatus(syncedSocialInsuranceInput);
 
             await this.procedureService.syncQualificationProcedureForEmployee({
                 employee,
                 healthInsuranceStartDate: null,
-                healthInsuranceStatus: socialInsuranceStatusInput.healthInsuranceStatus,
-                pensionInsuranceStatus: socialInsuranceStatusInput.pensionInsuranceStatus,
+                healthInsuranceStatus: syncedSocialInsuranceInput.healthInsuranceStatus,
+                pensionInsuranceStatus: syncedSocialInsuranceInput.pensionInsuranceStatus,
             });
 
             const inviteEmail = await this.confirmService.confirmInviteEmail(this.employee.email);
@@ -191,21 +203,10 @@ export class EmployeeCreatePageComponent {
         }
     }
 
-    private judgeCareInsurance(birthDate: string, employmentType: EmploymentType): insuranceJoinStatus {
-        if (employmentType === 'part-time') return 'inactive';
-        const age = this.ageToday(birthDate);
-        if (age === null) return 'unknown';
-        return age >= 40 && age < 65 ? 'active' : 'inactive';
-    }
-
-    private ageToday(birthDate: string): number | null {
-        const d = new Date(birthDate);
-        if (Number.isNaN(d.getTime())) return null;
-        const today = new Date();
-        let age = today.getFullYear() - d.getFullYear();
-        const m = today.getMonth() - d.getMonth();
-        if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
-        return age;
+    private resolveEmploymentJoinStatus(employmentType: EmploymentType): insuranceJoinStatus {
+        if (employmentType === 'full-time') return 'active';
+        if (employmentType === 'part-time') return 'unknown';
+        return 'unknown';
     }
 
     private generateMyNumber(): string {

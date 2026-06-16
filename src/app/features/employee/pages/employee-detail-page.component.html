@@ -24,6 +24,7 @@
                             <span class="meta-chip">社員番号 {{ employee()!.employeeNumber || '—' }}</span>
                             <span
                                 class="status-badge"
+                                [class.before-join]="isBeforeJoin(employee()!)"
                                 [class.retired]="isFullyRetired(employee()!)"
                                 [class.pending-retirement]="isPendingRetirement(employee()!)"
                             >
@@ -37,7 +38,7 @@
                 </div>
                 @if (!isEditing()) {
                     <div class="header-actions">
-                        <a [routerLink]="['/premium', employee()!.id]" class="btn sub-btn">保険料計算</a>
+                        <a [routerLink]="['/premium', employee()!.id]" class="btn sub-btn">社会保険</a>
                         @if (isActiveEmployee()) {
                             <button type="button" class="btn primary-btn" (click)="startEdit()">編集</button>
                         }
@@ -74,7 +75,12 @@
                         </div>
                         <div class="form-field">
                             <label for="birth-date">生年月日</label>
-                            <input id="birth-date" type="date" name="birthDate" [(ngModel)]="birthDate" />
+                            <input
+                                id="birth-date"
+                                type="date"
+                                name="birthDate"
+                                [(ngModel)]="birthDate"
+                            />
                         </div>
                         <div class="form-field">
                             <label for="employee-number">社員番号</label>
@@ -107,6 +113,11 @@
                         <div class="form-field">
                             <label for="joined-date">入社日</label>
                             <input id="joined-date" type="date" name="joinedDate" [(ngModel)]="joinedDate" />
+                        </div>
+                        <div class="form-field">
+                            <span class="readonly-field-label">在籍状況</span>
+                            <p class="readonly-field-value">{{ editingEmploymentStatusLabel() }}</p>
+                            <p class="field-note">入社日・退職日から自動で判定されます。</p>
                         </div>
                         <div class="form-field">
                             <label for="department">部署</label>
@@ -260,9 +271,10 @@
                             </dd>
                         </div>
                         <div class="detail-row">
-                            <dt>在籍状態</dt>
+                            <dt>在籍状況</dt>
                             <dd>{{ employeeStatusLabel(employee()!) }}</dd>
                         </div>
+                        <p class="detail-note muted">入社日・退職日から自動で判定されます。</p>
                         @if (employee()!.retiredDate) {
                             <div class="detail-row">
                                 <dt>退職日</dt>
@@ -276,9 +288,9 @@
             @if (!isEditing()) {
                 <section class="retire-section action-panel">
                     <h2 class="section-title">在籍・退職</h2>
-                    @if (isActiveEmployee()) {
+                    @if (canRetireEmployee()) {
                         @if (!isRetireFormOpen()) {
-                            <p class="section-note">退職した場合は削除せず、退職処理で在籍状態を「退職」に変更します。</p>
+                            <p class="section-note">退職日を登録すると、在籍状況は自動で「退職予定」または「退職済」に変わります。</p>
                             <button
                                 type="button"
                                 class="btn retire-btn"
@@ -323,7 +335,7 @@
                                 </button>
                             </div>
                         }
-                    } @else {
+                    } @else if (canReactivateEmployee()) {
                         @if (isPastRetiredDate()) {
                             <p class="section-note">この従業員は退職済みです。</p>
                         } @else {
@@ -401,14 +413,6 @@
                                 <dd>{{ displayOfficeNumber(office()?.regularWeeklyScheduledWorkHours) }}</dd>
                             </div>
                             <div class="detail-row">
-                                <dt>月の所定労働時間</dt>
-                                <dd>{{ displayOfficeNumber(office()?.regularMonthlyScheduledWorkHours) }}</dd>
-                            </div>
-                            <div class="detail-row">
-                                <dt>週の所定労働日数</dt>
-                                <dd>{{ displayOfficeNumber(office()?.regularWeeklyScheduledWorkDays) }}</dd>
-                            </div>
-                            <div class="detail-row">
                                 <dt>月の所定労働日数</dt>
                                 <dd>{{ displayOfficeNumber(office()?.regularMonthlyScheduledWorkDays) }}</dd>
                             </div>
@@ -436,18 +440,21 @@
                         </label>
                         <input id="wage" type="number" name="prescribedWage" [(ngModel)]="prescribedWage" placeholder="例: 88000" />
                     </div>
-                    <p class="judgment-sub-note">以下は4分の3基準を満たさない場合の短時間労働者判定でも参照します</p>
-                    <div class="form-field checkbox-field">
-                        <label>
-                            <input type="checkbox" name="isStudent" [(ngModel)]="isStudent" />
-                            学生
-                        </label>
-                    </div>
-                    <div class="form-field checkbox-field">
-                        <label>
-                            <input type="checkbox" name="expectedEmploymentOver2Months" [(ngModel)]="expectedEmploymentOver2Months" />
-                            雇用見込みが2カ月超
-                        </label>
+                    <div class="judgment-conditions-box">
+                        <p class="subsection-title">短時間労働者の加入要件</p>
+                        <p class="judgment-sub-note">4分の3基準を満たさない場合に参照します</p>
+                        <div class="form-field checkbox-field">
+                            <label>
+                                <input type="checkbox" name="isStudent" [(ngModel)]="isStudent" />
+                                学生
+                            </label>
+                        </div>
+                        <div class="form-field checkbox-field">
+                            <label>
+                                <input type="checkbox" name="expectedEmploymentOver2Months" [(ngModel)]="expectedEmploymentOver2Months" />
+                                雇用見込みが2か月超
+                            </label>
+                        </div>
                     </div>
                 }
             } @else {
@@ -468,14 +475,6 @@
                             <div class="detail-row">
                                 <dt>週の所定労働時間</dt>
                                 <dd>{{ displayOfficeNumber(office()?.regularWeeklyScheduledWorkHours) }}</dd>
-                            </div>
-                            <div class="detail-row">
-                                <dt>月の所定労働時間</dt>
-                                <dd>{{ displayOfficeNumber(office()?.regularMonthlyScheduledWorkHours) }}</dd>
-                            </div>
-                            <div class="detail-row">
-                                <dt>週の所定労働日数</dt>
-                                <dd>{{ displayOfficeNumber(office()?.regularWeeklyScheduledWorkDays) }}</dd>
                             </div>
                             <div class="detail-row">
                                 <dt>月の所定労働日数</dt>
@@ -501,49 +500,56 @@
                             <dd>{{ displayValue(prescribedWage) }}</dd>
                         </div>
                     </dl>
-                    <p class="judgment-sub-note">以下は4分の3基準を満たさない場合の短時間労働者判定でも参照します</p>
-                    <dl class="detail-list">
-                        <div class="detail-row">
-                            <dt>学生</dt>
-                            <dd>{{ yesNoLabel(isStudent) }}</dd>
-                        </div>
-                        <div class="detail-row">
-                            <dt>雇用見込みが2カ月超</dt>
-                            <dd>{{ yesNoLabel(expectedEmploymentOver2Months) }}</dd>
-                        </div>
-                    </dl>
+                    <div class="judgment-conditions-box">
+                        <p class="subsection-title">短時間労働者の加入要件</p>
+                        <p class="judgment-sub-note">4分の3基準を満たさない場合に参照します</p>
+                        <dl class="detail-list compact-list">
+                            <div class="detail-row">
+                                <dt>学生</dt>
+                                <dd>{{ yesNoLabel(isStudent) }}</dd>
+                            </div>
+                            <div class="detail-row">
+                                <dt>雇用見込みが2か月超</dt>
+                                <dd>{{ yesNoLabel(expectedEmploymentOver2Months) }}</dd>
+                            </div>
+                        </dl>
+                    </div>
                 }
             }
 
             <div class="result-box">
+                <p class="subsection-title">加入判定（参考）</p>
                 <div class="result-row">
                     <span class="result-label">健康保険</span>
-                    <span class="result-badge" [class.ok]="judgeHealthInsurance() === 'active'" [class.ng]="judgeHealthInsurance() === 'inactive'">
-                        @if(isEditing()) {
-                            {{ displayInsuranceStatus(judgeHealthInsurance()) }}
-                        } @else {
-                            {{ displayInsuranceStatus(socialInsuranceStatus()?.healthInsuranceStatus ?? 'unknown') }}
-                        }
+                    <span
+                        class="result-badge"
+                        [class.ok]="healthInsuranceJoinStatus() === 'active'"
+                        [class.ng]="healthInsuranceJoinStatus() === 'inactive'"
+                        [class.pending]="healthInsuranceJoinStatus() === 'unknown'"
+                    >
+                        {{ displayInsuranceStatus(healthInsuranceJoinStatus()) }}
                     </span>
                 </div>
                 <div class="result-row">
                     <span class="result-label">厚生年金</span>
-                    <span class="result-badge" [class.ok]="judgePensionInsurance() === 'active'" [class.ng]="judgePensionInsurance() === 'inactive'">
-                        @if(isEditing()) {
-                            {{ displayInsuranceStatus(judgePensionInsurance()) }}
-                        } @else {
-                            {{ displayInsuranceStatus(socialInsuranceStatus()?.pensionInsuranceStatus ?? 'unknown') }}
-                        }
+                    <span
+                        class="result-badge"
+                        [class.ok]="pensionInsuranceJoinStatus() === 'active'"
+                        [class.ng]="pensionInsuranceJoinStatus() === 'inactive'"
+                        [class.pending]="pensionInsuranceJoinStatus() === 'unknown'"
+                    >
+                        {{ displayInsuranceStatus(pensionInsuranceJoinStatus()) }}
                     </span>
                 </div>
                 <div class="result-row">
                     <span class="result-label">介護保険</span>
-                    <span class="result-badge" [class.ok]="careInsuranceJudge() === 'active'" [class.ng]="careInsuranceJudge() === 'inactive'">
-                        @if(isEditing()) {
-                            {{ displayInsuranceStatus(careInsuranceJudge()) }}
-                        } @else {
-                            {{ displayInsuranceStatus(socialInsuranceStatus()?.careInsuranceStatus ?? 'unknown') }}
-                        }
+                    <span
+                        class="result-badge"
+                        [class.ok]="careInsuranceJoinStatus() === 'active'"
+                        [class.ng]="careInsuranceJoinStatus() === 'inactive'"
+                        [class.pending]="careInsuranceJoinStatus() === 'unknown'"
+                    >
+                        {{ displayInsuranceStatus(careInsuranceJoinStatus()) }}
                     </span>
                 </div>
             </div>
@@ -623,11 +629,6 @@
                 </dl>
             }
 
-            @if (needsQualificationProcedurePrompt()) {
-                <p class="insurance-judgment-note" role="note">
-                    健康保険の加入対象ですが、まだ資格取得手続きが完了していません。手続きをしてください。
-                </p>
-            }
             </section>
 
             <section class="qualification-procedure-section profile-section">
@@ -955,6 +956,30 @@
         color: #92400e;
     }
 
+    .status-badge.before-join {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .readonly-field-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .readonly-field-value {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .detail-note.muted {
+        margin: -4px 0 0;
+        font-size: 12px;
+        color: #6b7280;
+    }
+
     .retire-section {
         margin-bottom: 0;
     }
@@ -1087,10 +1112,30 @@
     }
 
     .judgment-sub-note {
-        margin: -4px 0 12px;
+        margin: 0 0 10px;
         color: #6b7280;
         font-size: 12px;
         line-height: 1.5;
+    }
+
+    .judgment-conditions-box {
+        margin-bottom: 16px;
+        padding: 12px 14px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+    }
+
+    .judgment-conditions-box .subsection-title {
+        margin-bottom: 4px;
+    }
+
+    .judgment-conditions-box .checkbox-field {
+        margin-bottom: 8px;
+    }
+
+    .judgment-conditions-box .checkbox-field:last-child {
+        margin-bottom: 0;
     }
 
     .required-mark {
@@ -1142,6 +1187,10 @@
         border-radius: 10px;
     }
 
+    .result-box > .subsection-title {
+        margin: 0 0 4px;
+    }
+
     .result-row {
         display: flex;
         align-items: center;
@@ -1182,6 +1231,11 @@
     .result-badge.ng {
         background: #fee2e2;
         color: #991b1b;
+    }
+
+    .result-badge.pending {
+        background: #fef3c7;
+        color: #92400e;
     }
 
     .checkbox-field label {

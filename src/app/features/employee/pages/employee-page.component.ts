@@ -6,6 +6,7 @@ import { Employee, EmploymentType } from '../models/employee.models';
 import {
     EmployeeStatusFilter,
     employeeDisplayStatusLabel,
+    isEmployeeBeforeJoin,
     isEmployeeFullyRetired,
     isEmployeePendingRetirement,
     matchesEmployeeStatusFilter,
@@ -103,6 +104,10 @@ export class EmployeePageComponent {
 
     isPendingRetirement(employee: Employee): boolean {
         return isEmployeePendingRetirement(employee);
+    }
+
+    isBeforeJoin(employee: Employee): boolean {
+        return isEmployeeBeforeJoin(employee);
     }
 
     statusBadgeLabel(employee: Employee): string {

@@ -78,21 +78,6 @@
                             }
                         </dd>
                     </div>
-                    <div class="info-row">
-                        <dt>紐づく従業員</dt>
-                        <dd>
-                            @if (linkedEmployee(); as employee) {
-                                <a [routerLink]="['/employees', employee.id]" class="text-link">
-                                    {{ employee.lastName }} {{ employee.firstName }}
-                                </a>
-                                @if (employee.employeeNumber) {
-                                    <span class="sub-note">（{{ employee.employeeNumber }}）</span>
-                                }
-                            } @else {
-                                <span class="muted">未紐づけ</span>
-                            }
-                        </dd>
-                    </div>
                 </dl>
             </section>
         </div>
@@ -315,13 +300,6 @@
 
     .muted {
         color: #9ca3af;
-    }
-
-    .sub-note {
-        display: block;
-        margin-top: 2px;
-        font-size: 12px;
-        color: #6b7280;
     }
 
     .text-link {

@@ -23,16 +23,17 @@
                 </select>
             </div>
             <div class="form-field">
-                <label for="status-filter">在籍状態</label>
+                <label for="status-filter">在籍状況</label>
                 <select
                     id="status-filter"
                     [ngModel]="selectedStatus()"
                     (ngModelChange)="selectedStatus.set($event)"
                 >
                     <option value="">すべて</option>
+                    <option value="before-join">入社前</option>
                     <option value="active">在籍</option>
                     <option value="pending-retirement">退職予定</option>
-                    <option value="retired">退職</option>
+                    <option value="retired">退職済</option>
                 </select>
             </div>
             <div class="form-field form-field-search">
@@ -92,6 +93,7 @@
                             </div>
                             <span
                                 class="status-badge"
+                                [class.before-join]="isBeforeJoin(employee)"
                                 [class.retired]="isRetiredBadge(employee)"
                                 [class.retiring-soon]="isPendingRetirement(employee)"
                             >
@@ -328,6 +330,11 @@
     .status-badge.retiring-soon {
         background: #fef3c7;
         color: #92400e;
+    }
+
+    .status-badge.before-join {
+        background: #dbeafe;
+        color: #1d4ed8;
     }
 
     .employee-meta {

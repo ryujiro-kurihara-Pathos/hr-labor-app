@@ -7,7 +7,7 @@
                 <div>
                     <a routerLink="/employees" class="back-link">← 従業員一覧</a>
                     <h1>従業員を追加</h1>
-                    <p class="page-note">必須項目を入力して登録してください。詳細は登録後に編集できます。</p>
+                    <p class="page-note">必須項目を入力して登録してください。その他の基本情報は任意です。登録後も編集できます。</p>
                 </div>
             </header>
 
@@ -38,6 +38,27 @@
                             <input id="joined-date" type="date" name="joinedDate" [(ngModel)]="employee.joinedDate" required />
                         </div>
                         <div class="form-field">
+                            <label for="employment-type">雇用区分 <span class="required">必須</span></label>
+                            <select
+                                id="employment-type"
+                                name="employmentType"
+                                [(ngModel)]="employee.employmentType"
+                                required
+                            >
+                                <option [ngValue]="null" disabled>選択してください</option>
+                                <option ngValue="full-time">正社員</option>
+                                <option ngValue="part-time">パート・アルバイト</option>
+                            </select>
+                        </div>
+                        <div class="form-field">
+                            <label for="department">部署</label>
+                            <input id="department" type="text" name="department" [(ngModel)]="employee.department" placeholder="営業部" />
+                        </div>
+                        <div class="form-field">
+                            <label for="position">役職</label>
+                            <input id="position" type="text" name="position" [(ngModel)]="employee.position" placeholder="主任" />
+                        </div>
+                        <div class="form-field">
                             <label for="employee-number">社員番号</label>
                             <input
                                 id="employee-number"
@@ -63,6 +84,21 @@
                             <input id="first-name" type="text" name="firstName" [(ngModel)]="employee.firstName" placeholder="太郎" required />
                         </div>
                         <div class="form-field">
+                            <label for="last-name-kana">姓（カナ）</label>
+                            <input id="last-name-kana" type="text" name="lastNameKana" [(ngModel)]="employee.lastNameKana" placeholder="ヤマダ" />
+                        </div>
+                        <div class="form-field">
+                            <label for="first-name-kana">名（カナ）</label>
+                            <input id="first-name-kana" type="text" name="firstNameKana" [(ngModel)]="employee.firstNameKana" placeholder="タロウ" />
+                        </div>
+                        <div class="form-field">
+                            <label for="gender">性別</label>
+                            <select id="gender" name="gender" [(ngModel)]="employee.gender">
+                                <option value="male">男性</option>
+                                <option value="female">女性</option>
+                            </select>
+                        </div>
+                        <div class="form-field">
                             <label for="birth-date">生年月日 <span class="required">必須</span></label>
                             <input id="birth-date" type="date" name="birthDate" [(ngModel)]="employee.birthDate" required />
                         </div>
@@ -74,11 +110,11 @@
                     </div>
                 </section>
 
-                <section class="form-section invite-section">
-                    <h2 class="section-title">ログイン招待</h2>
-                    <p class="section-lead">任意。登録後に招待メールを送る場合の送信先です。</p>
+                <section class="form-section">
+                    <h2 class="section-title">連絡先・住所</h2>
+                    <p class="section-lead">メールアドレスは登録後のログイン招待にも使えます。</p>
                     <div class="form-grid">
-                        <div class="form-field form-field-wide">
+                        <div class="form-field">
                             <label for="email">メールアドレス</label>
                             <input
                                 id="email"
@@ -89,12 +125,18 @@
                                 autocomplete="email"
                             />
                         </div>
-                    </div>
-                </section>
-
-                <section class="form-section">
-                    <h2 class="section-title">住所</h2>
-                    <div class="form-grid">
+                        <div class="form-field">
+                            <label for="phone-number">電話番号</label>
+                            <input
+                                id="phone-number"
+                                type="text"
+                                name="phoneNumber"
+                                [(ngModel)]="employee.phoneNumber"
+                                placeholder="03-1234-5678"
+                                inputmode="tel"
+                                autocomplete="tel"
+                            />
+                        </div>
                         <div class="form-field form-field-wide">
                             <label for="postal-code">郵便番号</label>
                             <div class="postal-code-row">

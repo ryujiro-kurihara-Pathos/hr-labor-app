@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import {
     collection,
+    deleteDoc,
     doc,
     getDoc,
     getDocs,
@@ -18,6 +19,7 @@ import {
     BonusRewardInput,
     BonusRewardStatus,
 } from '../models/bonus-reward.model';
+import { normalizeBonusStatus } from '../utils/bonus-status.util';
 
 @Injectable({
     providedIn: 'root',
@@ -31,6 +33,19 @@ export class BonusRewardService {
 
     async confirm(input: BonusRewardInput): Promise<BonusReward> {
         return this.upsertBonusReward(input, 'confirmed');
+    }
+
+    async deleteDraftBonusReward(id: string): Promise<void> {
+        const docRef = doc(db, this.collectionName, id);
+        const existing = await getDoc(docRef);
+        if (!existing.exists()) return;
+
+        const bonus = { id: existing.id, ...existing.data() } as BonusReward;
+        if (normalizeBonusStatus(bonus) !== 'draft') {
+            throw new Error('確定済みの賞与は削除できません');
+        }
+
+        await deleteDoc(docRef);
     }
 
     async upsertBonusReward(

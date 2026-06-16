@@ -3,6 +3,8 @@ import {
     computePensionInsurancePremiumEndDate,
     isHealthInsurancePremiumTargetMonth,
     isPensionInsurancePremiumTargetMonth,
+    judgeHealthInsuranceJoinStatus,
+    judgePensionInsuranceJoinStatus,
 } from './age-premium-period.util';
 
 describe('age-premium-period.util', () => {
@@ -77,5 +79,15 @@ describe('age-premium-period.util', () => {
                 birthDate,
             ),
         ).toBeTrue();
+    });
+
+    it('marks pension join status inactive when employment is active but age is 70 or over', () => {
+        const birthDate72 = '1954-01-15';
+        expect(judgePensionInsuranceJoinStatus('active', birthDate72)).toBe('inactive');
+        expect(judgeHealthInsuranceJoinStatus('active', birthDate72)).toBe('active');
+    });
+
+    it('keeps join status inactive when employment is inactive regardless of age', () => {
+        expect(judgePensionInsuranceJoinStatus('inactive', '1990-01-01')).toBe('inactive');
     });
 });

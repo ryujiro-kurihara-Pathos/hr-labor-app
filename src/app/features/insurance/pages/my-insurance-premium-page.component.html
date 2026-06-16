@@ -56,13 +56,19 @@
         @if (!isViewableMonth()) {
             <p class="state-message excluded">{{ viewableMonthReason() }}</p>
         } @else {
+            @if (!canShowPremiumSummary()) {
+                <section class="summary-card summary-card-undetermined">
+                    <h2 class="summary-empty-title">保険料を判定できません</h2>
+                    <p class="summary-empty-note">{{ premiumSummaryUndeterminedReason() }}</p>
+                </section>
+            } @else {
             <section class="summary-card">
                 <div class="summary-main">
                     <p class="summary-kicker">{{ targetYearMonthLabel() }}給与控除</p>
                     <p class="summary-total">
                         @if (totalSocialInsurancePremium() !== null) {
                             {{ totalSocialInsurancePremium() | number }}<span class="summary-unit">円</span>
-                        } @else if (isNextMonthCollection()) {
+                        } @else if (isMonthlyPremiumNotSubject()) {
                             0<span class="summary-unit">円</span>
                         } @else {
                             —<span class="summary-unit">円</span>
@@ -77,13 +83,11 @@
                             } @else if (standardAmount() !== null) {
                                 {{ premiumLiabilityYearMonthLabel() }}分・標準報酬月額 {{ standardAmount() | number }}円
                             }
-                        } @else if (isNextMonthCollection()) {
-                            翌月徴収のため、この月の給与から控除される月次保険料はありません
-                        } @else {
-                            標準報酬月額が未確定のため、保険料を表示できません
+                        } @else if (isMonthlyPremiumNotSubject()) {
+                            {{ premiumNotSubjectReason() }}
                         }
                     </p>
-                    @if (totalSocialInsurancePremium() !== null || isNextMonthCollection()) {
+                    @if (totalSocialInsurancePremium() !== null || isMonthlyPremiumNotSubject()) {
                         <p class="summary-deduction">{{ premiumCollectionSummary() }}</p>
                     }
                 </div>
@@ -93,6 +97,7 @@
                     <span class="summary-badge care">介護保険</span>
                 </div>
             </section>
+            }
 
             <section class="premium-grid">
                 <article class="premium-card health">
@@ -101,12 +106,17 @@
                         <h2 class="premium-card-title">健康保険料</h2>
                     </div>
                     <p class="premium-amount">
-                        @if (healthPremium() !== null) {
-                            {{ healthPremium() | number }}<span class="premium-unit">円</span>
+                        @if (premiumDisplayAmountValue(healthPremiumAmountDisplay()); as amount) {
+                            {{ amount | number }}<span class="premium-unit">円</span>
+                        } @else if (premiumDisplayShowsZero(healthPremiumAmountDisplay())) {
+                            0<span class="premium-unit">円</span>
                         } @else {
                             —<span class="premium-unit">円</span>
                         }
                     </p>
+                    @if (premiumDisplayNote(healthPremiumAmountDisplay()); as note) {
+                        <p class="premium-status-note">{{ note }}</p>
+                    }
                     <dl class="premium-meta">
                         <div class="meta-row">
                             <dt>等級</dt>
@@ -135,12 +145,17 @@
                         <h2 class="premium-card-title">厚生年金保険料</h2>
                     </div>
                     <p class="premium-amount">
-                        @if (pensionPremium() !== null) {
-                            {{ pensionPremium() | number }}<span class="premium-unit">円</span>
+                        @if (premiumDisplayAmountValue(pensionPremiumAmountDisplay()); as amount) {
+                            {{ amount | number }}<span class="premium-unit">円</span>
+                        } @else if (premiumDisplayShowsZero(pensionPremiumAmountDisplay())) {
+                            0<span class="premium-unit">円</span>
                         } @else {
                             —<span class="premium-unit">円</span>
                         }
                     </p>
+                    @if (premiumDisplayNote(pensionPremiumAmountDisplay()); as note) {
+                        <p class="premium-status-note">{{ note }}</p>
+                    }
                     <dl class="premium-meta">
                         <div class="meta-row">
                             <dt>等級</dt>
@@ -169,12 +184,17 @@
                         <h2 class="premium-card-title">介護保険料</h2>
                     </div>
                     <p class="premium-amount">
-                        @if (carePremium() !== null) {
-                            {{ carePremium() | number }}<span class="premium-unit">円</span>
+                        @if (premiumDisplayAmountValue(carePremiumAmountDisplay()); as amount) {
+                            {{ amount | number }}<span class="premium-unit">円</span>
+                        } @else if (premiumDisplayShowsZero(carePremiumAmountDisplay())) {
+                            0<span class="premium-unit">円</span>
                         } @else {
                             —<span class="premium-unit">円</span>
                         }
                     </p>
+                    @if (premiumDisplayNote(carePremiumAmountDisplay()); as note) {
+                        <p class="premium-status-note">{{ note }}</p>
+                    }
                     <dl class="premium-meta">
                         <div class="meta-row">
                             <dt>対象</dt>
@@ -211,10 +231,6 @@
                     <p class="detail-note">{{ effectiveStandard()!.description }}</p>
                 }
                 <dl class="detail-dl">
-                    <div class="detail-row">
-                        <dt>決定区分</dt>
-                        <dd>{{ effectiveStandard()?.determinationLabel ?? '—' }}</dd>
-                    </div>
                     <div class="detail-row">
                         <dt>算定対象月</dt>
                         <dd>{{ effectiveCalculationMonthsLabel() }}</dd>
@@ -351,7 +367,7 @@
                 <div class="total-row grand">
                     <span class="total-label">本人負担合計</span>
                     <span class="total-value">
-                        {{ totalSocialInsurancePremium() ?? 0 | number}}円
+                        {{ totalSocialInsurancePremium() ?? 0 | number }}円
                     </span>
                 </div>
             </section>
@@ -494,6 +510,33 @@
         background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 60%, #fff 100%);
         border: 1px solid #bfdbfe;
         box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    }
+
+    .summary-card-undetermined {
+        display: block;
+        background: #f9fafb;
+        border-color: #e5e7eb;
+    }
+
+    .summary-empty-title {
+        margin: 0 0 8px;
+        font-size: 18px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .summary-empty-note {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #6b7280;
+    }
+
+    .premium-status-note {
+        margin: 4px 0 12px;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #6b7280;
     }
 
     .summary-kicker {

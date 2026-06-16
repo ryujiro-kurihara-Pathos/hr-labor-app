@@ -25,6 +25,11 @@ export function viewableYearMonthMax(employee: Employee, currentYearMonth: strin
     return currentYearMonth;
 }
 
+/** 矢印ナビの上限（退職月のみ。在籍中は上限なし） */
+export function navigableYearMonthMax(employee: Employee): string | null {
+    return yearMonthFromTimestamp(employee.retiredDate);
+}
+
 export function viewableYearMonthMin(employee: Employee): string | null {
     return yearMonthFromDateString(employee.joinedDate);
 }

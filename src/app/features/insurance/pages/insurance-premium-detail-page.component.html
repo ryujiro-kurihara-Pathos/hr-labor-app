@@ -6,7 +6,7 @@
     } @else {
         <header class="page-header">
             <a routerLink="/premium" class="back-link">← 一覧に戻る</a>
-            <h1>保険料計算</h1>
+            <h1>社会保険</h1>
             <p class="employee-meta">
                 <a [routerLink]="['/employees', employee()!.id]">{{ employee()!.lastName }} {{ employee()!.firstName }}</a>
                 @if (office()?.prefecture) {
@@ -28,13 +28,19 @@
                 type="button"
                 class="month-nav-btn"
                 (click)="shiftMonth(-1)"
-                [disabled]="isLoadingMonth()"
+                [disabled]="isLoadingMonth() || !canGoPrevMonth()"
                 aria-label="前月"
             >
                 ←
             </button>
             <div class="month-picker">
-                <label for="target-year-month" class="month-label">対象年月</label>
+                <label for="target-year-month" class="month-label">
+                    @if (activeTab() === 'premium') {
+                        控除する月
+                    } @else {
+                        対象年月
+                    }
+                </label>
                 <input
                     id="target-year-month"
                     type="month"
@@ -49,7 +55,7 @@
                 type="button"
                 class="month-nav-btn"
                 (click)="shiftMonth(1)"
-                [disabled]="isLoadingMonth()"
+                [disabled]="isLoadingMonth() || !canGoNextMonth()"
                 aria-label="翌月"
             >
                 →
@@ -59,6 +65,30 @@
             <p class="month-loading">報酬情報を読み込み中...</p>
         }
 
+        <nav class="page-tabs" role="tablist" aria-label="社会保険">
+            <button
+                type="button"
+                role="tab"
+                class="page-tab"
+                [class.active]="activeTab() === 'input'"
+                [attr.aria-selected]="activeTab() === 'input'"
+                (click)="setActiveTab('input')"
+            >
+                報酬入力
+            </button>
+            <button
+                type="button"
+                role="tab"
+                class="page-tab"
+                [class.active]="activeTab() === 'premium'"
+                [attr.aria-selected]="activeTab() === 'premium'"
+                (click)="setActiveTab('premium')"
+            >
+                保険料
+            </button>
+        </nav>
+
+        @if (activeTab() === 'input') {
         @if (
             monthRewardStatus() === 'confirmed' &&
             standardReward()?.fixedWageChanged &&
@@ -88,7 +118,7 @@
                             </div>
                         } @else {
                             <p class="regular-decision-procedure-note">
-                                {{ revisionCtx.windowLabel }}の報酬をもとに、{{ revisionCtx.applyFromLabel }}からの月額変更届を作成できます。
+                                {{ revisionCtx.windowLabel }}の報酬をもとに、{{ revisionCtx.applyFromLabel }}からの月額変更届を提出してください。
                             </p>
                         }
                         <button
@@ -128,7 +158,7 @@
                         </div>
                     } @else {
                         <p class="regular-decision-procedure-note">
-                            {{ regularDecisionYearLabel() }}4〜6月の報酬をもとに、定時決定の算定基礎届を作成できます。
+                            {{ regularDecisionYearLabel() }}4〜6月の報酬をもとに、定時決定の算定基礎届を提出してください。
                         </p>
                     }
                     <button
@@ -504,14 +534,58 @@
                     </p>
                 }
                 @if (monthRewardStatus() === 'draft') {
-                    <p class="month-status-action">下書きです。修正して再保存するか、賞与欄の下の確定ボタンで確定してください。</p>
+                    <p class="month-status-action">下書きです。修正して下書き保存するか、画面下部の「報酬・賞与を確定」から確定してください。</p>
                 }
+
+                <div class="status-block month-bonus-status-block">
+                    <h3 class="status-block-title">賞与</h3>
+                    @if (isLoadingBonus()) {
+                        <p class="status-line muted">読み込み中...</p>
+                    } @else if (treatBonusAsMonthlyRemuneration()) {
+                        <p class="status-line">
+                            対象期間内で4回目以降の賞与のため、報酬月額に算入しています（{{ includedBonusInMonth() | number }}円／月）。
+                        </p>
+                        <p class="status-line muted">標準賞与額・賞与保険料は算定しません。</p>
+                    } @else if (monthBonuses().length > 0) {
+                        <dl class="status-dl month-bonus-status-list">
+                            @for (bonus of monthBonuses(); track bonus.id) {
+                                <div class="status-row month-bonus-status-row">
+                                    <dt>{{ bonus.paymentDate }}</dt>
+                                    <dd class="month-bonus-status-value">
+                                        <span>{{ bonus.bonusAmount | number }}円</span>
+                                        <span class="month-bonus-standard-note">
+                                            標準 {{ bonus.standardBonusAmount | number }}円
+                                        </span>
+                                        <span
+                                            class="month-bonus-status-badge"
+                                            [class.draft]="bonusStatusLabel(bonus) === '下書き'"
+                                            [class.confirmed]="bonusStatusLabel(bonus) === '確定'"
+                                        >
+                                            {{ bonusStatusLabel(bonus) }}
+                                        </span>
+                                    </dd>
+                                </div>
+                            }
+                        </dl>
+                    } @else {
+                        <p class="status-line muted">この月の賞与は未登録です。</p>
+                    }
+                </div>
             </section>
         </div>
 
         <section class="card bonus-card">
             <span class="card-type-badge bonus">賞与</span>
-            <h2 class="section-title">賞与入力（{{ targetYearMonthLabel() }}）</h2>
+            <div class="section-title-row">
+                <h2 class="section-title">賞与入力（{{ targetYearMonthLabel() }}）</h2>
+                @if (!treatBonusAsMonthlyRemuneration()) {
+                    <app-field-help-tooltip
+                        title="標準賞与額の上限"
+                        [lines]="bonusStandardAmountLimitHelpLines"
+                        ariaLabel="標準賞与額の上限について"
+                    />
+                }
+            </div>
             <p class="bonus-section-note">
                 @if (treatBonusAsMonthlyRemuneration()) {
                     対象期間（{{ targetYearMonthLabel() }}の暦年）内で4回目以降の賞与支給があるため、当該賞与は賞与支払届の対象外です。標準報酬月額には対象期間内の賞与合計（{{ bonusTotalInTargetPeriod() | number }}円）を12で除した額（{{ includedBonusInMonth() | number }}円）を毎月加算します。標準賞与額・賞与保険料は計算しません。
@@ -545,7 +619,7 @@
                     </div>
                     <ul>
                         @for (bonus of monthBonuses(); track bonus.id) {
-                            <li>
+                            <li class="bonus-list-row">
                                 <button
                                     type="button"
                                     class="bonus-list-item"
@@ -567,6 +641,17 @@
                                         標準 {{ bonus.standardBonusAmount | number }}円
                                     </span>
                                 </button>
+                                @if (canSelectBonusForEdit(bonus) && isBonusEditable()) {
+                                    <button
+                                        type="button"
+                                        class="bonus-delete-btn"
+                                        (click)="deleteDraftBonus(bonus, $event)"
+                                        [disabled]="isDeletingBonus() || isSavingBonus()"
+                                        [attr.aria-label]="bonus.paymentDate + 'の下書き賞与を削除'"
+                                    >
+                                        削除
+                                    </button>
+                                }
                             </li>
                         }
                     </ul>
@@ -616,17 +701,33 @@
                             />
                         </div>
                     </div>
-    
+
                     @if (getPreviewStandardBonusAmount(); as standardAmount) {
                         <p class="bonus-preview">標準賞与額（見込み）：{{ standardAmount | number }}円</p>
                     }
-    
+
                     <div class="bonus-form-actions">
+                        @if (isEditingBonus() && editingBonus(); as editing) {
+                            @if (canSelectBonusForEdit(editing)) {
+                                <button
+                                    type="button"
+                                    class="btn sub-btn bonus-delete-form-btn"
+                                    (click)="deleteDraftBonus(editing)"
+                                    [disabled]="isDeletingBonus() || isSavingBonus()"
+                                >
+                                    @if (isDeletingBonus()) {
+                                        削除中...
+                                    } @else {
+                                        削除
+                                    }
+                                </button>
+                            }
+                        }
                         <button
                             type="button"
                             class="btn sub-btn"
                             (click)="resetBonusForm()"
-                            [disabled]="isSavingBonus()"
+                            [disabled]="isSavingBonus() || isDeletingBonus()"
                         >
                             クリア
                         </button>
@@ -634,7 +735,7 @@
                             type="button"
                             class="btn sub-btn bonus-save-btn"
                             (click)="saveBonusReward()"
-                            [disabled]="isSavingBonus() || isLoadingBonus()"
+                            [disabled]="isSavingBonus() || isLoadingBonus() || isDeletingBonus()"
                         >
                             @if (isSavingBonus()) {
                                 保存中...
@@ -647,10 +748,47 @@
             }
 
             @if (canConfirmMonth()) {
-                <div class="confirm-month-actions">
-                    <p class="confirm-month-note">
-                        保存済みの報酬・賞与をまとめて確定します。確定後は変更できません。
+                <section class="confirm-month-panel">
+                    <h3 class="confirm-month-title">報酬・賞与の確定</h3>
+                    <p class="confirm-month-lead">
+                        {{ targetYearMonthLabel() }}の報酬と賞与をまとめて確定します。賞与を入力していない場合は「なし」として確定されます。
                     </p>
+                    <ul class="confirm-month-target-list">
+                        @if (willConfirmRewardInMonth()) {
+                            <li class="confirm-month-target-item">
+                                <span class="confirm-target-label">月次報酬</span>
+                                <span class="confirm-target-value">
+                                    @if (targetMonthMonthlyReward(); as amount) {
+                                        {{ amount | number }}円
+                                    } @else {
+                                        入力内容
+                                    }
+                                </span>
+                            </li>
+                            <li class="confirm-month-target-item">
+                                <span class="confirm-target-label">賞与</span>
+                                <span class="confirm-target-value">
+                                    @if (hasDraftBonusesInMonth()) {
+                                        @for (bonus of draftBonusesInMonth(); track bonus.id; let last = $last) {
+                                            {{ bonus.paymentDate }}・{{ bonus.bonusAmount | number }}円@if (!last) {、}
+                                        }
+                                    } @else {
+                                        <span class="confirm-target-none">なし</span>
+                                    }
+                                </span>
+                            </li>
+                        } @else {
+                            @for (bonus of draftBonusesInMonth(); track bonus.id) {
+                                <li class="confirm-month-target-item">
+                                    <span class="confirm-target-label">賞与</span>
+                                    <span class="confirm-target-value">
+                                        {{ bonus.paymentDate }}・{{ bonus.bonusAmount | number }}円
+                                    </span>
+                                </li>
+                            }
+                        }
+                    </ul>
+                    <p class="confirm-month-warning">確定後は報酬・賞与の内容を変更できません。</p>
                     <button
                         type="button"
                         class="btn primary-btn confirm-month-btn"
@@ -660,10 +798,10 @@
                         @if (isConfirmingMonth()) {
                             確定中...
                         } @else {
-                            確定
+                            {{ confirmMonthButtonLabel() }}
                         }
                     </button>
-                </div>
+                </section>
             }
 
             @if (showBonusPaymentProcedureSection()) {
@@ -684,7 +822,7 @@
                             </div>
                         } @else {
                             <p class="regular-decision-procedure-note">
-                                {{ targetYearMonthLabel() }}の賞与をもとに、賞与支払届を作成できます。
+                                {{ targetYearMonthLabel() }}の賞与をもとに、賞与支払届を提出してください。
                             </p>
                         }
                         <button
@@ -705,358 +843,569 @@
                 </section>
             }
         </section>
+        }
 
-        <section class="card premium-card">
-            <div class="premium-card-header">
-                <h2 class="section-title">{{ premiumSectionTitle() }}</h2>
-                <app-field-help-tooltip
-                    title="徴収タイミング"
-                    [lines]="payrollDeductionHelpLines"
-                />
-            </div>
-            <p class="premium-collection-summary">{{ premiumCollectionSummary() }}</p>
+        @if (activeTab() === 'premium') {
+            <div class="premium-display-tab">
+                <p class="premium-tab-lead">{{ premiumTabLeadNote() }}</p>
+                @if (!canShowPremiumSummary()) {
+                    <section class="premium-empty-state">
+                        <h2 class="premium-empty-title">{{ premiumEmptyStateTitle() }}</h2>
+                        <p class="premium-empty-note">{{ premiumEmptyStateNote() }}</p>
+                        @if (!isPremiumEnrollmentUndetermined()) {
+                            <button type="button" class="btn primary-btn" (click)="setActiveTab('input')">
+                                報酬を入力する
+                            </button>
+                        } @else if (employee(); as emp) {
+                            <a [routerLink]="['/employees', emp.id]" fragment="social-insurance" class="btn primary-btn">
+                                加入状況を入力する
+                            </a>
+                        }
+                    </section>
+                } @else {
+                    <section class="premium-summary-card">
+                        <div class="premium-summary-main">
+                            <p class="premium-summary-kicker">{{ premiumSummaryKicker() }}</p>
+                            <p class="premium-summary-total">
+                                @if (socialInsuranceTotalPremium() !== null) {
+                                    {{ socialInsuranceTotalPremium() | number }}<span class="premium-summary-unit">円</span>
+                                } @else if (isMonthlyPremiumNotSubject()) {
+                                    0<span class="premium-summary-unit">円</span>
+                                } @else {
+                                    —<span class="premium-summary-unit">円</span>
+                                }
+                            </p>
+                            <p class="premium-summary-sub">
+                                @if (hasMonthlyPremiumDisplay()) {
+                                    @if (bonusSocialInsuranceEmployeePremium() !== null && applicableHealthStandardAmount() !== null) {
+                                        {{ premiumLiabilityYearMonthLabel() }}分（標準報酬月額 {{ applicableHealthStandardAmount() | number }}円）＋賞与分
+                                    } @else if (bonusSocialInsuranceEmployeePremium() !== null) {
+                                        {{ premiumLiabilityYearMonthLabel() }}分＋賞与分
+                                    } @else if (applicableHealthStandardAmount() !== null) {
+                                        {{ premiumLiabilityYearMonthLabel() }}分・標準報酬月額 {{ applicableHealthStandardAmount() | number }}円
+                                    }
+                                } @else if (isMonthlyPremiumNotSubject()) {
+                                    {{ premiumNotSubjectReason() }}
+                                }
+                            </p>
+                            <p class="premium-summary-deduction">{{ premiumCollectionSummary() }}</p>
+                            <p class="premium-summary-note muted">{{ payrollDeductionNote() }}</p>
+                        </div>
+                        <div class="premium-summary-badges">
+                            <span class="premium-summary-badge health">健康保険</span>
+                            <span class="premium-summary-badge pension">厚生年金</span>
+                            <span class="premium-summary-badge care">介護保険</span>
+                        </div>
+                    </section>
 
-            @if (employee(); as emp) {
-                <p class="join-status-summary">
-                    <span>{{ joinStatusSummary() }}</span>
-                    <a [routerLink]="['/employees', emp.id]" fragment="social-insurance" class="join-status-link">
-                        加入状況を編集
-                    </a>
-                </p>
-            }
+                    <div class="premium-display-grid">
+                        <article class="premium-display-card health">
+                            <div class="premium-display-card-header">
+                                <span class="premium-display-icon">健</span>
+                                <h2 class="premium-display-card-title">健康保険料</h2>
+                            </div>
+                            <p class="premium-display-amount">
+                                @if (premiumDisplayAmountValue(healthPremiumAmountDisplay()); as amount) {
+                                    {{ amount | number }}<span class="premium-display-unit">円</span>
+                                } @else if (premiumDisplayShowsZero(healthPremiumAmountDisplay())) {
+                                    0<span class="premium-display-unit">円</span>
+                                } @else {
+                                    —<span class="premium-display-unit">円</span>
+                                }
+                            </p>
+                            <p class="premium-display-sub">
+                                @if (premiumDisplayIsAmount(healthPremiumAmountDisplay())) {
+                                    本人負担
+                                } @else if (premiumDisplayNote(healthPremiumAmountDisplay()); as note) {
+                                    {{ note }}
+                                }
+                            </p>
+                            <dl class="premium-display-meta">
+                                <div class="premium-display-meta-row">
+                                    <dt>等級</dt>
+                                    <dd>{{ healthGrade() ?? '—' }}</dd>
+                                </div>
+                                <div class="premium-display-meta-row">
+                                    <dt>料率（本人）</dt>
+                                    <dd>{{ insuranceRatePercentLabel(healthInsuranceRate()) ?? '—' }}%</dd>
+                                </div>
+                                <div class="premium-display-meta-row">
+                                    <dt>会社負担</dt>
+                                    <dd>
+                                        @if (healthInsuranceEmployerPremium() !== null) {
+                                            {{ healthInsuranceEmployerPremium() | number }}円
+                                        } @else {
+                                            —
+                                        }
+                                    </dd>
+                                </div>
+                            </dl>
+                        </article>
 
-            <div class="premium-subsection monthly-premium-subsection">
-                <div class="premium-subsection-header">
-                    <span class="card-type-badge monthly">月次報酬</span>
-                    <h3 class="premium-subsection-title">月次報酬に対する保険料</h3>
-                    <app-field-help-tooltip
-                        title="保険料の計算"
-                        [lines]="premiumCalculationHelpLines"
-                    />
-                </div>
-                @if (hasMonthlyPremiumDisplay()) {
-                    @if (applicableHealthStandardAmount(); as standardAmount) {
-                        <p class="premium-note">
-                            {{ premiumLiabilityYearMonthLabel() }}分・標準報酬月額 {{ standardAmount | number }}円をもとに計算
-                            <app-field-help-tooltip
-                                title="標準報酬月額"
-                                [lines]="premiumStandardAmountHelpLines"
-                            />
+                        <article class="premium-display-card pension">
+                            <div class="premium-display-card-header">
+                                <span class="premium-display-icon">年</span>
+                                <h2 class="premium-display-card-title">厚生年金保険料</h2>
+                            </div>
+                            <p class="premium-display-amount">
+                                @if (premiumDisplayAmountValue(pensionPremiumAmountDisplay()); as amount) {
+                                    {{ amount | number }}<span class="premium-display-unit">円</span>
+                                } @else if (premiumDisplayShowsZero(pensionPremiumAmountDisplay())) {
+                                    0<span class="premium-display-unit">円</span>
+                                } @else {
+                                    —<span class="premium-display-unit">円</span>
+                                }
+                            </p>
+                            <p class="premium-display-sub">
+                                @if (premiumDisplayIsAmount(pensionPremiumAmountDisplay())) {
+                                    本人負担
+                                } @else if (premiumDisplayNote(pensionPremiumAmountDisplay()); as note) {
+                                    {{ note }}
+                                }
+                            </p>
+                            <dl class="premium-display-meta">
+                                <div class="premium-display-meta-row">
+                                    <dt>等級</dt>
+                                    <dd>{{ pensionGrade() ?? '—' }}</dd>
+                                </div>
+                                <div class="premium-display-meta-row">
+                                    <dt>料率（本人）</dt>
+                                    <dd>{{ insuranceRatePercentLabel(pensionInsuranceRate) }}%</dd>
+                                </div>
+                                <div class="premium-display-meta-row">
+                                    <dt>会社負担</dt>
+                                    <dd>
+                                        @if (pensionInsuranceEmployerPremium() !== null) {
+                                            {{ pensionInsuranceEmployerPremium() | number }}円
+                                        } @else {
+                                            —
+                                        }
+                                    </dd>
+                                </div>
+                            </dl>
+                        </article>
+
+                        <article class="premium-display-card care">
+                            <div class="premium-display-card-header">
+                                <span class="premium-display-icon">介</span>
+                                <h2 class="premium-display-card-title">介護保険料</h2>
+                            </div>
+                            <p class="premium-display-amount">
+                                @if (premiumDisplayAmountValue(carePremiumAmountDisplay()); as amount) {
+                                    {{ amount | number }}<span class="premium-display-unit">円</span>
+                                } @else if (premiumDisplayShowsZero(carePremiumAmountDisplay())) {
+                                    0<span class="premium-display-unit">円</span>
+                                } @else {
+                                    —<span class="premium-display-unit">円</span>
+                                }
+                            </p>
+                            <p class="premium-display-sub">
+                                @if (premiumDisplayIsAmount(carePremiumAmountDisplay())) {
+                                    本人負担
+                                } @else if (premiumDisplayNote(carePremiumAmountDisplay()); as note) {
+                                    {{ note }}
+                                }
+                            </p>
+                            <dl class="premium-display-meta">
+                                <div class="premium-display-meta-row">
+                                    <dt>対象</dt>
+                                    <dd>{{ careTargetLabel() }}（{{ careStatusLabel() }}）</dd>
+                                </div>
+                                <div class="premium-display-meta-row">
+                                    <dt>料率（本人）</dt>
+                                    <dd>{{ insuranceRatePercentLabel(careInsuranceRate()) ?? '—' }}%</dd>
+                                </div>
+                                <div class="premium-display-meta-row">
+                                    <dt>会社負担</dt>
+                                    <dd>
+                                        @if (careInsuranceEmployerPremium() !== null) {
+                                            {{ careInsuranceEmployerPremium() | number }}円
+                                        } @else {
+                                            —
+                                        }
+                                    </dd>
+                                </div>
+                            </dl>
+                        </article>
+                    </div>
+
+                    @if (canShowBonusPremiumCards()) {
+                        <section class="premium-bonus-section">
+                            <h2 class="premium-bonus-section-title">賞与に対する保険料</h2>
+                            <div class="premium-display-grid">
+                                <article class="premium-display-card health">
+                                    <div class="premium-display-card-header">
+                                        <span class="premium-display-icon">健</span>
+                                        <h3 class="premium-display-card-title">健康保険料</h3>
+                                    </div>
+                                    <p class="premium-display-amount">
+                                        @if (bonusHealthInsurancePremium() !== null) {
+                                            {{ bonusHealthInsurancePremium() | number }}<span class="premium-display-unit">円</span>
+                                        } @else {
+                                            —<span class="premium-display-unit">円</span>
+                                        }
+                                    </p>
+                                    <p class="premium-display-sub">
+                                        @if (bonusHealthInsurancePremium() !== null) {
+                                            本人負担
+                                        }
+                                    </p>
+                                    <dl class="premium-display-meta">
+                                        <div class="premium-display-meta-row">
+                                            <dt class="premium-display-meta-label-row">
+                                                <span>標準賞与額</span>
+                                                <app-field-help-tooltip
+                                                    title="標準賞与額の上限"
+                                                    [lines]="bonusHealthCareStandardAmountLimitHelpLines"
+                                                    ariaLabel="健康保険・介護保険の標準賞与額上限について"
+                                                />
+                                            </dt>
+                                            <dd>
+                                                @if (bonusHealthCarePremiumableStandardAmount() !== null) {
+                                                    {{ bonusHealthCarePremiumableStandardAmount() | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </dd>
+                                        </div>
+                                        <div class="premium-display-meta-row">
+                                            <dt>料率（本人）</dt>
+                                            <dd>{{ insuranceRatePercentLabel(healthInsuranceRate()) ?? '—' }}%</dd>
+                                        </div>
+                                        <div class="premium-display-meta-row">
+                                            <dt>会社負担</dt>
+                                            <dd>
+                                                @if (bonusHealthInsuranceEmployerPremium() !== null) {
+                                                    {{ bonusHealthInsuranceEmployerPremium() | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </dd>
+                                        </div>
+                                    </dl>
+                                </article>
+
+                                <article class="premium-display-card pension">
+                                    <div class="premium-display-card-header">
+                                        <span class="premium-display-icon">年</span>
+                                        <h3 class="premium-display-card-title">厚生年金保険料</h3>
+                                    </div>
+                                    <p class="premium-display-amount">
+                                        @if (bonusPensionInsurancePremium() !== null) {
+                                            {{ bonusPensionInsurancePremium() | number }}<span class="premium-display-unit">円</span>
+                                        } @else {
+                                            —<span class="premium-display-unit">円</span>
+                                        }
+                                    </p>
+                                    <p class="premium-display-sub">
+                                        @if (bonusPensionInsurancePremium() !== null) {
+                                            本人負担
+                                        }
+                                    </p>
+                                    <dl class="premium-display-meta">
+                                        <div class="premium-display-meta-row">
+                                            <dt class="premium-display-meta-label-row">
+                                                <span>標準賞与額</span>
+                                                <app-field-help-tooltip
+                                                    title="標準賞与額の上限"
+                                                    [lines]="bonusPensionStandardAmountLimitHelpLines"
+                                                    ariaLabel="厚生年金の標準賞与額上限について"
+                                                />
+                                            </dt>
+                                            <dd>
+                                                @if (bonusPensionPremiumableStandardAmount() !== null) {
+                                                    {{ bonusPensionPremiumableStandardAmount() | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </dd>
+                                        </div>
+                                        <div class="premium-display-meta-row">
+                                            <dt>料率（本人）</dt>
+                                            <dd>{{ insuranceRatePercentLabel(pensionInsuranceRate) }}%</dd>
+                                        </div>
+                                        <div class="premium-display-meta-row">
+                                            <dt>会社負担</dt>
+                                            <dd>
+                                                @if (bonusPensionInsuranceEmployerPremium() !== null) {
+                                                    {{ bonusPensionInsuranceEmployerPremium() | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </dd>
+                                        </div>
+                                    </dl>
+                                </article>
+
+                                <article class="premium-display-card care">
+                                    <div class="premium-display-card-header">
+                                        <span class="premium-display-icon">介</span>
+                                        <h3 class="premium-display-card-title">介護保険料</h3>
+                                    </div>
+                                    <p class="premium-display-amount">
+                                        @if (bonusCareInsurancePremium() !== null) {
+                                            {{ bonusCareInsurancePremium() | number }}<span class="premium-display-unit">円</span>
+                                        } @else {
+                                            —<span class="premium-display-unit">円</span>
+                                        }
+                                    </p>
+                                    <p class="premium-display-sub">
+                                        @if (bonusCareInsurancePremium() !== null) {
+                                            本人負担
+                                        }
+                                    </p>
+                                    <dl class="premium-display-meta">
+                                        <div class="premium-display-meta-row">
+                                            <dt class="premium-display-meta-label-row">
+                                                <span>標準賞与額</span>
+                                                <app-field-help-tooltip
+                                                    title="標準賞与額の上限"
+                                                    [lines]="bonusHealthCareStandardAmountLimitHelpLines"
+                                                    ariaLabel="健康保険・介護保険の標準賞与額上限について"
+                                                />
+                                            </dt>
+                                            <dd>
+                                                @if (bonusHealthCarePremiumableStandardAmount() !== null) {
+                                                    {{ bonusHealthCarePremiumableStandardAmount() | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </dd>
+                                        </div>
+                                        <div class="premium-display-meta-row">
+                                            <dt>料率（本人）</dt>
+                                            <dd>{{ insuranceRatePercentLabel(careInsuranceRate()) ?? '—' }}%</dd>
+                                        </div>
+                                        <div class="premium-display-meta-row">
+                                            <dt>会社負担</dt>
+                                            <dd>
+                                                @if (bonusCareInsuranceEmployerPremium() !== null) {
+                                                    {{ bonusCareInsuranceEmployerPremium() | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </dd>
+                                        </div>
+                                    </dl>
+                                </article>
+                            </div>
+                        </section>
+                    } @else if (treatBonusAsMonthlyRemuneration() && monthBonuses().length > 0) {
+                        <p class="premium-detail-note muted premium-bonus-section-note">
+                            対象期間内で4回目以降の賞与があるため、賞与合計÷12（{{ includedBonusInMonth() | number }}円）を報酬月額に算入済みです。
                         </p>
                     }
-                } @else if (showZeroMonthlyPremiumDueToCollectionTiming()) {
-                    <p class="premium-note muted">
-                        翌月徴収のため、{{ targetYearMonthLabel() }}の給与から控除される月次保険料はありません（0円）。
-                    </p>
-                } @else if (!liabilityMonthHasSavedReward()) {
-                    <p class="premium-note muted">
-                        {{ premiumLiabilityYearMonthLabel() }}の報酬を保存すると保険料を表示できます。
-                        <app-field-help-tooltip
-                            title="標準報酬月額"
-                            [lines]="premiumStandardAmountHelpLines"
-                        />
-                    </p>
-                } @else {
-                    <p class="premium-note muted">
-                        算定に必要な報酬が不足しているため、保険料を表示できません。
-                        <app-field-help-tooltip
-                            title="標準報酬月額"
-                            [lines]="premiumStandardAmountHelpLines"
-                        />
-                    </p>
-                }
 
-                <div class="table-wrap">
-                    <table class="premium-table">
-                        <thead>
-                            <tr>
-                                <th>種別</th>
-                                <th class="num">料率（本人）</th>
-                                <th class="num">料率（会社）</th>
-                                <th class="num">保険料（本人）</th>
-                                <th class="num">保険料（会社）</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>健康保険</td>
-                                <td class="num">{{ insuranceRatePercentLabel(healthInsuranceRate()) ?? '—' }}%</td>
-                                <td class="num">{{ insuranceRatePercentLabel(healthInsuranceEmployerRate()) ?? '—' }}%</td>
-                                <td class="num">
-                                    @if (hasCalculatedPremium(healthInsurancePremium())) {
-                                        {{ healthInsurancePremium() | number }}円
-                                    } @else {
-                                        —
-                                    }
-                                </td>
-                                <td class="num">
-                                    @if (hasCalculatedPremium(healthInsuranceEmployerPremium())) {
-                                        {{ healthInsuranceEmployerPremium() | number }}円
-                                    } @else {
-                                        —
-                                    }
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>厚生年金</td>
-                                <td class="num">{{ insuranceRatePercentLabel(pensionInsuranceRate) }}%</td>
-                                <td class="num">{{ insuranceRatePercentLabel(pensionInsuranceRate) }}%</td>
-                                <td class="num">
-                                    @if (hasCalculatedPremium(pensionInsurancePremium())) {
-                                        {{ pensionInsurancePremium() | number }}円
-                                    } @else {
-                                        —
-                                    }
-                                </td>
-                                <td class="num">
-                                    @if (hasCalculatedPremium(pensionInsuranceEmployerPremium())) {
-                                        {{ pensionInsuranceEmployerPremium() | number }}円
-                                    } @else {
-                                        —
-                                    }
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>介護保険</td>
-                                <td class="num">{{ insuranceRatePercentLabel(careInsuranceRate()) ?? '—' }}%</td>
-                                <td class="num">{{ insuranceRatePercentLabel(careInsuranceEmployerRate()) ?? '—' }}%</td>
-                                <td class="num">
-                                    @if (hasCalculatedPremium(careInsurancePremium())) {
-                                        {{ careInsurancePremium() | number }}円
-                                    } @else {
-                                        —
-                                    }
-                                </td>
-                                <td class="num">
-                                    @if (hasCalculatedPremium(careInsuranceEmployerPremium())) {
-                                        {{ careInsuranceEmployerPremium() | number }}円
-                                    } @else {
-                                        —
-                                    }
-                                </td>
-                            </tr>
-                        </tbody>
-                        <tfoot>
-                            <tr>
-                                <th colspan="3">合計</th>
-                                <th class="num">{{ socialInsurancePremium() | number }}円</th>
-                                <th class="num">{{ socialInsuranceEmployerPremium() | number }}円</th>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-            </div>
-
-            <div class="premium-subsection bonus-premium-subsection">
-                <div class="premium-subsection-header">
-                    <span class="card-type-badge bonus">賞与</span>
-                    <h3 class="premium-subsection-title">賞与に対する保険料</h3>
-                </div>
-
-                @if (bonusesForPremium().length > 0) {
-                    @for (bonus of bonusesForPremium(); track bonus.id) {
-                        <div class="bonus-premium-block">
-                            <p class="premium-note">
-                                支給日 {{ bonus.paymentDate }}
-                                · 賞与額 {{ bonus.bonusAmount | number }}円
-                                · 標準賞与額 {{ bonus.standardBonusAmount | number }}円をもとに計算
-                            </p>
-
-                            <div class="table-wrap">
-                                <table class="premium-table bonus-premium-table">
-                                    <thead>
-                                        <tr>
-                                            <th>種別</th>
-                                            <th class="num">料率（本人）</th>
-                                            <th class="num">料率（会社）</th>
-                                            <th class="num">保険料（本人）</th>
-                                            <th class="num">保険料（会社）</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td>健康保険</td>
-                                            <td class="num">{{ insuranceRatePercentLabel(healthInsuranceRate()) ?? '—' }}%</td>
-                                            <td class="num">{{ insuranceRatePercentLabel(healthInsuranceEmployerRate()) ?? '—' }}%</td>
-                                            <td class="num">
-                                                @if (healthInsuranceBonusPremium(); as premium) {
-                                                    {{ premium | number }}円
-                                                } @else {
-                                                    —
-                                                }
-                                            </td>
-                                            <td class="num">
-                                                @if (healthInsuranceBonusPremium(); as premium) {
-                                                    {{ premium | number }}円
-                                                } @else {
-                                                    —
-                                                }
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td>厚生年金</td>
-                                            <td class="num">{{ insuranceRatePercentLabel(pensionInsuranceRate) }}%</td>
-                                            <td class="num">{{ insuranceRatePercentLabel(pensionInsuranceRate) }}%</td>
-                                            <td class="num">
-                                                @if (pensionInsuranceBonusPremium(); as premium) {
-                                                    {{ premium | number }}円
-                                                } @else {
-                                                    —
-                                                }
-                                            </td>
-                                            <td class="num">
-                                                @if (pensionInsuranceBonusPremium(); as premium) {
-                                                    {{ premium | number }}円
-                                                } @else {
-                                                    —
-                                                }
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td>介護保険</td>
-                                            <td class="num">{{ insuranceRatePercentLabel(careInsuranceRate()) ?? '—' }}%</td>
-                                            <td class="num">{{ insuranceRatePercentLabel(careInsuranceEmployerRate()) ?? '—' }}%</td>
-                                            <td class="num">
-                                                @if (careInsuranceBonusPremium(); as premium) {
-                                                    {{ premium | number }}円
-                                                } @else {
-                                                    —
-                                                }
-                                            </td>
-                                            <td class="num">
-                                                @if (careInsuranceBonusPremium(); as premium) {
-                                                    {{ premium | number }}円
-                                                } @else {
-                                                    —
-                                                }
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                    <tfoot>
-                                        <tr>
-                                            <th colspan="3">合計</th>
-                                            <th class="num">
-                                                @if (socialInsuranceBonusPremium(); as premium) {
-                                                    {{ premium | number }}円
-                                                } @else {
-                                                    —
-                                                }
-                                            </th>
-                                            <th class="num">
-                                                @if (socialInsuranceBonusPremium(); as premium) {
-                                                    {{ premium | number }}円
-                                                } @else {
-                                                    —
-                                                }
-                                            </th>
-                                        </tr>
-                                    </tfoot>
-                                </table>
+                    @if (effectiveStandardForPremium(); as effective) {
+                        <section class="premium-detail-card">
+                            <div class="premium-detail-card-header">
+                                <h2 class="section-title">標準報酬月額</h2>
+                                <span class="determination-badge" [class]="premiumDeterminationBadgeClass()">
+                                    {{ effective.determinationLabel }}
+                                </span>
                             </div>
-                        </div>
+                            @if (effective.description) {
+                                <p class="premium-detail-note">{{ effective.description }}</p>
+                            }
+                            <dl class="premium-detail-dl">
+                                <div class="premium-detail-row">
+                                    <dt>算定対象月</dt>
+                                    <dd>{{ premiumEffectiveCalculationMonthsLabel() }}</dd>
+                                </div>
+                                <div class="premium-detail-row">
+                                    <dt>算定報酬月額</dt>
+                                    <dd>
+                                        @if (effective.averageMonthlyReward != null) {
+                                            {{ effective.averageMonthlyReward | number }}円
+                                        } @else {
+                                            —
+                                        }
+                                    </dd>
+                                </div>
+                                <div class="premium-detail-row">
+                                    <dt>健康保険（等級 / 標準報酬月額）</dt>
+                                    <dd>
+                                        @if (effective.calculation?.health) {
+                                            {{ effective.calculation!.health!.grade }}等級 /
+                                            {{ effective.calculation!.health!.standardMonthlyAmount | number }}円
+                                        } @else {
+                                            —
+                                        }
+                                    </dd>
+                                </div>
+                                <div class="premium-detail-row">
+                                    <dt>厚生年金（等級 / 標準報酬月額）</dt>
+                                    <dd>
+                                        @if (effective.calculation?.pension) {
+                                            {{ effective.calculation!.pension!.grade }}等級 /
+                                            {{ effective.calculation!.pension!.standardMonthlyAmount | number }}円
+                                        } @else {
+                                            —
+                                        }
+                                    </dd>
+                                </div>
+                            </dl>
+                        </section>
                     }
-                } @else if (treatBonusAsMonthlyRemuneration() && monthBonuses().length > 0) {
-                    <p class="premium-note muted">
-                        対象期間内で4回目以降の賞与があるため、賞与合計÷12（{{ includedBonusInMonth() | number }}円）を報酬月額に算入済みです。賞与に対する保険料は計算しません。
-                    </p>
-                } @else {
-                    <p class="premium-note muted">この月の賞与は未登録のため、賞与に対する保険料を計算できません。</p>
+
+                    <section class="premium-total-card">
+                        <h2 class="section-title">負担額の内訳</h2>
+                        <div class="premium-total-table-wrap">
+                            <table class="premium-total-table">
+                                <thead>
+                                    <tr>
+                                        <th>区分</th>
+                                        <th class="num">本人負担</th>
+                                        <th class="num">会社負担</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="premium-total-group">
+                                        <th colspan="3">健康保険料</th>
+                                    </tr>
+                                    <tr class="premium-total-sub">
+                                        <td>月次報酬</td>
+                                        <td class="num">
+                                            @if (healthInsurancePremium(); as premium) {
+                                                {{ premium | number }}円
+                                            } @else {
+                                                —
+                                            }
+                                        </td>
+                                        <td class="num">
+                                            @if (healthInsuranceEmployerPremium(); as premium) {
+                                                {{ premium | number }}円
+                                            } @else {
+                                                —
+                                            }
+                                        </td>
+                                    </tr>
+                                    <tr class="premium-total-sub">
+                                        <td>賞与</td>
+                                        <td class="num">
+                                            @if (bonusHealthInsurancePremium(); as premium) {
+                                                {{ premium | number }}円
+                                            } @else {
+                                                —
+                                            }
+                                        </td>
+                                        <td class="num">
+                                            @if (bonusHealthInsuranceEmployerPremium(); as premium) {
+                                                {{ premium | number }}円
+                                            } @else {
+                                                —
+                                            }
+                                        </td>
+                                    </tr>
+                                    <tr class="premium-total-group">
+                                        <th colspan="3">厚生年金保険料</th>
+                                    </tr>
+                                    <tr class="premium-total-sub">
+                                        <td>月次報酬</td>
+                                        <td class="num">
+                                            @if (pensionInsurancePremium(); as premium) {
+                                                {{ premium | number }}円
+                                            } @else {
+                                                —
+                                            }
+                                        </td>
+                                        <td class="num">
+                                            @if (pensionInsuranceEmployerPremium(); as premium) {
+                                                {{ premium | number }}円
+                                            } @else {
+                                                —
+                                            }
+                                        </td>
+                                    </tr>
+                                    <tr class="premium-total-sub">
+                                        <td>賞与</td>
+                                        <td class="num">
+                                            @if (bonusPensionInsurancePremium(); as premium) {
+                                                {{ premium | number }}円
+                                            } @else {
+                                                —
+                                            }
+                                        </td>
+                                        <td class="num">
+                                            @if (bonusPensionInsuranceEmployerPremium(); as premium) {
+                                                {{ premium | number }}円
+                                            } @else {
+                                                —
+                                            }
+                                        </td>
+                                    </tr>
+                                    <tr class="premium-total-group">
+                                        <th colspan="3">介護保険料</th>
+                                    </tr>
+                                    <tr class="premium-total-sub">
+                                        <td>月次報酬</td>
+                                        <td class="num">
+                                            @if (careInsurancePremium(); as premium) {
+                                                {{ premium | number }}円
+                                            } @else {
+                                                —
+                                            }
+                                        </td>
+                                        <td class="num">
+                                            @if (careInsuranceEmployerPremium(); as premium) {
+                                                {{ premium | number }}円
+                                            } @else {
+                                                —
+                                            }
+                                        </td>
+                                    </tr>
+                                    <tr class="premium-total-sub">
+                                        <td>賞与</td>
+                                        <td class="num">
+                                            @if (bonusCareInsurancePremium(); as premium) {
+                                                {{ premium | number }}円
+                                            } @else {
+                                                —
+                                            }
+                                        </td>
+                                        <td class="num">
+                                            @if (bonusCareInsuranceEmployerPremium(); as premium) {
+                                                {{ premium | number }}円
+                                            } @else {
+                                                —
+                                            }
+                                        </td>
+                                    </tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <th>合計</th>
+                                        <th class="num">
+                                            @if (socialInsuranceTotalPremium() !== null) {
+                                                {{ socialInsuranceTotalPremium() | number }}円
+                                            } @else {
+                                                —
+                                            }
+                                        </th>
+                                        <th class="num">
+                                            @if (totalEmployerPremium() !== null) {
+                                                {{ totalEmployerPremium() | number }}円
+                                            } @else {
+                                                —
+                                            }
+                                        </th>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </section>
+
+                    @if (employee(); as emp) {
+                        <p class="join-status-summary premium-join-status">
+                            <span>{{ joinStatusSummary() }}</span>
+                            <a [routerLink]="['/employees', emp.id]" fragment="social-insurance" class="join-status-link">
+                                加入状況を編集
+                            </a>
+                        </p>
+                    }
                 }
             </div>
-
-            <div class="premium-subsection payroll-deduction-subsection">
-                <div class="premium-subsection-header">
-                    <span class="card-type-badge payroll">給与控除</span>
-                    <h3 class="premium-subsection-title">給与控除としての表示</h3>
-                    <app-field-help-tooltip
-                        title="給与控除"
-                        [lines]="payrollDeductionHelpLines"
-                    />
-                </div>
-                <p class="premium-note payroll-deduction-note">{{ premiumCollectionSummary() }}</p>
-                <p class="premium-note muted">{{ payrollDeductionNote() }}</p>
-                <div class="payroll-deduction-amount">
-                    <span class="payroll-deduction-label">本人負担控除額</span>
-                    <span class="payroll-deduction-value">
-                        @if (socialInsuranceTotalPremium() !== null) {
-                            {{ socialInsuranceTotalPremium() | number }}円
-                        } @else {
-                            —
-                        }
-                    </span>
-                </div>
-            </div>
-
-            <div class="premium-subsection total-premium-subsection">
-                <div class="premium-subsection-header">
-                    <span class="card-type-badge total">合計</span>
-                    <h3 class="premium-subsection-title">社会保険料の合計</h3>
-                </div>
-
-                <div class="table-wrap">
-                    <table class="premium-table">
-                        <thead>
-                            <tr>
-                                <th>区分</th>
-                                <th class="num">本人負担</th>
-                                <th class="num">会社負担</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>月次報酬</td>
-                                <td class="num">{{ socialInsurancePremium() | number }}円</td>
-                                <td class="num">{{ socialInsuranceEmployerPremium() | number }}円</td>
-                            </tr>
-                            <tr>
-                                <td>賞与</td>
-                                <td class="num">
-                                    @if (bonusSocialInsuranceEmployeePremium(); as premium) {
-                                        {{ premium | number }}円
-                                    } @else {
-                                        —
-                                    }
-                                </td>
-                                <td class="num">
-                                    @if (bonusSocialInsuranceEmployerPremium(); as premium) {
-                                        {{ premium | number }}円
-                                    } @else {
-                                        —
-                                    }
-                                </td>
-                            </tr>
-                        </tbody>
-                        <tfoot>
-                            <tr>
-                                <th>合計</th>
-                                <th class="num">
-                                    @if (socialInsuranceTotalPremium() !== null) {
-                                        {{ socialInsuranceTotalPremium() | number }}円
-                                    } @else {
-                                        —
-                                    }
-                                </th>
-                                <th class="num">
-                                    @if (totalEmployerPremium() !== null) {
-                                        {{ totalEmployerPremium() | number }}円
-                                    } @else {
-                                        —
-                                    }
-                                </th>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-            </div>
-        </section>
-
-        <p class="payment-base-days-note">
-            @if (isPartTimeEmployee()) {
-                パート・アルバイトはシフト制のため、入力した報酬月額を日割りしません。
-            } @else {
-                支払基礎日数：{{ paymentBaseDays() ?? '—' }}日
-            }
-        </p>
+        }
     }
 </div>
 
@@ -1256,6 +1605,485 @@
         color: #6b7280;
     }
 
+    .page-tabs {
+        display: flex;
+        gap: 8px;
+        margin: 0 0 20px;
+        padding: 4px;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        background: #f9fafb;
+    }
+
+    .page-tab {
+        flex: 1;
+        height: 40px;
+        border: none;
+        border-radius: 8px;
+        background: transparent;
+        color: #6b7280;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+    }
+
+    .page-tab:hover {
+        color: #374151;
+        background: #fff;
+    }
+
+    .page-tab.active {
+        background: #fff;
+        color: #1d4ed8;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+    }
+
+    .premium-display-tab {
+        margin-top: 0;
+    }
+
+    .premium-tab-lead {
+        margin: 0 0 16px;
+        padding: 12px 14px;
+        border-radius: 10px;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        font-size: 13px;
+        line-height: 1.6;
+        color: #1e40af;
+    }
+
+    .premium-empty-state {
+        padding: 32px 24px;
+        border: 1px dashed #d1d5db;
+        border-radius: 12px;
+        background: #f9fafb;
+        text-align: center;
+    }
+
+    .premium-empty-title {
+        margin: 0 0 8px;
+        font-size: 18px;
+        color: #111827;
+    }
+
+    .premium-empty-note {
+        margin: 0 0 20px;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #6b7280;
+    }
+
+    .premium-summary-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 24px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 60%, #fff 100%);
+        border: 1px solid #bfdbfe;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    }
+
+    .premium-summary-kicker {
+        margin: 0 0 6px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #2563eb;
+        letter-spacing: 0.04em;
+    }
+
+    .premium-summary-total {
+        margin: 0;
+        font-size: 40px;
+        font-weight: 800;
+        line-height: 1.1;
+        color: #1d4ed8;
+    }
+
+    .premium-summary-unit {
+        margin-left: 4px;
+        font-size: 18px;
+        font-weight: 700;
+    }
+
+    .premium-summary-sub,
+    .premium-summary-deduction {
+        margin: 8px 0 0;
+        font-size: 13px;
+        color: #6b7280;
+    }
+
+    .premium-summary-deduction {
+        font-weight: 600;
+        color: #5b21b6;
+    }
+
+    .premium-summary-note.muted {
+        margin: 8px 0 0;
+        font-size: 12px;
+        color: #9ca3af;
+    }
+
+    .premium-summary-badges {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+
+    .premium-summary-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .premium-summary-badge.health {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .premium-summary-badge.pension {
+        background: #ede9fe;
+        color: #6d28d9;
+    }
+
+    .premium-summary-badge.care {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .premium-display-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 14px;
+        margin-top: 16px;
+    }
+
+    .premium-bonus-section {
+        margin-top: 20px;
+    }
+
+    .premium-bonus-section-title {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .premium-bonus-section-note {
+        margin-top: 16px;
+    }
+
+    .premium-display-meta-label-row {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    @media (min-width: 720px) {
+        .premium-display-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+
+    .premium-display-card {
+        padding: 18px;
+        border-radius: 14px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+    }
+
+    .premium-display-card.health {
+        border-top: 3px solid #3b82f6;
+    }
+
+    .premium-display-card.pension {
+        border-top: 3px solid #8b5cf6;
+    }
+
+    .premium-display-card.care {
+        border-top: 3px solid #22c55e;
+    }
+
+    .premium-display-card-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+    }
+
+    .premium-display-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: #f3f4f6;
+        font-size: 13px;
+        font-weight: 800;
+        color: #374151;
+    }
+
+    .premium-display-card.health .premium-display-icon {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .premium-display-card.pension .premium-display-icon {
+        background: #ede9fe;
+        color: #6d28d9;
+    }
+
+    .premium-display-card.care .premium-display-icon {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .premium-display-card-title {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .premium-display-amount {
+        margin: 0;
+        font-size: 28px;
+        font-weight: 800;
+        color: #111827;
+    }
+
+    .premium-display-unit {
+        margin-left: 2px;
+        font-size: 14px;
+        font-weight: 700;
+        color: #6b7280;
+    }
+
+    .premium-display-sub {
+        margin: 4px 0 12px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #9ca3af;
+    }
+
+    .premium-display-meta {
+        margin: 0;
+    }
+
+    .premium-display-meta-row {
+        display: grid;
+        grid-template-columns: 88px 1fr;
+        gap: 8px;
+        padding: 6px 0;
+        border-bottom: 1px solid #f3f4f6;
+        font-size: 13px;
+    }
+
+    .premium-display-meta-row:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    .premium-display-meta-row dt {
+        margin: 0;
+        color: #6b7280;
+        font-weight: 600;
+    }
+
+    .premium-display-meta-row dd {
+        margin: 0;
+        color: #111827;
+    }
+
+    .premium-detail-card,
+    .premium-total-card {
+        margin-top: 16px;
+        padding: 20px;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        background: #fff;
+    }
+
+    .premium-detail-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+    }
+
+    .premium-detail-note {
+        margin: 0 0 14px;
+        font-size: 13px;
+        color: #6b7280;
+        line-height: 1.6;
+    }
+
+    .premium-detail-note.muted {
+        margin-top: 16px;
+    }
+
+    .premium-detail-dl {
+        margin: 0;
+    }
+
+    .premium-detail-row {
+        display: grid;
+        grid-template-columns: 180px 1fr;
+        gap: 10px;
+        padding: 8px 0;
+        border-bottom: 1px solid #f3f4f6;
+        font-size: 13px;
+    }
+
+    .premium-detail-row:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    .premium-detail-row dt {
+        margin: 0;
+        color: #6b7280;
+        font-weight: 600;
+    }
+
+    .premium-detail-row dd {
+        margin: 0;
+        color: #111827;
+    }
+
+    .determination-badge {
+        flex-shrink: 0;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .determination-badge.initial {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .determination-badge.regular {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .determination-badge.revision {
+        background: #ede9fe;
+        color: #6d28d9;
+    }
+
+    .premium-total-table-wrap {
+        overflow-x: auto;
+    }
+
+    .premium-total-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+
+    .premium-total-table th,
+    .premium-total-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .premium-total-table .num {
+        text-align: right;
+        white-space: nowrap;
+    }
+
+    .premium-total-table .premium-total-group th {
+        padding-top: 14px;
+        padding-bottom: 6px;
+        background: #f9fafb;
+        font-size: 13px;
+        font-weight: 700;
+        color: #374151;
+        text-align: left;
+        border-bottom: none;
+    }
+
+    .premium-total-table .premium-total-group:first-child th {
+        padding-top: 10px;
+    }
+
+    .premium-total-table .premium-total-sub td:first-child {
+        padding-left: 28px;
+        color: #6b7280;
+    }
+
+    .premium-total-table tfoot th {
+        background: #f9fafb;
+        font-weight: 700;
+    }
+
+    .premium-bonus-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .premium-bonus-item {
+        padding: 14px;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        background: #f9fafb;
+    }
+
+    .premium-bonus-item-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 14px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .premium-bonus-item-note {
+        margin: 6px 0 0;
+        font-size: 13px;
+        color: #6b7280;
+    }
+
+    .premium-join-status {
+        margin-top: 16px;
+        margin-bottom: 0;
+    }
+
+    @media (max-width: 640px) {
+        .premium-summary-card {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .premium-summary-badges {
+            flex-direction: row;
+            flex-wrap: wrap;
+        }
+
+        .premium-detail-row {
+            grid-template-columns: 1fr;
+            gap: 2px;
+        }
+    }
+
     .copy-prev-btn {
         margin-bottom: 16px;
         width: auto;
@@ -1374,11 +2202,72 @@
         color: #6b7280;
     }
 
+    .section-title-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 14px;
+    }
+
+    .section-title-row .section-title {
+        margin-bottom: 0;
+    }
+
     .bonus-loading,
     .bonus-empty {
         margin: 0 0 14px;
         font-size: 13px;
         color: #6b7280;
+    }
+
+    .included-bonus-note {
+        display: block;
+        margin-top: 4px;
+        font-size: 12px;
+        font-weight: 500;
+        color: #6b7280;
+    }
+
+    .month-bonus-status-block {
+        margin-top: 14px;
+    }
+
+    .month-bonus-status-list {
+        margin-top: 4px;
+    }
+
+    .month-bonus-status-row dd.month-bonus-status-value {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px 10px;
+        text-align: right;
+    }
+
+    .month-bonus-standard-note {
+        font-size: 12px;
+        font-weight: 500;
+        color: #6b7280;
+    }
+
+    .month-bonus-status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .month-bonus-status-badge.draft {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .month-bonus-status-badge.confirmed {
+        background: #dcfce7;
+        color: #166534;
     }
 
     .bonus-list {
@@ -1426,6 +2315,41 @@
         display: flex;
         flex-direction: column;
         gap: 6px;
+    }
+
+    .bonus-list-row {
+        display: flex;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .bonus-list-row .bonus-list-item {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .bonus-delete-btn {
+        flex-shrink: 0;
+        align-self: center;
+        height: 36px;
+        padding: 0 12px;
+        border: 1px solid #fecaca;
+        border-radius: 8px;
+        background: #fff;
+        color: #b91c1c;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .bonus-delete-btn:hover:not(:disabled) {
+        background: #fef2f2;
+        border-color: #f87171;
+    }
+
+    .bonus-delete-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
     }
 
     .bonus-list-item {
@@ -1521,6 +2445,18 @@
     .bonus-form-actions {
         display: flex;
         gap: 10px;
+    }
+
+    .bonus-delete-form-btn {
+        margin-right: auto;
+        border: 1px solid #fecaca;
+        background: #fff;
+        color: #b91c1c;
+    }
+
+    .bonus-delete-form-btn:hover:not(:disabled) {
+        background: #fef2f2;
+        border-color: #f87171;
     }
 
     .bonus-save-btn {
@@ -1705,7 +2641,76 @@
         min-width: 96px;
     }
 
+    .confirm-month-panel {
+        margin-top: 20px;
+        padding: 18px;
+        border: 1px solid #bfdbfe;
+        border-radius: 12px;
+        background: #eff6ff;
+    }
+
+    .confirm-month-title {
+        margin: 0 0 8px;
+        font-size: 16px;
+        font-weight: 700;
+        color: #1e40af;
+    }
+
+    .confirm-month-lead {
+        margin: 0 0 12px;
+        font-size: 13px;
+        color: #374151;
+        line-height: 1.5;
+    }
+
+    .confirm-month-target-list {
+        margin: 0 0 12px;
+        padding: 0;
+        list-style: none;
+        border: 1px solid #dbeafe;
+        border-radius: 8px;
+        background: #fff;
+        overflow: hidden;
+    }
+
+    .confirm-month-target-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        font-size: 13px;
+    }
+
+    .confirm-month-target-item + .confirm-month-target-item {
+        border-top: 1px solid #eff6ff;
+    }
+
+    .confirm-target-label {
+        font-weight: 600;
+        color: #1e3a8a;
+    }
+
+    .confirm-target-value {
+        color: #374151;
+        text-align: right;
+    }
+
+    .confirm-target-none {
+        color: #9ca3af;
+        font-weight: 600;
+    }
+
+    .confirm-month-warning {
+        margin: 0 0 14px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #b45309;
+        line-height: 1.5;
+    }
+
     .confirm-month-btn {
+        width: 100%;
         background: #2563eb;
         color: #fff;
         border: none;

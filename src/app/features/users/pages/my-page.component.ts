@@ -8,6 +8,7 @@ import { AppUser } from '../models/user.model';
 import { Employee, Dependent, EmploymentType } from '../../employee/models/employee.models';
 import {
     employeeDisplayStatusLabel,
+    isEmployeeBeforeJoin,
     isEmployeeFullyRetired,
     isEmployeePendingRetirement,
 } from '../../employee/utils/employee-status-display.util';
@@ -167,6 +168,10 @@ export class MyPageComponent implements OnInit {
 
     isPendingRetirement(employee: Employee): boolean {
         return isEmployeePendingRetirement(employee);
+    }
+
+    isBeforeJoin(employee: Employee): boolean {
+        return isEmployeeBeforeJoin(employee);
     }
 
     isFullyRetired(employee: Employee): boolean {

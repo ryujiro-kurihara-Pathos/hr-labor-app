@@ -33,6 +33,7 @@
                         }
                         <span
                             class="badge status"
+                            [class.before-join]="isBeforeJoin(emp)"
                             [class.retired]="isFullyRetired(emp)"
                             [class.pending-retirement]="isPendingRetirement(emp)"
                         >
@@ -421,6 +422,11 @@
     .badge.status.pending-retirement {
         background: #fef3c7;
         color: #92400e;
+    }
+
+    .badge.status.before-join {
+        background: #dbeafe;
+        color: #1d4ed8;
     }
 
     .badge.status.retired {

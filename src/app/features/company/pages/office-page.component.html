@@ -151,26 +151,6 @@
                     />
                 </div>
                 <div class="form-field">
-                    <label for="regular-monthly-hours">月の所定労働時間</label>
-                    <input
-                        id="regular-monthly-hours"
-                        type="number"
-                        name="regularMonthlyScheduledWorkHours"
-                        [(ngModel)]="regularMonthlyScheduledWorkHours"
-                        placeholder="例: 160"
-                    />
-                </div>
-                <div class="form-field">
-                    <label for="regular-weekly-days">週の所定労働日数</label>
-                    <input
-                        id="regular-weekly-days"
-                        type="number"
-                        name="regularWeeklyScheduledWorkDays"
-                        [(ngModel)]="regularWeeklyScheduledWorkDays"
-                        placeholder="例: 5"
-                    />
-                </div>
-                <div class="form-field">
                     <label for="regular-monthly-days">月の所定労働日数</label>
                     <input
                         id="regular-monthly-days"
@@ -241,14 +221,6 @@
                     <div class="detail-row">
                         <dt>週の所定労働時間</dt>
                         <dd>{{ displayNumber(office()!.regularWeeklyScheduledWorkHours) }}</dd>
-                    </div>
-                    <div class="detail-row">
-                        <dt>月の所定労働時間</dt>
-                        <dd>{{ displayNumber(office()!.regularMonthlyScheduledWorkHours) }}</dd>
-                    </div>
-                    <div class="detail-row">
-                        <dt>週の所定労働日数</dt>
-                        <dd>{{ displayNumber(office()!.regularWeeklyScheduledWorkDays) }}</dd>
                     </div>
                     <div class="detail-row">
                         <dt>月の所定労働日数</dt>

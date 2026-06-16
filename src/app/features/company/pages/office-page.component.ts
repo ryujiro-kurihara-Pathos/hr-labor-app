@@ -50,10 +50,8 @@ export class OfficePageComponent {
     phoneNumber = '';
     officeSymbol = '';
     officeNumber = '';
-    regularWeeklyScheduledWorkHours = '';
-    regularMonthlyScheduledWorkHours = '';
-    regularWeeklyScheduledWorkDays = '';
-    regularMonthlyScheduledWorkDays = '';
+    regularWeeklyScheduledWorkHours: string | number = '';
+    regularMonthlyScheduledWorkDays: string | number = '';
 
     readonly healthInsuranceHelpLines = [
         '本アプリは協会けんぽのみに対応しています。',
@@ -71,8 +69,8 @@ export class OfficePageComponent {
     ];
 
     readonly regularWorkerHelpLines = [
-        'パート・アルバイトの加入要件判定（4分の3ルール）で参照します。',
-        '未入力の項目は絶対基準のみで判定します。',
+        'パート・アルバイトの加入要件判定（4分の3ルール）で、週の所定労働時間と月の所定労働日数を参照します。',
+        '未入力の場合は絶対基準のみで判定します。',
     ];
 
     // 初期処理
@@ -176,8 +174,6 @@ export class OfficePageComponent {
 
         try {
             const regularWeeklyScheduledWorkHours = this.toNullableNumber(this.regularWeeklyScheduledWorkHours);
-            const regularMonthlyScheduledWorkHours = this.toNullableNumber(this.regularMonthlyScheduledWorkHours);
-            const regularWeeklyScheduledWorkDays = this.toNullableNumber(this.regularWeeklyScheduledWorkDays);
             const regularMonthlyScheduledWorkDays = this.toNullableNumber(this.regularMonthlyScheduledWorkDays);
 
             const officeSymbol = normalizeOfficeSymbol(this.officeSymbol);
@@ -195,28 +191,12 @@ export class OfficePageComponent {
                 officeSymbol,
                 officeNumber: normalizeOfficeNumber(this.officeNumber),
                 regularWeeklyScheduledWorkHours,
-                regularMonthlyScheduledWorkHours,
-                regularWeeklyScheduledWorkDays,
+                regularMonthlyScheduledWorkHours: null,
+                regularWeeklyScheduledWorkDays: null,
                 regularMonthlyScheduledWorkDays,
                 status: office.status,
             });
-            this.office.set({
-                ...office,
-                name: this.name,
-                postalCode: this.postalCode,
-                prefecture: this.prefecture,
-                city: this.city,
-                streetAddress: this.streetAddress,
-                buildingName: this.buildingName,
-                phoneNumber: this.phoneNumber,
-                healthInsuranceType: 'kyokai',
-                officeSymbol,
-                officeNumber: normalizeOfficeNumber(this.officeNumber),
-                regularWeeklyScheduledWorkHours,
-                regularMonthlyScheduledWorkHours,
-                regularWeeklyScheduledWorkDays,
-                regularMonthlyScheduledWorkDays,
-            });
+            await this.refreshOffice(office.id);
             this.isEditing.set(false);
         } catch (error) {
             console.error('事業所の更新に失敗しました', error);
@@ -354,6 +334,13 @@ export class OfficePageComponent {
         }
     }
 
+    private async refreshOffice(officeId: string): Promise<void> {
+        const refreshed = await this.officeService.getOfficeById(officeId);
+        if (!refreshed) return;
+        this.office.set(refreshed);
+        this.syncFormFromOffice(refreshed);
+    }
+
     private syncFormFromOffice(office: Office): void {
         this.name = office.name;
         this.postalCode = office.postalCode;
@@ -365,8 +352,6 @@ export class OfficePageComponent {
         this.officeSymbol = office.officeSymbol;
         this.officeNumber = office.officeNumber;
         this.regularWeeklyScheduledWorkHours = this.numberToFormValue(office.regularWeeklyScheduledWorkHours);
-        this.regularMonthlyScheduledWorkHours = this.numberToFormValue(office.regularMonthlyScheduledWorkHours);
-        this.regularWeeklyScheduledWorkDays = this.numberToFormValue(office.regularWeeklyScheduledWorkDays);
         this.regularMonthlyScheduledWorkDays = this.numberToFormValue(office.regularMonthlyScheduledWorkDays);
     }
 
@@ -374,7 +359,9 @@ export class OfficePageComponent {
         return value !== null && value !== undefined ? String(value) : '';
     }
 
-    private toNullableNumber(value: string): number | null {
+    private toNullableNumber(value: string | number | null | undefined): number | null {
+        if (value === null || value === undefined) return null;
+        if (typeof value === 'number') return Number.isFinite(value) ? value : null;
         const trimmed = value.trim();
         if (!trimmed) return null;
         const num = Number(trimmed);

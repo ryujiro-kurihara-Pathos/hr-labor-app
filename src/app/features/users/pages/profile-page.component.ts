@@ -3,8 +3,6 @@ import { Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../../auth/services/auth.service';
 import { CompanyService } from '../../company/services/company.service';
-import { Employee } from '../../employee/models/employee.models';
-import { EmployeeService } from '../../employee/services/employee.service';
 import { AppUser, UserRole, UserStatus } from '../models/user.model';
 import { UserService } from '../services/user.service';
 import { ConfirmService } from '../../../shared/services/confirm.service';
@@ -19,7 +17,6 @@ export class ProfilePageComponent {
     private readonly authService = inject(AuthService);
     private readonly userService = inject(UserService);
     private readonly companyService = inject(CompanyService);
-    private readonly employeeService = inject(EmployeeService);
     private readonly router = inject(Router);
     private readonly confirmService = inject(ConfirmService);
 
@@ -29,7 +26,6 @@ export class ProfilePageComponent {
 
     currentUser = signal<AppUser | null>(null);
     companyName = signal('');
-    linkedEmployee = signal<Employee | null>(null);
 
     displayName = computed(() => {
         const user = this.currentUser();
@@ -109,15 +105,8 @@ export class ProfilePageComponent {
             }
             this.currentUser.set(appUser);
 
-            const [company, employee] = await Promise.all([
-                this.companyService.getCompanyById(appUser.companyId),
-                appUser.employeeId
-                    ? this.employeeService.getEmployeeById(appUser.employeeId)
-                    : Promise.resolve(null),
-            ]);
-
+            const company = await this.companyService.getCompanyById(appUser.companyId);
             this.companyName.set(company?.name ?? '—');
-            this.linkedEmployee.set(employee);
         } catch (error) {
             console.error('プロフィールの取得に失敗しました', error);
             this.errorMessage.set('プロフィールの取得に失敗しました');

@@ -8,6 +8,10 @@ import { EmployeeService } from '../../employee/services/employee.service';
 import { AuthService } from '../../auth/services/auth.service';
 import { UserService } from '../../users/services/user.service';
 import { OfficeService } from '../../company/services/office.service';
+import { CompanyService } from '../../company/services/company.service';
+import { Company, InsurancePremiumCollectionTiming } from '../../company/models/company.model';
+import { Office } from '../../company/models/office.model';
+import { SocialInsuranceStatus } from '../../social-insurance/models/social-insurance-status.model';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 import { EffectiveStandardRemuneration } from '../models/standard-remuneration-determination.model';
 import { BonusReward } from '../../bonus/models/bonus-reward.model';
@@ -15,10 +19,10 @@ import { BonusRewardService } from '../../bonus/services/bonus-reward.service';
 import { StandardMonthlyRewardService } from '../services/standard-monthly-reward.service';
 import { StandardRemunerationDeterminationService } from '../services/standard-remuneration-determination.service';
 import { SocialInsuranceStatusService } from '../../social-insurance/services/social-insurance-status.service';
-import { InsurancePremiumResultService } from '../services/insurance-premium-result.service';
-import { InsurancePremiumResult } from '../models/insurance-premium-result.model';
+import { InsurancePremiumCalculationService, CalculatedInsurancePremium } from '../services/insurance-premium-calculation.service';
 import { addMonthsToYearMonth, isRewardTargetMonth } from '../utils/reward-target-month.util';
 import { isRewardConfirmed } from '../utils/reward-status.util';
+import { exportInsurancePremiumCsv } from '../utils/insurance-premium-csv-export.util';
 
 export type InsurancePremiumListRow = {
     employee: Employee;
@@ -27,7 +31,7 @@ export type InsurancePremiumListRow = {
     /** 対象年月の月次報酬が入力済みか */
     isRegistered: boolean;
     isTargetMonth: boolean;
-    premiumResult: InsurancePremiumResult | null;
+    calculatedPremium: CalculatedInsurancePremium | null;
 };
 
 @Component({
@@ -39,24 +43,27 @@ export type InsurancePremiumListRow = {
 export class InsurancePremiumPageComponent {
     private readonly employeeService = inject(EmployeeService);
     private readonly officeService = inject(OfficeService);
+    private readonly companyService = inject(CompanyService);
     private readonly authService = inject(AuthService);
     private readonly userService = inject(UserService);
     private readonly rewardService = inject(StandardMonthlyRewardService);
     private readonly determinationService = inject(StandardRemunerationDeterminationService);
     private readonly bonusRewardService = inject(BonusRewardService);
     private readonly socialInsuranceStatusService = inject(SocialInsuranceStatusService);
-    private readonly premiumResultService = inject(InsurancePremiumResultService);
+    private readonly premiumCalculationService = inject(InsurancePremiumCalculationService);
 
     isLoading = signal(false);
     errorMessage = signal('');
+    csvExportMessage = signal('');
     companyId = signal('');
 
     employees = signal<Employee[]>([]);
+    officeById = signal<Record<string, Office>>({});
     officeNameById = signal<Record<string, string>>({});
     rewardsByEmployeeId = signal<Record<string, Record<string, StandardMonthlyReward>>>({});
     bonusesByEmployeeId = signal<Record<string, BonusReward[]>>({});
-    healthInsuranceStartDateByEmployeeId = signal<Record<string, string | null>>({});
-    premiumResultsByEmployeeId = signal<Record<string, InsurancePremiumResult>>({});
+    socialInsuranceByEmployeeId = signal<Record<string, SocialInsuranceStatus | null>>({});
+    insurancePremiumCollectionTiming = signal<InsurancePremiumCollectionTiming>('next_month');
 
     targetYearMonth = signal(this.currentYearMonth());
 
@@ -74,21 +81,22 @@ export class InsurancePremiumPageComponent {
         this.buildRows().filter((row) => !row.isTargetMonth).length,
     );
 
-    savedPremiumRows = computed(() =>
-        this.buildRows().filter((row) => row.isTargetMonth && row.premiumResult !== null),
+    calculablePremiumRows = computed(() =>
+        this.buildRows().filter((row) => row.isTargetMonth && row.calculatedPremium !== null),
     );
 
     companyEmployerPremiumTotal = computed(() =>
-        this.premiumResultService.sumEmployerPremium(
-            this.savedPremiumRows().map((row) => row.premiumResult!),
+        this.calculablePremiumRows().reduce(
+            (sum, row) => sum + (row.calculatedPremium?.totalEmployerPremium ?? 0),
+            0,
         ),
     );
 
-    /** 会社負担合計に含めた従業員数（保存済み保険料がある行） */
-    calculableEmployerPremiumRowCount = computed(() => this.savedPremiumRows().length);
+    /** 会社負担合計に含めた従業員数 */
+    calculableEmployerPremiumRowCount = computed(() => this.calculablePremiumRows().length);
 
-    unsavedTargetRowCount = computed(() =>
-        this.buildRows().filter((row) => row.isTargetMonth && row.premiumResult === null).length,
+    uncalculableTargetRowCount = computed(() =>
+        this.buildRows().filter((row) => row.isTargetMonth && row.calculatedPremium === null).length,
     );
 
     async ngOnInit() {
@@ -96,10 +104,12 @@ export class InsurancePremiumPageComponent {
     }
 
     async onTargetYearMonthChange() {
+        this.csvExportMessage.set('');
         await this.loadRewardsForMonth();
     }
 
     async shiftMonth(delta: number) {
+        this.csvExportMessage.set('');
         this.targetYearMonth.set(addMonthsToYearMonth(this.targetYearMonth(), delta));
         await this.loadRewardsForMonth();
     }
@@ -114,19 +124,26 @@ export class InsurancePremiumPageComponent {
             if (!appUser) return;
             this.companyId.set(appUser.companyId);
 
-            const [employees, offices] = await Promise.all([
+            const [employees, offices, company] = await Promise.all([
                 this.employeeService.getEmployeesByCompanyId(appUser.companyId),
                 this.officeService.getOfficesByCompanyId(appUser.companyId),
+                this.companyService.getCompanyById(appUser.companyId),
             ]);
             this.employees.set(employees);
+            this.insurancePremiumCollectionTiming.set(
+                company?.insurancePremiumCollectionTiming ?? 'next_month',
+            );
 
-            const map: Record<string, string> = {};
+            const officeMap: Record<string, Office> = {};
+            const nameMap: Record<string, string> = {};
             for (const office of offices) {
-                map[office.id] = office.name;
+                officeMap[office.id] = office;
+                nameMap[office.id] = office.name;
             }
-            this.officeNameById.set(map);
+            this.officeById.set(officeMap);
+            this.officeNameById.set(nameMap);
 
-            await this.loadHealthInsuranceStartDates(employees);
+            await this.loadSocialInsuranceStatuses(employees);
             await this.loadRewardsForMonth();
         } catch (e) {
             console.error('保険料計算画面の取得に失敗しました', e);
@@ -141,13 +158,11 @@ export class InsurancePremiumPageComponent {
         if (employees.length === 0) {
             this.rewardsByEmployeeId.set({});
             this.bonusesByEmployeeId.set({});
-            this.premiumResultsByEmployeeId.set({});
             return;
         }
 
-        const companyId = this.companyId();
         const targetYearMonth = this.targetYearMonth();
-        const [rewardLists, bonusLists, premiumResults] = await Promise.all([
+        const [rewardLists, bonusLists] = await Promise.all([
             Promise.all(employees.map((employee) => this.rewardService.listByEmployee(employee.id))),
             Promise.all(
                 employees.map((employee) =>
@@ -157,9 +172,6 @@ export class InsurancePremiumPageComponent {
                     ),
                 ),
             ),
-            companyId
-                ? this.premiumResultService.listByCompanyAndMonth(companyId, targetYearMonth)
-                : Promise.resolve([]),
         ]);
 
         const byEmployee: Record<string, Record<string, StandardMonthlyReward>> = {};
@@ -174,48 +186,58 @@ export class InsurancePremiumPageComponent {
         }
         this.rewardsByEmployeeId.set(byEmployee);
         this.bonusesByEmployeeId.set(bonusesByEmployee);
-
-        const premiumByEmployee: Record<string, InsurancePremiumResult> = {};
-        for (const result of premiumResults) {
-            premiumByEmployee[result.employeeId] = result;
-        }
-        this.premiumResultsByEmployeeId.set(premiumByEmployee);
     }
 
-    private async loadHealthInsuranceStartDates(employees: Employee[]) {
+    private async loadSocialInsuranceStatuses(employees: Employee[]) {
         const entries = await Promise.all(
             employees.map(async (employee) => {
                 const status = await this.socialInsuranceStatusService.getInsuranceStatusByEmployeeId(employee.id);
-                return [employee.id, status?.healthInsuranceStartDate ?? null] as const;
+                return [employee.id, status] as const;
             }),
         );
-        this.healthInsuranceStartDateByEmployeeId.set(Object.fromEntries(entries));
+        this.socialInsuranceByEmployeeId.set(Object.fromEntries(entries));
     }
 
     private buildRows(): InsurancePremiumListRow[] {
         const byEmployee = this.rewardsByEmployeeId();
         const bonusesByEmployee = this.bonusesByEmployeeId();
-        const premiumByEmployee = this.premiumResultsByEmployeeId();
-        const ym = this.targetYearMonth();
-        const healthDates = this.healthInsuranceStartDateByEmployeeId();
+        const socialInsuranceByEmployee = this.socialInsuranceByEmployeeId();
+        const officeById = this.officeById();
+        const payYearMonth = this.targetYearMonth();
+        const collectionTiming = this.insurancePremiumCollectionTiming();
         return this.employees().map((employee) => {
             const employeeRewards = byEmployee[employee.id] ?? {};
-            const reward = employeeRewards[ym] ?? null;
-            const isTargetMonth = isRewardTargetMonth(employee, ym);
+            const reward = employeeRewards[payYearMonth] ?? null;
+            const isTargetMonth = isRewardTargetMonth(employee, payYearMonth);
+            const socialInsurance = socialInsuranceByEmployee[employee.id] ?? null;
             const effective = this.determinationService.resolve(
                 employee,
                 employeeRewards,
-                ym,
-                healthDates[employee.id],
+                payYearMonth,
+                socialInsurance?.healthInsuranceStartDate ?? null,
                 bonusesByEmployee[employee.id] ?? [],
             );
+            const calculatedPremium = isTargetMonth
+                ? this.premiumCalculationService.calculateForPayMonth({
+                    employee,
+                    payYearMonth,
+                    collectionTiming,
+                    rewardsByYearMonth: employeeRewards,
+                    bonuses: bonusesByEmployee[employee.id] ?? [],
+                    healthInsuranceStartDate: socialInsurance?.healthInsuranceStartDate ?? null,
+                    healthInsuranceEndDate: socialInsurance?.healthInsuranceEndDate ?? null,
+                    pensionInsuranceStartDate: socialInsurance?.pensionInsuranceStartDate ?? null,
+                    pensionInsuranceEndDate: socialInsurance?.pensionInsuranceEndDate ?? null,
+                    office: officeById[employee.officeId] ?? null,
+                })
+                : null;
             return {
                 employee,
                 reward,
                 effective,
                 isRegistered: isRewardConfirmed(reward),
                 isTargetMonth,
-                premiumResult: premiumByEmployee[employee.id] ?? null,
+                calculatedPremium,
             };
         });
     }
@@ -224,8 +246,43 @@ export class InsurancePremiumPageComponent {
         return ['/premium', employeeId];
     }
 
-    detailQueryParams() {
-        return { ym: this.targetYearMonth() };
+    detailQueryParams(registered = false) {
+        return {
+            ym: this.targetYearMonth(),
+            ...(registered ? { tab: 'premium' } : {}),
+        };
+    }
+
+    exportCsv() {
+        this.csvExportMessage.set('');
+        const items = this.calculablePremiumRows().map((row) => ({
+            employee: row.employee,
+            officeName: this.officeNameById()[row.employee.officeId] ?? '—',
+            payYearMonth: this.targetYearMonth(),
+            premium: row.calculatedPremium!,
+        }));
+
+        const result = exportInsurancePremiumCsv({
+            items,
+            collectionTiming: this.insurancePremiumCollectionTiming(),
+            payYearMonth: this.targetYearMonth(),
+        });
+
+        if (!result.ok) {
+            this.csvExportMessage.set(result.error);
+            return;
+        }
+
+        this.csvExportMessage.set(`${this.targetYearMonthLabel()}の保険料計算結果をCSVで出力しました（${items.length}名）`);
+    }
+
+    employeeInitial(employee: Employee): string {
+        const initial = employee.lastName?.trim().charAt(0) || employee.firstName?.trim().charAt(0);
+        return initial || '?';
+    }
+
+    employeeDisplayName(employee: Employee): string {
+        return `${employee.lastName} ${employee.firstName}`.trim();
     }
 
     private currentYearMonth(): string {
