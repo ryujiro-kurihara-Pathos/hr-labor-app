@@ -30,6 +30,7 @@ import {
     computeInsurancePremiumPeriod,
     lossDateFromRetirementDate,
 } from '../../social-insurance/utils/insurance-premium-period.util';
+import { resolveLossProcedureOccurredAndDueDate } from '../../social-insurance/utils/procedure-due-date.util';
 import {
     judgeHealthInsuranceJoinStatus,
     judgePensionInsuranceJoinStatus,
@@ -432,7 +433,7 @@ export class EmployeeDetailPageComponent {
                 employeeId: employee.id,
                 procedureType: 'dependentChange',
                 status: 'notStarted',
-                occurredDate: employee.joinedDate,
+                occurredDate: '',
                 dueDate: '',
                 completedDate: null,
                 submittedDate: null,
@@ -515,14 +516,19 @@ export class EmployeeDetailPageComponent {
         this.errorMessage.set('');
 
         try {
+            const retirementDate = this.retiredDateString(employee.retiredDate);
+            const { occurredDate, dueDate } = resolveLossProcedureOccurredAndDueDate({
+                retirementDate,
+                lossReason: 'retirement',
+            });
             const procedure = await this.procedureService.createProcedure({
                 companyId: employee.companyId,
                 officeId: employee.officeId,
                 employeeId: employee.id,
                 procedureType: 'loss',
                 status: 'notStarted',
-                occurredDate: this.retiredDateString(employee.retiredDate),
-                dueDate: '',
+                occurredDate,
+                dueDate,
                 completedDate: null,
                 submittedDate: null,
                 targetYearMonth: null,

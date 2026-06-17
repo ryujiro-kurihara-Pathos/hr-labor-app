@@ -7,7 +7,10 @@ import { shouldProrateMonthlyRewardByPaymentBaseDays } from '../../insurance/uti
 import { Procedure, ProcedureStatus, QualificationProcedureData } from '../models/procedures.model';
 import { insuranceJoinStatus } from '../models/social-insurance-status.model';
 import { employeeAddressLabel } from './procedure-display.util';
+import { qualificationProcedureDueDate } from './procedure-due-date.util';
 import { QualificationMonthlyReward } from './qualification-reward.util';
+
+export { qualificationProcedureDueDate };
 
 export type QualificationProcedureDates = {
     qualificationDate: string | null;
@@ -21,21 +24,6 @@ export function todayDateString(): string {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
-}
-
-/** YYYY-MM-DD に日数を加算 */
-export function addDaysToDateString(dateString: string, days: number): string {
-    const date = new Date(`${dateString}T00:00:00`);
-    date.setDate(date.getDate() + days);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-/** 資格取得届の対応期限（資格取得日から5日後） */
-export function qualificationProcedureDueDate(qualificationDate: string): string {
-    return addDaysToDateString(qualificationDate, 5);
 }
 
 export function resolveQualificationProcedureDates(

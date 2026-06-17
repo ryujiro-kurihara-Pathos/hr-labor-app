@@ -20,7 +20,9 @@ import {
     dateLabel,
     genderLabel,
     procedureStatusLabel,
+    todayDateString,
 } from '../utils/procedure-display.util';
+import { resolveDependentChangeOccurredAndDueDate } from '../utils/procedure-due-date.util';
 import {
     dependentAddReasonLabel,
     dependentChangeTypeLabel,
@@ -31,7 +33,6 @@ import {
     extractDependentProcedureData,
     hasSavedDependentData,
 } from '../utils/dependent-procedure-data.util';
-import { todayDateString } from '../utils/qualification-procedure-data.util';
 
 type ChangeType = 'add' | 'change' | 'delete';
 
@@ -280,11 +281,18 @@ export class DependentProcedureComponent {
             }
 
             const submittedDate = todayDateString();
+            const procedureDates = resolveDependentChangeOccurredAndDueDate({
+                changeType: type,
+                dependencyStartDate: form.dependencyStartDate,
+                dependencyEndDate: form.dependencyEndDate,
+            });
             const updated: Procedure = {
                 ...item,
                 status: 'completed',
                 completedDate: submittedDate,
                 submittedDate,
+                occurredDate: procedureDates?.occurredDate ?? item.occurredDate,
+                dueDate: procedureDates?.dueDate ?? item.dueDate,
                 dependentChanges: type,
                 dependentId,
                 dependentLastName: form.lastName,

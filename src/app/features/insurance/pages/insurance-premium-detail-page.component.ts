@@ -99,6 +99,10 @@ import { InsurancePremiumResultService } from '../services/insurance-premium-res
 import { InsurancePremiumCalculationService } from '../services/insurance-premium-calculation.service';
 import { Procedure, ProcedureStatus } from '../../social-insurance/models/procedures.model';
 import { procedureStatusLabel } from '../../social-insurance/utils/procedure-display.util';
+import {
+    procedureDueDateFromOccurredDate,
+    regularDecisionProcedureDueDate,
+} from '../../social-insurance/utils/procedure-due-date.util';
 import { isPartTimeEmployment } from '../../social-insurance/utils/part-time-insurance-judgment.util';
 import {
     getDaysInMonth,
@@ -2414,7 +2418,7 @@ export class InsurancePremiumDetailPageComponent {
                 procedureType: 'bonusPayment',
                 status: 'notStarted',
                 occurredDate: bonus.paymentDate,
-                dueDate: '',
+                dueDate: procedureDueDateFromOccurredDate(bonus.paymentDate),
                 completedDate: null,
                 submittedDate: null,
                 targetYearMonth,
@@ -2498,7 +2502,7 @@ export class InsurancePremiumDetailPageComponent {
                 procedureType: 'regularDecision',
                 status: 'notStarted',
                 occurredDate: `${targetYearMonth.slice(0, 4)}-06-30`,
-                dueDate: '',
+                dueDate: regularDecisionProcedureDueDate(targetYearMonth),
                 completedDate: null,
                 submittedDate: null,
                 targetYearMonth,
