@@ -73,13 +73,16 @@ export function resolveLossProcedureOccurredAndDueDate(params: {
 
 export function resolveDependentChangeOccurredAndDueDate(params: {
     changeType: 'add' | 'change' | 'delete';
+    occurredDate?: string | null;
     dependencyStartDate?: string | null;
     dependencyEndDate?: string | null;
 }): { occurredDate: string; dueDate: string } | null {
+    const explicitOccurred = params.occurredDate?.trim();
     const occurredDate =
-        params.changeType === 'delete'
+        explicitOccurred
+        || (params.changeType === 'delete'
             ? params.dependencyEndDate?.trim()
-            : params.dependencyStartDate?.trim();
+            : params.dependencyStartDate?.trim());
     if (!occurredDate) return null;
     return {
         occurredDate,

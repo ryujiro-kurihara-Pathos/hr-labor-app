@@ -84,6 +84,7 @@ export class SocialInsuranceProcedureDetailPageComponent {
 
         await this.loadEmployee();
         await this.loadSocialInsuranceStatus();
+        await this.syncQualificationProcedureIfNeeded();
         await this.loadDependents();
         await Promise.all([this.loadJoinMonthReward(), this.loadEmployeeBonuses()]);
         await this.loadOffice();
@@ -211,6 +212,29 @@ export class SocialInsuranceProcedureDetailPageComponent {
 
     onProcedureUpdated(procedure: Procedure): void {
         this.procedure.set(procedure);
+    }
+
+    private async syncQualificationProcedureIfNeeded(): Promise<void> {
+        const procedure = this.procedure();
+        const employee = this.employee();
+        const status = this.socialInsuranceStatus();
+        if (!procedure || !employee || procedure.procedureType !== 'qualification') return;
+        if (procedure.status === 'completed') return;
+
+        try {
+            const synced = await this.procedureService.syncQualificationProcedureForEmployee({
+                employee,
+                healthInsuranceStartDate: status?.healthInsuranceStartDate ?? null,
+                healthInsuranceStatus: status?.healthInsuranceStatus,
+                pensionInsuranceStatus: status?.pensionInsuranceStatus,
+                previousJoinedDate: employee.joinedDate,
+            });
+            if (synced) {
+                this.procedure.set(synced);
+            }
+        } catch (error) {
+            console.error('資格取得届の同期に失敗しました', error);
+        }
     }
 
     async onDependentsUpdated(): Promise<void> {

@@ -22,7 +22,7 @@
             [procedureForExport]="exportProcedure()"
             [exportContext]="{ dependent: exportDependent() }"
             [isSubmitting]="isSaving()"
-            [submitDisabled]="!canSubmit()"
+            [submitValidation]="submitValidation()"
             [actionErrorMessage]="saveErrorMessage()"
             (submitClick)="saveProcedure()"
         />
@@ -118,6 +118,14 @@
                     <dd>{{ dependentChangeTypeLabel(item.dependentChanges) }}</dd>
                 </div>
                 <div class="meta-row">
+                    <dt>事象が発生した日</dt>
+                    <dd>{{ dateLabel(item.occurredDate) }}</dd>
+                </div>
+                <div class="meta-row">
+                    <dt>対応期限</dt>
+                    <dd>{{ dateLabel(item.dueDate) }}</dd>
+                </div>
+                <div class="meta-row">
                     <dt>氏名</dt>
                     <dd>{{ dependentDisplayName(displayData()) }}</dd>
                 </div>
@@ -181,7 +189,7 @@
         </article>
     } @else {
         <article class="dependent-block">
-            <h3 class="dependent-heading">異動の別</h3>
+            <h3 id="dependent-change-type" class="dependent-heading">異動の別</h3>
             <div class="change-type-options">
                 <button
                     type="button"
@@ -202,6 +210,26 @@
                     (click)="selectChangeType('delete')"
                 >削除</button>
             </div>
+
+            @if (changeType()) {
+                <div id="dep-occurred-date" class="occurred-date-section">
+                    <div class="form-field">
+                        <label for="dep-occurred-date-input">事象が発生した日</label>
+                        <input
+                            id="dep-occurred-date-input"
+                            type="date"
+                            [ngModel]="f.occurredDate"
+                            (ngModelChange)="updateForm('occurredDate', $event)"
+                            [min]="occurredDateBounds().min ?? undefined"
+                            [max]="occurredDateBounds().max ?? undefined"
+                        />
+                        <p class="field-note">被扶養者の異動事実が発生した日（異動日）を入力してください。届出期限はその日から5日以内です。</p>
+                        @if (previewDueDate(); as dueDate) {
+                            <p class="due-date-preview">対応期限：{{ dateLabel(dueDate) }}</p>
+                        }
+                    </div>
+                </div>
+            }
 
             @if (changeType() === 'change' || changeType() === 'delete') {
                 <div class="form-field">
@@ -617,6 +645,21 @@
         margin: 4px 0 0;
         font-size: 13px;
         color: #6b7280;
+    }
+
+    .occurred-date-section {
+        margin: 16px 0;
+        padding: 14px 16px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+    }
+
+    .due-date-preview {
+        margin: 8px 0 0;
+        font-size: 13px;
+        font-weight: 600;
+        color: #1d4ed8;
     }
 
     .form-actions {

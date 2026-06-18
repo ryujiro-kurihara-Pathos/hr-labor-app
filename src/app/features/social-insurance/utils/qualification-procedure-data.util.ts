@@ -76,15 +76,63 @@ export function isQualificationDateDerivedFromJoinDate(
 
 export function shouldSyncQualificationProcedureDates(
     procedureStatus: ProcedureStatus,
-    _healthInsuranceStartDate: string | null | undefined,
+    healthInsuranceStartDate: string | null | undefined,
     options?: {
         previousJoinedDate?: string | null;
         newJoinedDate?: string | null;
-        procedure?: Pick<Procedure, 'qualificationDate' | 'occurredDate'> | null;
+        procedure?: Pick<Procedure, 'qualificationDate' | 'occurredDate' | 'dueDate'> | null;
+        employee?: Employee | null;
     },
 ): boolean {
     if (procedureStatus === 'completed') return false;
-    return hasJoinDateChanged(options?.previousJoinedDate, options?.newJoinedDate);
+    if (hasJoinDateChanged(options?.previousJoinedDate, options?.newJoinedDate)) return true;
+
+    const employee = options?.employee;
+    const procedure = options?.procedure;
+    if (!employee || !procedure) return false;
+
+    const effectiveStart = resolveEffectiveHealthInsuranceStartDateForSync(
+        employee,
+        healthInsuranceStartDate ?? null,
+        options?.previousJoinedDate ?? null,
+        { ...procedure, status: procedureStatus },
+    );
+    const expected = resolveQualificationProcedureDates(employee, effectiveStart);
+    if (!expected) return false;
+
+    const storedQualification = procedure.qualificationDate?.trim() ?? '';
+    const expectedQualification = expected.qualificationDate?.trim() ?? '';
+    return (
+        storedQualification !== expectedQualification
+        || procedure.occurredDate !== expected.occurredDate
+        || procedure.dueDate !== expected.dueDate
+    );
+}
+
+/** 手続き未完了時に入社日から資格取得日を表示する */
+export function resolvePreviewQualificationDate(
+    employee: Employee | null | undefined,
+    options?: {
+        joinedDate?: string | null;
+        healthInsuranceStartDate?: string | null;
+        procedure?: Pick<Procedure, 'qualificationDate' | 'occurredDate' | 'status'> | null;
+    },
+): string | null {
+    const procedure = options?.procedure;
+    const registered = options?.healthInsuranceStartDate?.trim()
+        || procedure?.qualificationDate?.trim()
+        || null;
+
+    if (procedure?.status === 'completed') {
+        return registered;
+    }
+
+    const joinedDate = (options?.joinedDate ?? employee?.joinedDate)?.trim() || null;
+    if (joinedDate) {
+        return joinedDate;
+    }
+
+    return registered;
 }
 
 /** 同期時に入社日を資格取得日のソースとして使う */

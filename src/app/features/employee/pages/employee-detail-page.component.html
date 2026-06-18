@@ -14,32 +14,38 @@
                         <h1>従業員情報の編集</h1>
                         <p class="profile-sub">{{ lastName }} {{ firstName }}</p>
                     } @else {
-                        <h1>{{ employee()!.lastName }} {{ employee()!.firstName }}</h1>
-                        @if (employee()!.lastNameKana || employee()!.firstNameKana) {
-                            <p class="profile-kana">
-                                {{ employee()!.lastNameKana }} {{ employee()!.firstNameKana }}
-                            </p>
-                        }
-                        <div class="profile-meta">
-                            <span class="meta-chip">社員番号 {{ employee()!.employeeNumber || '—' }}</span>
-                            <span
-                                class="status-badge"
-                                [class.before-join]="isBeforeJoin(employee()!)"
-                                [class.retired]="isFullyRetired(employee()!)"
-                                [class.pending-retirement]="isPendingRetirement(employee()!)"
-                            >
-                                {{ employeeStatusLabel(employee()!) }}
-                            </span>
-                            @if (officeName()) {
-                                <span class="meta-chip muted">{{ officeName() }}</span>
-                            }
-                            <span class="meta-chip muted">{{ genderLabel(employee()!.gender) }}</span>
+                        <div class="profile-hero">
+                            <div class="profile-avatar" aria-hidden="true">
+                                {{ employeeInitials(employee()!) }}
+                            </div>
+                            <div class="profile-hero-body">
+                                <h1>{{ employee()!.lastName }} {{ employee()!.firstName }}</h1>
+                                @if (employee()!.lastNameKana || employee()!.firstNameKana) {
+                                    <p class="profile-kana">
+                                        {{ employee()!.lastNameKana }} {{ employee()!.firstNameKana }}
+                                    </p>
+                                }
+                                <div class="profile-meta">
+                                    <span class="meta-chip">社員番号 {{ employee()!.employeeNumber || '—' }}</span>
+                                    <span
+                                        class="status-badge"
+                                        [class.before-join]="isBeforeJoin(employee()!)"
+                                        [class.retired]="isFullyRetired(employee()!)"
+                                        [class.pending-retirement]="isPendingRetirement(employee()!)"
+                                    >
+                                        {{ employeeStatusLabel(employee()!) }}
+                                    </span>
+                                    @if (officeName()) {
+                                        <span class="meta-chip muted">{{ officeName() }}</span>
+                                    }
+                                </div>
+                            </div>
                         </div>
                     }
                 </div>
                 @if (!isEditing()) {
                     <div class="header-actions">
-                        <a [routerLink]="['/premium', employee()!.id]" class="btn sub-btn">社会保険</a>
+                        <a [routerLink]="['/premium', employee()!.id]" class="btn sub-btn">保険料</a>
                         @if (isActiveEmployee()) {
                             <button type="button" class="btn primary-btn" (click)="startEdit()">編集</button>
                         }
@@ -193,192 +199,269 @@
                     </div>
                 </section>
             } @else {
-                <section class="profile-section">
-                    <h2 class="section-title">基本情報</h2>
-                    <dl class="detail-grid">
-                        <div class="detail-row">
-                            <dt>性別</dt>
-                            <dd>{{ genderLabel(employee()!.gender) }}</dd>
+                <div class="summary-strip">
+                    <div class="summary-card">
+                        <span class="summary-card-label">健康保険</span>
+                        <span
+                            class="summary-card-value"
+                            [class.ok]="healthInsuranceJoinStatus() === 'active'"
+                            [class.ng]="healthInsuranceJoinStatus() === 'inactive'"
+                            [class.pending]="healthInsuranceJoinStatus() === 'unknown'"
+                        >
+                            {{ displayInsuranceStatus(healthInsuranceJoinStatus()) }}
+                        </span>
+                    </div>
+                    <div class="summary-card">
+                        <span class="summary-card-label">厚生年金</span>
+                        <span
+                            class="summary-card-value"
+                            [class.ok]="pensionInsuranceJoinStatus() === 'active'"
+                            [class.ng]="pensionInsuranceJoinStatus() === 'inactive'"
+                            [class.pending]="pensionInsuranceJoinStatus() === 'unknown'"
+                        >
+                            {{ displayInsuranceStatus(pensionInsuranceJoinStatus()) }}
+                        </span>
+                    </div>
+                    <div class="summary-card">
+                        <span class="summary-card-label">被扶養者</span>
+                        <span class="summary-card-value neutral">
+                            {{ activeDependentCount() }}人
+                            <span class="summary-card-sub">／ 計{{ dependents().length }}人</span>
+                        </span>
+                    </div>
+                    <div class="summary-card" [class.attention]="pendingProcedureCount() > 0">
+                        <span class="summary-card-label">手続き</span>
+                        <span class="summary-card-value" [class.attention-text]="pendingProcedureCount() > 0">
+                            @if (pendingProcedureCount() > 0) {
+                                要対応 {{ pendingProcedureCount() }}件
+                            } @else {
+                                対応なし
+                            }
+                        </span>
+                    </div>
+                </div>
+
+                <nav class="section-nav" aria-label="ページ内リンク">
+                    <button type="button" class="section-nav-link" (click)="scrollToSection('overview')">基本情報</button>
+                    <button type="button" class="section-nav-link" (click)="scrollToSection('dependents')">被扶養者</button>
+                    <button type="button" class="section-nav-link" (click)="scrollToSection('social-insurance')">社会保険</button>
+                    <button type="button" class="section-nav-link" (click)="scrollToSection('procedures')">手続き</button>
+                    @if (canRetireEmployee() || canReactivateEmployee()) {
+                        <button type="button" class="section-nav-link" (click)="scrollToSection('retire-section')">在籍管理</button>
+                    }
+                </nav>
+
+                <div class="detail-layout">
+                    <div class="detail-main">
+                <section id="overview" class="section-card profile-section">
+                    <div class="section-card-header">
+                        <h2 class="section-title">基本情報</h2>
+                        <p class="section-card-desc">連絡先・所属・在籍状況</p>
+                    </div>
+                    <div class="info-tile-grid">
+                        <div class="info-tile">
+                            <span class="info-tile-label">性別</span>
+                            <span class="info-tile-value">{{ genderLabel(employee()!.gender) }}</span>
                         </div>
-                        <div class="detail-row">
-                            <dt>生年月日</dt>
-                            <dd>
+                        <div class="info-tile">
+                            <span class="info-tile-label">生年月日</span>
+                            <span class="info-tile-value">
                                 {{ formatInsuranceDate(employee()!.birthDate) }}
                                 @if (age() !== null) {
                                     <span class="sub-text">（満{{ age() }}歳）</span>
                                 }
-                            </dd>
+                            </span>
                         </div>
-                        <div class="detail-row">
-                            <dt>入社日</dt>
-                            <dd>{{ formatInsuranceDate(employee()!.joinedDate) }}</dd>
+                        <div class="info-tile">
+                            <span class="info-tile-label">入社日</span>
+                            <span class="info-tile-value">{{ formatInsuranceDate(employee()!.joinedDate) }}</span>
                         </div>
-                        <div class="detail-row">
-                            <dt>部署 / 役職</dt>
-                            <dd>
+                        <div class="info-tile">
+                            <span class="info-tile-label">雇用区分</span>
+                            <span class="info-tile-value">{{ employmentTypeLabel(employmentType) }}</span>
+                        </div>
+                        <div class="info-tile">
+                            <span class="info-tile-label">部署 / 役職</span>
+                            <span class="info-tile-value">
                                 {{ employee()!.department || '—' }}
                                 @if (employee()!.position) {
                                     <span class="sub-text">／ {{ employee()!.position }}</span>
                                 }
-                            </dd>
+                            </span>
                         </div>
-                        <div class="detail-row">
-                            <dt>電話番号</dt>
-                            <dd>{{ employee()!.phoneNumber || '—' }}</dd>
+                        <div class="info-tile">
+                            <span class="info-tile-label">在籍状況</span>
+                            <span class="info-tile-value">{{ employeeStatusLabel(employee()!) }}</span>
                         </div>
-                        <div class="detail-row">
-                            <dt>メールアドレス</dt>
-                            <dd class="mono">{{ employee()!.email || '—' }}</dd>
+                        <div class="info-tile">
+                            <span class="info-tile-label">電話番号</span>
+                            <span class="info-tile-value">{{ employee()!.phoneNumber || '—' }}</span>
                         </div>
-                        <div class="detail-row">
-                            <dt>マイナンバー</dt>
-                            <dd class="mono">{{ employee()!.myNumber || '—' }}</dd>
+                        <div class="info-tile">
+                            <span class="info-tile-label">メール</span>
+                            <span class="info-tile-value mono">{{ employee()!.email || '—' }}</span>
                         </div>
-                    </dl>
-                </section>
-
-                <section class="profile-section">
-                    <h2 class="section-title">住所</h2>
-                    <p class="address-block">{{ formatAddress(employee()!) }}</p>
-                </section>
-
-                <section id="user-invite" class="profile-section">
-                    <h2 class="section-title">ログイン招待</h2>
-                    <app-employee-invite-panel
-                        [employee]="employee()!"
-                        [initialSuccessMessage]="inviteMessage()"
-                    />
-                </section>
-
-                <section class="profile-section">
-                    <h2 class="section-title">扶養家族・在籍</h2>
-                    <dl class="detail-grid">
-                        <div class="detail-row">
-                            <dt>扶養家族</dt>
-                            <dd class="inline-action">
-                                <span>{{ dependents().length }}人</span>
-                                @if (openDependentChangeProcedure()) {
-                                    <a
-                                        [routerLink]="['/procedures', openDependentChangeProcedure()!.id]"
-                                        class="link-btn"
-                                    >
-                                        扶養変更届へ
-                                    </a>
-                                } @else {
-                                    <button type="button" class="link-btn" (click)="createDependentProcedure()">
-                                        扶養家族を変更
-                                    </button>
-                                }
-                            </dd>
+                        <div class="info-tile info-tile-wide">
+                            <span class="info-tile-label">住所</span>
+                            <span class="info-tile-value">{{ formatAddress(employee()!) }}</span>
                         </div>
-                        <div class="detail-row">
-                            <dt>在籍状況</dt>
-                            <dd>{{ employeeStatusLabel(employee()!) }}</dd>
+                        <div class="info-tile">
+                            <span class="info-tile-label">マイナンバー</span>
+                            <span class="info-tile-value mono">{{ employee()!.myNumber || '—' }}</span>
                         </div>
-                        <p class="detail-note muted">入社日・退職日から自動で判定されます。</p>
                         @if (employee()!.retiredDate) {
-                            <div class="detail-row">
-                                <dt>退職日</dt>
-                                <dd>{{ formatRetiredDate(employee()!.retiredDate) }}</dd>
+                            <div class="info-tile">
+                                <span class="info-tile-label">退職日</span>
+                                <span class="info-tile-value">{{ formatRetiredDate(employee()!.retiredDate) }}</span>
                             </div>
                         }
-                    </dl>
+                    </div>
                 </section>
-            }
 
-            @if (!isEditing()) {
-                <section class="retire-section action-panel">
-                    <h2 class="section-title">在籍・退職</h2>
-                    @if (canRetireEmployee()) {
-                        @if (!isRetireFormOpen()) {
-                            <p class="section-note">退職日を登録すると、在籍状況は自動で「退職予定」または「退職済」に変わります。</p>
-                            <button
-                                type="button"
-                                class="btn retire-btn"
-                                (click)="openRetireForm()"
-                                [disabled]="isRetiring()"
+                <section id="dependents" class="section-card profile-section">
+                    <div class="section-card-header">
+                        <div>
+                            <h2 class="section-title">被扶養者</h2>
+                            <p class="section-card-desc">扶養家族 {{ dependents().length }}人（扶養中 {{ activeDependentCount() }}人）</p>
+                        </div>
+                        @if (openDependentChangeProcedure()) {
+                            <a
+                                [routerLink]="['/procedures', openDependentChangeProcedure()!.id]"
+                                class="section-card-action"
                             >
-                                退職処理
+                                扶養変更届へ
+                            </a>
+                        } @else {
+                            <button type="button" class="section-card-action" (click)="createDependentProcedure()">
+                                扶養家族を変更
                             </button>
-                        } @else {
-                            <div class="form-field">
-                                <label for="retired-date">退職日</label>
-                                <input
-                                    id="retired-date"
-                                    type="date"
-                                    name="retiredDateInput"
-                                    [(ngModel)]="retiredDateInput"
-                                />
-                            </div>
-                            @if (errorMessage()) {
-                                <p class="error-message">{{ errorMessage() }}</p>
-                            }
-                            <div class="button-area">
+                        }
+                    </div>
+                    @if (dependents().length > 0) {
+                        <div class="dependent-list" role="list">
+                            @for (dependent of sortedDependents(); track dependent.id) {
                                 <button
                                     type="button"
-                                    class="btn sub-btn"
-                                    (click)="closeRetireForm()"
-                                    [disabled]="isRetiring()"
+                                    class="dependent-list-item"
+                                    role="listitem"
+                                    [class.selected]="selectedDependentId() === dependent.id"
+                                    [attr.aria-expanded]="selectedDependentId() === dependent.id"
+                                    (click)="toggleDependentDetail(dependent.id)"
                                 >
-                                    キャンセル
+                                    <span class="dependent-list-main">
+                                        <span class="dependent-list-name">
+                                            {{ dependent.lastName }} {{ dependent.firstName }}
+                                        </span>
+                                        <span class="dependent-list-meta">
+                                            {{ dependentRelationshipLabel(dependent.relationship) }}
+                                            @if (dependent.birthDate) {
+                                                <span class="dependent-list-age">
+                                                    （{{ formatInsuranceDate(dependent.birthDate) }}）
+                                                </span>
+                                            }
+                                        </span>
+                                    </span>
+                                    <span class="dependent-list-actions">
+                                        <span
+                                            class="dependent-status-badge"
+                                            [class.active]="dependent.status === 'active'"
+                                            [class.ended]="dependent.status === 'ended'"
+                                        >
+                                            {{ dependentStatusLabel(dependent.status) }}
+                                        </span>
+                                        <span class="dependent-detail-toggle">
+                                            {{ selectedDependentId() === dependent.id ? '閉じる' : '詳細' }}
+                                        </span>
+                                    </span>
                                 </button>
-                                <button
-                                    type="button"
-                                    class="btn retire-confirm-btn"
-                                    (click)="retireEmployee()"
-                                    [disabled]="isRetiring()"
-                                >
-                                    @if (isRetiring()) {
-                                        処理中...
-                                    } @else {
-                                        退職を確定
+                            }
+                        </div>
+
+                        @if (selectedDependent(); as dep) {
+                            <article class="dependent-detail-panel">
+                                <h3 class="subsection-title">被扶養者詳細</h3>
+                                <dl class="detail-grid">
+                                    <div class="detail-row">
+                                        <dt>氏名</dt>
+                                        <dd>{{ dep.lastName }} {{ dep.firstName }}</dd>
+                                    </div>
+                                    <div class="detail-row">
+                                        <dt>続柄</dt>
+                                        <dd>{{ dependentRelationshipLabel(dep.relationship) }}</dd>
+                                    </div>
+                                    <div class="detail-row">
+                                        <dt>生年月日</dt>
+                                        <dd>
+                                            {{ formatInsuranceDate(dep.birthDate) }}
+                                            @if (dependentAge(dep.birthDate); as depAge) {
+                                                <span class="sub-text">（満{{ depAge }}歳）</span>
+                                            }
+                                        </dd>
+                                    </div>
+                                    <div class="detail-row">
+                                        <dt>性別</dt>
+                                        <dd>{{ dep.gender ? genderLabel(dep.gender) : '—' }}</dd>
+                                    </div>
+                                    <div class="detail-row">
+                                        <dt>個人番号</dt>
+                                        <dd class="mono">{{ dep.myNumber?.trim() || '—' }}</dd>
+                                    </div>
+                                    <div class="detail-row">
+                                        <dt>住所</dt>
+                                        <dd>{{ dep.address?.trim() || '—' }}</dd>
+                                    </div>
+                                    <div class="detail-row">
+                                        <dt>被扶養者になった日</dt>
+                                        <dd>{{ formatInsuranceDate(dep.dependencyStartDate) }}</dd>
+                                    </div>
+                                    @if (dep.dependencyEndDate) {
+                                        <div class="detail-row">
+                                            <dt>被扶養者でなくなった日</dt>
+                                            <dd>{{ formatInsuranceDate(dep.dependencyEndDate) }}</dd>
+                                        </div>
                                     }
-                                </button>
-                            </div>
+                                    <div class="detail-row">
+                                        <dt>職業</dt>
+                                        <dd>{{ dep.occupation?.trim() || '—' }}</dd>
+                                    </div>
+                                    <div class="detail-row">
+                                        <dt>収入</dt>
+                                        <dd>
+                                            @if (dep.income !== null && dep.income !== undefined) {
+                                                {{ dep.income | number }} 円
+                                            } @else {
+                                                —
+                                            }
+                                        </dd>
+                                    </div>
+                                    <div class="detail-row">
+                                        <dt>扶養状態</dt>
+                                        <dd>{{ dependentStatusLabel(dep.status) }}</dd>
+                                    </div>
+                                    @if (dep.memo.trim()) {
+                                        <div class="detail-row detail-row-wide">
+                                            <dt>メモ</dt>
+                                            <dd>{{ dep.memo }}</dd>
+                                        </div>
+                                    }
+                                </dl>
+                            </article>
                         }
-                    } @else if (canReactivateEmployee()) {
-                        @if (isPastRetiredDate()) {
-                            <p class="section-note">この従業員は退職済みです。</p>
-                        } @else {
-                            <p class="section-note">この従業員は{{ formatRetiredDate(employee()!.retiredDate) }}に退職予定です。</p>
-                        }
-                        @if (errorMessage()) {
-                            <p class="error-message">{{ errorMessage() }}</p>
-                        }
-                        <button
-                            type="button"
-                            class="btn sub-btn"
-                            (click)="reactivateEmployee()"
-                            [disabled]="isRetiring()"
-                        >
-                            @if (isRetiring()) {
-                                処理中...
-                            } @else {
-                                在籍に戻す
-                            }
-                        </button>
-                        
-                        <button
-                            type="button"
-                            class="btn sub-btn"
-                            (click)="openLossProcedure()"
-                            [disabled]="isCreatingLossProcedure()"
-                        >
-                            @if (isCreatingLossProcedure()) {
-                                作成中...
-                            } @else if (lossProcedureExists()) {
-                                資格喪失手続きを開く
-                            } @else {
-                                資格喪失手続きを行う
-                            }
-                        </button>
+                    } @else {
+                        <p class="dependent-empty-note">登録されている被扶養者はいません。</p>
                     }
                 </section>
+                    </div>
+                </div>
             }
 
-            <section id="social-insurance" class="social-insurance-section profile-section">
-            <h2 class="section-title">社会保険</h2>
-            <p class="section-note">加入要件の入力と参考判定。資格日は手続き提出で自動登録されます。</p>
+            <section id="social-insurance" class="section-card social-insurance-section profile-section">
+            <div class="section-card-header">
+                <div>
+                    <h2 class="section-title">社会保険</h2>
+                    <p class="section-card-desc">加入要件と資格日。資格日は手続き提出で自動登録されます。</p>
+                </div>
+            </div>
             <app-part-time-insurance-warning
                 [employeeId]="employee()?.id ?? null"
                 [employmentType]="employmentType"
@@ -561,30 +644,66 @@
                 <dl class="detail-list">
                     <div class="detail-row">
                         <dt>健康保険 資格取得日</dt>
-                        <dd>{{ formatHealthStartDateLabel() }}</dd>
+                        @let healthStart = formatHealthStartDateDisplay();
+                        <dd>
+                            {{ healthStart.main }}
+                            @if (healthStart.monthNote) {
+                                <span class="premium-month-note">（{{ healthStart.monthNote }}）</span>
+                            }
+                        </dd>
                     </div>
                     <div class="detail-row">
                         <dt>健康保険 資格喪失日</dt>
-                        <dd>{{ formatHealthEndDateLabel() }}</dd>
+                        @let healthEnd = formatHealthEndDateDisplay();
+                        <dd>
+                            {{ healthEnd.main }}
+                            @if (healthEnd.monthNote) {
+                                <span class="premium-month-note">（{{ healthEnd.monthNote }}）</span>
+                            }
+                        </dd>
                     </div>
                     <div class="detail-row">
                         <dt>厚生年金 資格取得日</dt>
-                        <dd>{{ formatPensionStartDateLabel() }}</dd>
+                        @let pensionStart = formatPensionStartDateDisplay();
+                        <dd>
+                            {{ pensionStart.main }}
+                            @if (pensionStart.monthNote) {
+                                <span class="premium-month-note">（{{ pensionStart.monthNote }}）</span>
+                            }
+                        </dd>
                     </div>
                     <div class="detail-row">
                         <dt>厚生年金 資格喪失日</dt>
-                        <dd>{{ formatPensionEndDateLabel() }}</dd>
+                        @let pensionEnd = formatPensionEndDateDisplay();
+                        <dd>
+                            {{ pensionEnd.main }}
+                            @if (pensionEnd.monthNote) {
+                                <span class="premium-month-note">（{{ pensionEnd.monthNote }}）</span>
+                            }
+                        </dd>
                     </div>
                 </dl>
                 <p class="insurance-date-note">介護保険は資格日と生年月日から自動算出されます。</p>
                 <dl class="detail-list">
                     <div class="detail-row">
                         <dt>対象日</dt>
-                        <dd>{{ formatCareStartDateLabel() }}</dd>
+                        @let careStart = formatCareStartDateDisplay();
+                        <dd>
+                            {{ careStart.main }}
+                            @if (careStart.monthNote) {
+                                <span class="premium-month-note">（{{ careStart.monthNote }}）</span>
+                            }
+                        </dd>
                     </div>
                     <div class="detail-row">
                         <dt>喪失日</dt>
-                        <dd>{{ formatCareEndDateLabel() }}</dd>
+                        @let careEnd = formatCareEndDateDisplay();
+                        <dd>
+                            {{ careEnd.main }}
+                            @if (careEnd.monthNote) {
+                                <span class="premium-month-note">（{{ careEnd.monthNote }}）</span>
+                            }
+                        </dd>
                     </div>
                 </dl>
                 <div class="form-field">
@@ -601,27 +720,63 @@
                 <dl class="detail-list">
                     <div class="detail-row">
                         <dt>健康保険 資格取得日</dt>
-                        <dd>{{ formatHealthStartDateLabel() }}</dd>
+                        @let healthStartView = formatHealthStartDateDisplay();
+                        <dd>
+                            {{ healthStartView.main }}
+                            @if (healthStartView.monthNote) {
+                                <span class="premium-month-note">（{{ healthStartView.monthNote }}）</span>
+                            }
+                        </dd>
                     </div>
                     <div class="detail-row">
                         <dt>健康保険 資格喪失日</dt>
-                        <dd>{{ formatHealthEndDateLabel() }}</dd>
+                        @let healthEndView = formatHealthEndDateDisplay();
+                        <dd>
+                            {{ healthEndView.main }}
+                            @if (healthEndView.monthNote) {
+                                <span class="premium-month-note">（{{ healthEndView.monthNote }}）</span>
+                            }
+                        </dd>
                     </div>
                     <div class="detail-row">
                         <dt>厚生年金 資格取得日</dt>
-                        <dd>{{ formatPensionStartDateLabel() }}</dd>
+                        @let pensionStartView = formatPensionStartDateDisplay();
+                        <dd>
+                            {{ pensionStartView.main }}
+                            @if (pensionStartView.monthNote) {
+                                <span class="premium-month-note">（{{ pensionStartView.monthNote }}）</span>
+                            }
+                        </dd>
                     </div>
                     <div class="detail-row">
                         <dt>厚生年金 資格喪失日</dt>
-                        <dd>{{ formatPensionEndDateLabel() }}</dd>
+                        @let pensionEndView = formatPensionEndDateDisplay();
+                        <dd>
+                            {{ pensionEndView.main }}
+                            @if (pensionEndView.monthNote) {
+                                <span class="premium-month-note">（{{ pensionEndView.monthNote }}）</span>
+                            }
+                        </dd>
                     </div>
                     <div class="detail-row">
                         <dt>対象日</dt>
-                        <dd>{{ formatCareStartDateLabel() }}</dd>
+                        @let careStartView = formatCareStartDateDisplay();
+                        <dd>
+                            {{ careStartView.main }}
+                            @if (careStartView.monthNote) {
+                                <span class="premium-month-note">（{{ careStartView.monthNote }}）</span>
+                            }
+                        </dd>
                     </div>
                     <div class="detail-row">
                         <dt>喪失日</dt>
-                        <dd>{{ formatCareEndDateLabel() }}</dd>
+                        @let careEndView = formatCareEndDateDisplay();
+                        <dd>
+                            {{ careEndView.main }}
+                            @if (careEndView.monthNote) {
+                                <span class="premium-month-note">（{{ careEndView.monthNote }}）</span>
+                            }
+                        </dd>
                     </div>
                     <div class="detail-row">
                         <dt>備考</dt>
@@ -632,103 +787,185 @@
 
             </section>
 
-            <section class="qualification-procedure-section profile-section">
-                <h2 class="section-title">手続き</h2>
+            @if (!isEditing()) {
+            <section id="procedures" class="section-card qualification-procedure-section profile-section">
+                <div class="section-card-header">
+                    <div>
+                        <h2 class="section-title">手続き</h2>
+                        <p class="section-card-desc">
+                            @if (pendingProcedureCount() > 0) {
+                                要対応 {{ pendingProcedureCount() }}件
+                            } @else {
+                                すべて完了、または手続きなし
+                            }
+                        </p>
+                    </div>
+                </div>
 
-                <div class="qualification-procedure-box">
-                    @if (isHealthInsuranceEligible()) {
-                        @if (qualificationProcedureExists()) {
-                            <div class="qualification-procedure-header">
-                                @if (needsQualificationProcedurePrompt()) {
-                                    <p class="qualification-procedure-message">
-                                        健康保険の加入対象ですが、まだ手続きが完了していません。手続きをしてください。
-                                    </p>
-                                } @else {
-                                    <p class="qualification-procedure-message">資格取得手続きが完了しています。</p>
-                                }
-                                <span
-                                    class="procedure-status-badge"
-                                    [class.not-started]="qualificationProcedureStatus() === 'notStarted'"
-                                    [class.in-progress]="qualificationProcedureStatus() === 'inProgress'"
-                                    [class.completed]="qualificationProcedureStatus() === 'completed'"
+                @if (employeeProceduresSorted().length > 0) {
+                    <ul class="procedure-row-list">
+                        @for (procedure of employeeProceduresSorted(); track procedure.id) {
+                            @let meta = procedureTypeMeta(procedure.procedureType);
+                            <li>
+                                <a
+                                    class="procedure-row-card tone-{{ meta.tone }}"
+                                    [class.pending]="procedure.status !== 'completed'"
+                                    [class.overdue]="isOverdueProcedure(procedure)"
+                                    [class.completed]="procedure.status === 'completed'"
+                                    [routerLink]="['/procedures', procedure.id]"
                                 >
-                                    {{ qualificationProcedureStatusLabel(qualificationProcedureStatus()) }}
-                                </span>
-                            </div>
-                        } @else {
-                            <p class="section-note">健康保険・厚生年金の加入対象ですが、まだ手続きをしていません。手続きをしてください。</p>
+                                    <span class="procedure-row-label">{{ procedureListLabel(procedure) }}</span>
+                                    <span
+                                        class="procedure-row-status"
+                                        [class.not-started]="procedure.status === 'notStarted'"
+                                        [class.in-progress]="procedure.status === 'inProgress'"
+                                        [class.completed]="procedure.status === 'completed'"
+                                    >
+                                        {{ procedureStatusLabel(procedure.status) }}
+                                    </span>
+                                    <span class="procedure-row-meta">{{ procedureDueDateLabel(procedure) }}</span>
+                                </a>
+                            </li>
                         }
-                        @if (errorMessage()) {
-                            <p class="error-message">{{ errorMessage() }}</p>
-                        }
+                    </ul>
+                } @else {
+                    <p class="empty-section-note">この従業員の手続きはまだありません。</p>
+                }
+
+                <div class="procedure-quick-actions">
+                    @if (isHealthInsuranceEligible()) {
                         <button
                             type="button"
-                            class="btn primary-btn qualification-procedure-create-btn"
+                            class="btn sub-btn"
                             (click)="openQualificationProcedure()"
                             [disabled]="isCreatingQualificationProcedure()"
                         >
                             @if (isCreatingQualificationProcedure()) {
                                 作成中...
                             } @else if (qualificationProcedureExists()) {
-                                資格取得手続きを開く
+                                資格取得届を開く
                             } @else {
-                                資格取得手続きを行う
+                                資格取得届を作成
                             }
                         </button>
+                    }
+                    @if (openDependentChangeProcedure(); as depProcedure) {
+                        <a [routerLink]="['/procedures', depProcedure.id]" class="btn sub-btn">扶養変更届を開く</a>
                     } @else {
-                        <p class="section-note">健康保険・厚生年金の加入対象外のため、資格取得手続きを作成できません。</p>
+                        <button type="button" class="btn sub-btn" (click)="createDependentProcedure()">
+                            扶養変更届を作成
+                        </button>
                     }
-                </div>
-
-                @if (hasRetiredDate()) {
-                    @if (needsLossProcedurePrompt()) {
-                        <p class="insurance-judgment-note" role="note">
-                            退職日が設定されています。資格喪失届の内容を確認し、手続きを進めてください。
-                        </p>
-                    }
-
-                    <div class="qualification-procedure-box">
-                        <h3 class="subsection-title">資格喪失届</h3>
-                        @if (lossProcedureExists()) {
-                            <div class="qualification-procedure-header">
-                                @if (needsLossProcedurePrompt()) {
-                                    <p class="qualification-procedure-message">
-                                        資格喪失届を作成しました。内容を確認して手続きを進めてください。
-                                    </p>
-                                } @else {
-                                    <p class="qualification-procedure-message">資格喪失手続きが完了しています。</p>
-                                }
-                                <span
-                                    class="procedure-status-badge"
-                                    [class.not-started]="lossProcedureStatus() === 'notStarted'"
-                                    [class.in-progress]="lossProcedureStatus() === 'inProgress'"
-                                    [class.completed]="lossProcedureStatus() === 'completed'"
-                                >
-                                    {{ qualificationProcedureStatusLabel(lossProcedureStatus()) }}
-                                </span>
-                            </div>
-                        } @else {
-                            <p class="section-note">
-                                退職日（{{ formatRetiredDate(employee()!.retiredDate) }}）が設定されています。資格喪失届を作成してください。
-                            </p>
-                        }
+                    @if (hasRetiredDate()) {
                         <button
                             type="button"
-                            class="btn primary-btn qualification-procedure-create-btn"
+                            class="btn sub-btn"
                             (click)="openLossProcedure()"
                             [disabled]="isCreatingLossProcedure()"
                         >
                             @if (isCreatingLossProcedure()) {
                                 作成中...
                             } @else if (lossProcedureExists()) {
-                                資格喪失手続きを開く
+                                資格喪失届を開く
                             } @else {
-                                資格喪失手続きを行う
+                                資格喪失届を作成
+                            }
+                        </button>
+                    }
+                </div>
+            </section>
+
+            <section id="user-invite" class="section-card profile-section">
+                <div class="section-card-header">
+                    <h2 class="section-title">ログイン招待</h2>
+                    <p class="section-card-desc">従業員本人がマイページにログインするための招待</p>
+                </div>
+                <app-employee-invite-panel
+                    [employee]="employee()!"
+                    [initialSuccessMessage]="inviteMessage()"
+                />
+            </section>
+
+            <section id="retire-section" class="section-card retire-section action-panel">
+                <div class="section-card-header">
+                    <h2 class="section-title">在籍管理</h2>
+                    <p class="section-card-desc">退職処理と在籍への復帰</p>
+                </div>
+                @if (canRetireEmployee()) {
+                    @if (!isRetireFormOpen()) {
+                        <p class="section-note">退職日を登録すると、在籍状況は自動で「退職予定」または「退職済」に変わります。</p>
+                        <button
+                            type="button"
+                            class="btn retire-btn"
+                            (click)="openRetireForm()"
+                            [disabled]="isRetiring()"
+                        >
+                            退職処理
+                        </button>
+                    } @else {
+                        <div class="form-field">
+                            <label for="retired-date">退職日</label>
+                            <input
+                                id="retired-date"
+                                type="date"
+                                name="retiredDateInput"
+                                [(ngModel)]="retiredDateInput"
+                            />
+                        </div>
+                        @if (errorMessage()) {
+                            <p class="error-message">{{ errorMessage() }}</p>
+                        }
+                        <div class="button-area">
+                            <button
+                                type="button"
+                                class="btn sub-btn"
+                                (click)="closeRetireForm()"
+                                [disabled]="isRetiring()"
+                            >
+                                キャンセル
+                            </button>
+                            <button
+                                type="button"
+                                class="btn retire-confirm-btn"
+                                (click)="retireEmployee()"
+                                [disabled]="isRetiring()"
+                            >
+                                @if (isRetiring()) {
+                                    処理中...
+                                } @else {
+                                    退職を確定
+                                }
+                            </button>
+                        </div>
+                    }
+                } @else if (canReactivateEmployee()) {
+                    @if (isPastRetiredDate()) {
+                        <p class="section-note">この従業員は退職済みです。</p>
+                    } @else {
+                        <p class="section-note">この従業員は{{ formatRetiredDate(employee()!.retiredDate) }}に退職予定です。</p>
+                    }
+                    @if (errorMessage()) {
+                        <p class="error-message">{{ errorMessage() }}</p>
+                    }
+                    <div class="button-area stacked">
+                        <button
+                            type="button"
+                            class="btn sub-btn"
+                            (click)="reactivateEmployee()"
+                            [disabled]="isRetiring()"
+                        >
+                            @if (isRetiring()) {
+                                処理中...
+                            } @else {
+                                在籍に戻す
                             }
                         </button>
                     </div>
+                } @else {
+                    <p class="section-note">在籍中の従業員です。退職処理は上記ボタンから行えます。</p>
                 }
             </section>
+            }
 
             @if (isEditing()) {
                 @if (errorMessage()) {
@@ -764,9 +1001,9 @@
 
 <style>
     .employee-detail-page {
-        max-width: 760px;
+        max-width: 960px;
         margin: 0 auto;
-        padding: 24px 16px;
+        padding: 24px 16px 48px;
     }
 
     .loading {
@@ -799,10 +1036,300 @@
         justify-content: space-between;
         align-items: flex-start;
         gap: 16px;
-        margin-bottom: 8px;
+        margin-bottom: 20px;
         padding-bottom: 20px;
-        border-bottom: 1px solid #f3f4f6;
+        border-bottom: 1px solid #e5e7eb;
     }
+
+    .profile-hero {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+    }
+
+    .profile-avatar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #dbeafe, #eff6ff);
+        color: #1d4ed8;
+        font-size: 18px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+    }
+
+    .profile-hero-body {
+        min-width: 0;
+    }
+
+    .summary-strip {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+
+    .summary-card {
+        padding: 12px 14px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+    }
+
+    .summary-card.attention {
+        border-color: #fcd34d;
+        background: #fffbeb;
+    }
+
+    .summary-card-label {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 11px;
+        font-weight: 700;
+        color: #6b7280;
+        letter-spacing: 0.02em;
+    }
+
+    .summary-card-value {
+        font-size: 15px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .summary-card-value.ok { color: #166534; }
+    .summary-card-value.ng { color: #991b1b; }
+    .summary-card-value.pending { color: #92400e; }
+    .summary-card-value.neutral { color: #374151; }
+    .summary-card-value.attention-text { color: #b45309; }
+
+    .summary-card-sub {
+        font-size: 12px;
+        font-weight: 500;
+        color: #9ca3af;
+    }
+
+    .section-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 20px;
+    }
+
+    .section-nav-link {
+        padding: 6px 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 999px;
+        background: #fff;
+        color: #374151;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+
+    .section-nav-link:hover {
+        border-color: #93c5fd;
+        color: #2563eb;
+        background: #f8fbff;
+    }
+
+    .detail-layout {
+        display: block;
+    }
+
+    .detail-main {
+        min-width: 0;
+    }
+
+    .section-card {
+        margin-bottom: 16px;
+        padding: 18px 20px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+    }
+
+    .section-card-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .section-card-header .section-title {
+        margin: 0;
+    }
+
+    .section-card-desc {
+        margin: 4px 0 0;
+        font-size: 13px;
+        color: #6b7280;
+        line-height: 1.4;
+    }
+
+    .section-card-action {
+        flex-shrink: 0;
+        padding: 0;
+        border: none;
+        background: none;
+        color: #2563eb;
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+
+    .section-card-action:hover {
+        text-decoration: underline;
+    }
+
+    .info-tile-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .info-tile {
+        padding: 12px 14px;
+        background: #f9fafb;
+        border: 1px solid #f3f4f6;
+        border-radius: 10px;
+    }
+
+    .info-tile-wide {
+        grid-column: 1 / -1;
+    }
+
+    .info-tile-label {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #6b7280;
+    }
+
+    .info-tile-value {
+        display: block;
+        font-size: 15px;
+        line-height: 1.5;
+        color: #111827;
+        word-break: break-word;
+    }
+
+    .procedure-row-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin: 0 0 16px;
+        padding: 0;
+        list-style: none;
+    }
+
+    .procedure-row-card {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        align-items: center;
+        gap: 8px 12px;
+        padding: 12px 14px;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        background: #fff;
+        text-decoration: none;
+        color: inherit;
+        transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .procedure-row-card:hover {
+        border-color: #93c5fd;
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
+    }
+
+    .procedure-row-card.pending {
+        background: #fffefb;
+    }
+
+    .procedure-row-card.overdue {
+        border-color: #fecaca;
+        background: #fff7f7;
+    }
+
+    .procedure-row-card.completed {
+        background: #f9fafb;
+    }
+
+    .procedure-row-label {
+        font-size: 14px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .procedure-row-status {
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        background: #f3f4f6;
+        color: #4b5563;
+        white-space: nowrap;
+    }
+
+    .procedure-row-status.in-progress {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .procedure-row-status.completed {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .procedure-row-meta {
+        font-size: 12px;
+        color: #6b7280;
+        white-space: nowrap;
+    }
+
+    .procedure-row-card.overdue .procedure-row-meta {
+        color: #b91c1c;
+        font-weight: 600;
+    }
+
+    .procedure-quick-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .procedure-quick-actions .btn {
+        flex: none;
+        height: 38px;
+        font-size: 13px;
+        text-decoration: none;
+    }
+
+    .empty-section-note {
+        margin: 0 0 16px;
+        font-size: 14px;
+        color: #6b7280;
+    }
+
+    .button-area.stacked {
+        flex-direction: column;
+    }
+
+    .tone-blue .procedure-row-label { color: #1d4ed8; }
+    .tone-rose .procedure-row-label { color: #be123c; }
+    .tone-violet .procedure-row-label { color: #6d28d9; }
+    .tone-amber .procedure-row-label { color: #b45309; }
+    .tone-orange .procedure-row-label { color: #c2410c; }
+    .tone-green .procedure-row-label { color: #047857; }
+    .tone-slate .procedure-row-label { color: #334155; }
 
     .profile-head {
         min-width: 0;
@@ -918,6 +1445,116 @@
 
     .link-btn:hover {
         text-decoration: underline;
+    }
+
+    .dependent-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 16px;
+    }
+
+    .dependent-list-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        width: 100%;
+        padding: 12px 14px;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        background: #fff;
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .dependent-list-item:hover {
+        border-color: #93c5fd;
+        background: #f8fbff;
+    }
+
+    .dependent-list-item.selected {
+        border-color: #2563eb;
+        background: #eff6ff;
+    }
+
+    .dependent-list-main {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+    }
+
+    .dependent-list-name {
+        font-size: 15px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .dependent-list-meta {
+        font-size: 13px;
+        color: #6b7280;
+    }
+
+    .dependent-list-age {
+        color: #9ca3af;
+    }
+
+    .dependent-list-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-shrink: 0;
+    }
+
+    .dependent-status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        background: #f3f4f6;
+        color: #4b5563;
+    }
+
+    .dependent-status-badge.active {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .dependent-status-badge.ended {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .dependent-detail-toggle {
+        font-size: 13px;
+        font-weight: 600;
+        color: #2563eb;
+    }
+
+    .dependent-detail-panel {
+        margin-top: 12px;
+        padding: 16px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+    }
+
+    .dependent-detail-panel .subsection-title {
+        margin: 0 0 12px;
+    }
+
+    .detail-row-wide {
+        grid-column: 1 / -1;
+    }
+
+    .dependent-empty-note {
+        margin: 12px 0 0;
+        font-size: 13px;
+        color: #6b7280;
     }
 
     .action-panel {
@@ -1110,6 +1747,14 @@
         color: #92400e;
         font-size: 13px;
         line-height: 1.5;
+    }
+
+    .premium-month-note {
+        margin-left: 2px;
+        color: #9ca3af;
+        font-size: 12px;
+        font-weight: 400;
+        white-space: nowrap;
     }
 
     .judgment-sub-note {
@@ -1447,9 +2092,33 @@
             flex: 1;
         }
 
+        .summary-strip {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
         .form-grid-two,
-        .detail-grid {
+        .detail-grid,
+        .info-tile-grid {
             grid-template-columns: 1fr;
+        }
+
+        .procedure-row-card {
+            grid-template-columns: 1fr;
+            gap: 6px;
+        }
+
+        .procedure-row-meta {
+            white-space: normal;
+        }
+
+        .dependent-list-item {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .dependent-list-actions {
+            width: 100%;
+            justify-content: space-between;
         }
     }
 </style>

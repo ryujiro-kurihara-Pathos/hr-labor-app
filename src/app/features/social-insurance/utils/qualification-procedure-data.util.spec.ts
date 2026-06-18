@@ -5,6 +5,7 @@ import {
     qualificationProcedureDueDate,
     resolveEffectiveHealthInsuranceStartDateForSync,
     resolveLiveQualificationDisplayDate,
+    resolvePreviewQualificationDate,
     resolveQualificationDateAfterJoinDateChange,
     resolveQualificationProcedureDates,
     shouldSyncQualificationProcedureDates,
@@ -24,6 +25,7 @@ describe('qualification-procedure-data.util sync helpers', () => {
     const procedure = {
         qualificationDate: '2026-04-01',
         occurredDate: '2026-04-01',
+        dueDate: qualificationProcedureDueDate('2026-04-01'),
         status: 'notStarted',
     } as Procedure;
 
@@ -72,12 +74,13 @@ describe('qualification-procedure-data.util sync helpers', () => {
         ).toBe(true);
     });
 
-    it('does not sync completed procedures or unchanged join dates', () => {
+    it('does not sync completed procedures or unchanged join dates without stale data', () => {
         expect(
             shouldSyncQualificationProcedureDates('completed', '2026-04-01', {
                 previousJoinedDate: '2026-04-01',
                 newJoinedDate: '2026-04-10',
                 procedure,
+                employee,
             }),
         ).toBe(false);
         expect(
@@ -85,8 +88,40 @@ describe('qualification-procedure-data.util sync helpers', () => {
                 previousJoinedDate: '2026-04-01',
                 newJoinedDate: '2026-04-01',
                 procedure,
+                employee,
             }),
         ).toBe(false);
+    });
+
+    it('syncs when stored procedure dates are stale for the current join date', () => {
+        expect(
+            shouldSyncQualificationProcedureDates('inProgress', null, {
+                previousJoinedDate: '2026-04-01',
+                newJoinedDate: '2026-04-01',
+                procedure: {
+                    qualificationDate: '2026-04-01',
+                    occurredDate: '2026-04-01',
+                    dueDate: qualificationProcedureDueDate('2026-04-01'),
+                },
+                employee: { ...employee, joinedDate: '2026-04-10' },
+            }),
+        ).toBe(true);
+    });
+
+    it('previews qualification date from join date before procedure completion', () => {
+        expect(
+            resolvePreviewQualificationDate(employee, {
+                joinedDate: '2026-04-10',
+                procedure: { ...procedure, status: 'notStarted' },
+            }),
+        ).toBe('2026-04-10');
+        expect(
+            resolvePreviewQualificationDate(employee, {
+                joinedDate: '2026-04-10',
+                healthInsuranceStartDate: '2026-04-01',
+                procedure: { ...procedure, status: 'completed' },
+            }),
+        ).toBe('2026-04-01');
     });
 
     it('uses join date for sync when start date matches previous join date', () => {

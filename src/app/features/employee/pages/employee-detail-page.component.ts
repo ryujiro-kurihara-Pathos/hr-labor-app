@@ -1,3 +1,4 @@
+import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink, Router } from '@angular/router';
@@ -13,7 +14,10 @@ import { Dependent, Employee, EmployeeInput, EmploymentType, toEmployeeInput } f
 import { insuranceJoinStatus, SocialInsuranceStatus, SocialInsuranceStatusInput } from '../../social-insurance/models/social-insurance-status.model';
 import { formatInsuranceDate } from '../../social-insurance/utils/social-insurance-status-display.util';
 import { Procedure, ProcedureStatus } from '../../social-insurance/models/procedures.model';
-import { resolveQualificationDateAfterJoinDateChange } from '../../social-insurance/utils/qualification-procedure-data.util';
+import {
+    resolvePreviewQualificationDate,
+    resolveQualificationDateAfterJoinDateChange,
+} from '../../social-insurance/utils/qualification-procedure-data.util';
 import { ConfirmService } from '../../../shared/services/confirm.service';
 import { PostalCodeLookupService } from '../../../shared/services/postal-code-lookup.service';
 import { applyPostalLookupResult } from '../../../shared/utils/postal-code-lookup.util';
@@ -47,6 +51,14 @@ import {
     resolveEmployeeStoredStatus,
     retiredDateFromInput,
 } from '../utils/employee-status-display.util';
+import { dependentRelationshipLabel } from '../../social-insurance/utils/dependent-procedure-data.util';
+import {
+    compareProceduresForList,
+    isProcedureOverdue,
+    procedureStatusLabel,
+    procedureTypeMeta,
+    todayDateString,
+} from '../../social-insurance/utils/procedure-display.util';
 
 type SocialInsuranceDraft = {
     weeklyScheduledWorkHours: string | number;
@@ -56,10 +68,15 @@ type SocialInsuranceDraft = {
     expectedEmploymentOver2Months: boolean;
 };
 
+type InsuranceDateDisplay = {
+    main: string;
+    monthNote: string | null;
+};
+
 @Component({
     selector: 'app-employee-detail-page',
     standalone: true,
-    imports: [FormsModule, RouterLink, PartTimeInsuranceWarningComponent, EmployeeInvitePanelComponent],
+    imports: [FormsModule, RouterLink, DecimalPipe, PartTimeInsuranceWarningComponent, EmployeeInvitePanelComponent],
     templateUrl: './employee-detail-page.component.html',
 })
 
@@ -80,6 +97,10 @@ export class EmployeeDetailPageComponent {
     
     // 取得資格手続きのID
     qualificationProcedure = signal<Procedure | null>(null);
+    employeeProcedures = signal<Procedure[]>([]);
+
+    readonly procedureTypeMeta = procedureTypeMeta;
+    readonly procedureStatusLabel = procedureStatusLabel;
 
     // ローディング
     isLoading = signal<boolean>(false);
@@ -96,6 +117,19 @@ export class EmployeeDetailPageComponent {
         const employee = this.employee();
         return employee ? this.ageToday(employee.birthDate) : null;
     });
+
+    employeeProceduresSorted = computed(() => {
+        const today = todayDateString();
+        return [...this.employeeProcedures()].sort((a, b) => compareProceduresForList(a, b, today));
+    });
+
+    pendingProcedureCount = computed(
+        () => this.employeeProceduresSorted().filter((procedure) => procedure.status !== 'completed').length,
+    );
+
+    activeDependentCount = computed(
+        () => this.dependents().filter((dependent) => dependent.status === 'active').length,
+    );
 
     /** 編集中はフォームの生年月日、閲覧時は保存済みの生年月日 */
     birthDateForInsuranceJudgment(): string | null {
@@ -213,7 +247,7 @@ export class EmployeeDetailPageComponent {
 
         await this.loadEmployee(employeeId);
         await this.loadDependents();
-        this.scrollToSocialInsuranceFragment();
+        this.scrollToRouteFragment();
         if (inviteMsg) {
             queueMicrotask(() => {
                 document.getElementById('user-invite')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -221,12 +255,12 @@ export class EmployeeDetailPageComponent {
         }
     }
 
-    private scrollToSocialInsuranceFragment(): void {
+    private scrollToRouteFragment(): void {
         const fragment = this.route.snapshot.fragment;
-        if (fragment !== 'social-insurance') return;
+        if (!fragment) return;
 
         queueMicrotask(() => {
-            document.getElementById('social-insurance')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            document.getElementById(fragment)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
     }
 
@@ -262,6 +296,7 @@ export class EmployeeDetailPageComponent {
             await this.loadQualificationProcedure();
             await this.loadLossProcedure();
             await this.loadOpenDependentChangeProcedure();
+            await this.loadEmployeeProcedures();
         } catch (error) {
             console.error('従業員の取得に失敗しました', error);
             this.errorMessage.set('従業員の取得に失敗しました');
@@ -310,6 +345,25 @@ export class EmployeeDetailPageComponent {
 
     // 扶養家族
     dependents = signal<Dependent[]>([]);
+    selectedDependentId = signal<string | null>(null);
+
+    sortedDependents = computed(() => {
+        const list = [...this.dependents()];
+        return list.sort((a, b) => {
+            if (a.status !== b.status) {
+                return a.status === 'active' ? -1 : 1;
+            }
+            return b.dependencyStartDate.localeCompare(a.dependencyStartDate);
+        });
+    });
+
+    selectedDependent = computed(() => {
+        const id = this.selectedDependentId();
+        if (!id) return null;
+        return this.dependents().find((dependent) => dependent.id === id) ?? null;
+    });
+
+    readonly dependentRelationshipLabel = dependentRelationshipLabel;
 
     // 扶養家族の取得
     async loadDependents(): Promise<void> {
@@ -321,9 +375,31 @@ export class EmployeeDetailPageComponent {
         try {
             const dependents = await this.employeeService.getDependentsByEmployeeId(employee.id);
             this.dependents.set(dependents);
+            this.selectedDependentId.set(null);
         } catch (error) {
             console.error('扶養家族の取得に失敗しました', error);
             this.errorMessage.set('扶養家族の取得に失敗しました');
+        }
+    }
+
+    async loadEmployeeProcedures(): Promise<void> {
+        this.employeeProcedures.set([]);
+
+        const employee = this.employee();
+        if (!employee) return;
+
+        try {
+            const procedures = await this.procedureService.getProcedures();
+            const today = todayDateString();
+            const list = procedures
+                .filter(
+                    (procedure) =>
+                        procedure.companyId === employee.companyId && procedure.employeeId === employee.id,
+                )
+                .sort((a, b) => compareProceduresForList(a, b, today));
+            this.employeeProcedures.set(list);
+        } catch (error) {
+            console.error('手続きの取得に失敗しました', error);
         }
     }
 
@@ -620,11 +696,6 @@ export class EmployeeDetailPageComponent {
         const currentSocialInsuranceStatus = this.socialInsuranceStatus();
         const employmentStatus = this.judgeSocialInsuranceEmployment();
         const previousJoinedDate = employee.joinedDate;
-        const carePeriod = computeCareInsurancePeriod(
-            this.emptyToNullDate(this.healthInsuranceStartDate),
-            this.emptyToNullDate(this.healthInsuranceEndDate),
-            input.birthDate || null,
-        );
 
         try {
             await this.employeeService.updateEmployee(employee.id, input);
@@ -655,17 +726,30 @@ export class EmployeeDetailPageComponent {
                 return;
             }
 
-            let healthInsuranceStartDate = currentSocialInsuranceStatus.healthInsuranceStartDate;
-            let pensionInsuranceStartDate = currentSocialInsuranceStatus.pensionInsuranceStartDate;
-            const syncedQualificationDate = resolveQualificationDateAfterJoinDateChange(
-                updatedEmployee,
-                previousJoinedDate,
-                qualificationProcedure,
-            );
-            if (syncedQualificationDate) {
-                healthInsuranceStartDate = syncedQualificationDate;
-                pensionInsuranceStartDate = syncedQualificationDate;
+            const procedureForEnrollment = qualificationProcedure ?? this.qualificationProcedure();
+
+            let healthInsuranceStartDate: string | null = null;
+            let pensionInsuranceStartDate: string | null = null;
+
+            if (procedureForEnrollment?.status === 'completed') {
+                healthInsuranceStartDate = currentSocialInsuranceStatus.healthInsuranceStartDate;
+                pensionInsuranceStartDate = currentSocialInsuranceStatus.pensionInsuranceStartDate;
+                const syncedQualificationDate = resolveQualificationDateAfterJoinDateChange(
+                    updatedEmployee,
+                    previousJoinedDate,
+                    procedureForEnrollment,
+                );
+                if (syncedQualificationDate) {
+                    healthInsuranceStartDate = syncedQualificationDate;
+                    pensionInsuranceStartDate = syncedQualificationDate;
+                }
             }
+
+            const carePeriod = computeCareInsurancePeriod(
+                healthInsuranceStartDate,
+                currentSocialInsuranceStatus.healthInsuranceEndDate,
+                input.birthDate || null,
+            );
 
             const socialInsuranceStatusInput: SocialInsuranceStatusInput = {
                 employeeId: employee.id,
@@ -755,6 +839,46 @@ export class EmployeeDetailPageComponent {
 
     genderLabel(gender: Employee['gender']): string {
         return gender === 'female' ? '女性' : '男性';
+    }
+
+    dependentStatusLabel(status: Dependent['status']): string {
+        return status === 'active' ? '扶養中' : '扶養終了';
+    }
+
+    dependentAge(birthDate: string): number | null {
+        return this.ageToday(birthDate);
+    }
+
+    toggleDependentDetail(dependentId: string): void {
+        this.selectedDependentId.update((current) => (current === dependentId ? null : dependentId));
+    }
+
+    employeeInitials(employee: Employee): string {
+        const last = employee.lastName.trim().charAt(0);
+        const first = employee.firstName.trim().charAt(0);
+        return `${last}${first}` || '?';
+    }
+
+    scrollToSection(sectionId: string): void {
+        document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    isOverdueProcedure(procedure: Procedure): boolean {
+        return isProcedureOverdue(procedure);
+    }
+
+    procedureListLabel(procedure: Procedure): string {
+        return procedureTypeMeta(procedure.procedureType).shortLabel;
+    }
+
+    procedureDueDateLabel(procedure: Procedure): string {
+        if (procedure.status === 'completed') {
+            return procedure.submittedDate
+                ? `提出 ${this.formatInsuranceDate(procedure.submittedDate)}`
+                : '完了';
+        }
+        if (!procedure.dueDate) return '期限未設定';
+        return `期限 ${this.formatInsuranceDate(procedure.dueDate)}`;
     }
 
     formatAddress(employee: Employee): string {
@@ -974,57 +1098,76 @@ export class EmployeeDetailPageComponent {
         return formatInsuranceDate(value);
     }
 
-    formatHealthStartDateLabel(): string {
-        return this.formatDateWithPremiumMonth(
-            this.emptyToNullDate(this.healthInsuranceStartDate),
-            this.healthPensionPremiumPeriod().premiumStartYearMonth,
-            '開始月',
-        );
+    resolveDisplayQualificationDate(): string | null {
+        const employee = this.employee();
+        if (!employee) return null;
+
+        return resolvePreviewQualificationDate(employee, {
+            joinedDate: this.isEditing() ? this.joinedDate : employee.joinedDate,
+            healthInsuranceStartDate: this.socialInsuranceStatus()?.healthInsuranceStartDate ?? null,
+            procedure: this.qualificationProcedure(),
+        });
     }
 
-    formatHealthEndDateLabel(): string {
-        return this.formatDateWithPremiumMonth(
+    formatHealthStartDateDisplay(): InsuranceDateDisplay {
+        const date = this.resolveDisplayQualificationDate();
+        const period = computeInsurancePremiumPeriod(
+            date,
+            this.emptyToNullDate(this.healthInsuranceEndDate),
+        );
+        return this.resolveDateWithPremiumMonth(date, period.premiumStartYearMonth, '開始月');
+    }
+
+    formatHealthEndDateDisplay(): InsuranceDateDisplay {
+        return this.resolveDateWithPremiumMonth(
             this.emptyToNullDate(this.healthInsuranceEndDate),
             this.healthPensionPremiumPeriod().premiumEndYearMonth,
             '終了月',
         );
     }
 
-    formatPensionStartDateLabel(): string {
-        return this.formatHealthStartDateLabel();
+    formatPensionStartDateDisplay(): InsuranceDateDisplay {
+        return this.formatHealthStartDateDisplay();
     }
 
-    formatPensionEndDateLabel(): string {
-        return this.formatHealthEndDateLabel();
+    formatPensionEndDateDisplay(): InsuranceDateDisplay {
+        return this.formatHealthEndDateDisplay();
     }
 
-    formatCareStartDateLabel(): string {
-        const period = this.careInsurancePeriodForDisplay();
-        return this.formatDateWithPremiumMonth(
+    formatCareStartDateDisplay(): InsuranceDateDisplay {
+        const period = computeCareInsurancePeriod(
+            this.resolveDisplayQualificationDate(),
+            this.emptyToNullDate(this.healthInsuranceEndDate),
+            this.birthDateForInsuranceJudgment(),
+        );
+        return this.resolveDateWithPremiumMonth(
             period.startDate,
             period.premiumStartYearMonth,
             '開始月',
         );
     }
 
-    formatCareEndDateLabel(): string {
+    formatCareEndDateDisplay(): InsuranceDateDisplay {
         const period = this.careInsurancePeriodForDisplay();
-        return this.formatDateWithPremiumMonth(
+        return this.resolveDateWithPremiumMonth(
             period.endDate,
             period.premiumEndYearMonth,
             '終了月',
         );
     }
 
-    private formatDateWithPremiumMonth(
+    private resolveDateWithPremiumMonth(
         date: string | null,
         yearMonth: string | null,
         monthPrefix: '開始月' | '終了月',
-    ): string {
-        if (!date) return '—';
+    ): InsuranceDateDisplay {
+        if (!date) return { main: '—', monthNote: null };
         const formatted = this.formatInsuranceDate(date);
-        if (!yearMonth) return formatted;
-        return `${formatted}（${monthPrefix}${formatYearMonthLabel(yearMonth)}）`;
+        if (!yearMonth) return { main: formatted, monthNote: null };
+        return {
+            main: formatted,
+            monthNote: `${monthPrefix}${formatYearMonthLabel(yearMonth)}`,
+        };
     }
 
     /** 事業所の通常労働者に対する4分の3基準（週の時間・月の日数の両方） */

@@ -12,6 +12,7 @@ import {
 import { Dependent, Employee } from '../../employee/models/employee.models';
 import { Office } from '../../company/models/office.model';
 import { Company } from '../../company/models/company.model';
+import { SocialInsuranceStatus } from '../models/social-insurance-status.model';
 import { SocialInsuranceProcedureService } from '../services/social-insurance-procedure.service';
 import { ProcedureActionBarComponent } from '../components/procedure-action-bar.component';
 import { EmployeeService } from '../../employee/services/employee.service';
@@ -22,7 +23,7 @@ import {
     procedureStatusLabel,
     todayDateString,
 } from '../utils/procedure-display.util';
-import { resolveDependentChangeOccurredAndDueDate } from '../utils/procedure-due-date.util';
+import { resolveDependentChangeOccurredAndDueDate, procedureDueDateFromOccurredDate } from '../utils/procedure-due-date.util';
 import {
     dependentAddReasonLabel,
     dependentChangeTypeLabel,
@@ -36,12 +37,16 @@ import {
 import {
     DependentProcedureSubmitForm,
     validateDependentProcedureSubmit,
-    PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE,
 } from '../utils/procedure-submit-validation.util';
+import {
+    resolveDependentOccurredDateBounds,
+    resolveInsuredPeriodBounds,
+} from '../utils/procedure-date-range.util';
 
 type ChangeType = 'add' | 'change' | 'delete';
 
 type DependentFormState = {
+    occurredDate: string;
     dependentId: string;
     lastName: string;
     firstName: string;
@@ -73,12 +78,14 @@ export class DependentProcedureComponent {
     office = input.required<Office>();
     company = input.required<Company>();
     dependents = input<Dependent[]>([]);
+    socialInsuranceStatus = input<SocialInsuranceStatus | null>(null);
 
     procedureUpdated = output<Procedure>();
     dependentsUpdated = output<void>();
 
     changeType = signal<ChangeType | null>(null);
     form = signal<DependentFormState>(this.emptyForm());
+    baselineForm = signal<DependentFormState | null>(null);
     isSaving = signal(false);
     saveMessage = signal('');
     saveErrorMessage = signal('');
@@ -105,15 +112,63 @@ export class DependentProcedureComponent {
 
     displayData = computed(() => extractDependentProcedureData(this.procedure()));
 
+    selectedDependent = computed(() => {
+        const dependentId = this.form().dependentId;
+        if (!dependentId) return null;
+        return this.dependents().find((dependent) => dependent.id === dependentId) ?? null;
+    });
+
+    insuredPeriodBounds = computed(() =>
+        resolveInsuredPeriodBounds({
+            employee: this.employee(),
+            healthInsuranceStartDate: this.socialInsuranceStatus()?.healthInsuranceStartDate,
+            healthInsuranceEndDate: this.socialInsuranceStatus()?.healthInsuranceEndDate,
+        }),
+    );
+
+    occurredDateBounds = computed(() =>
+        resolveDependentOccurredDateBounds({
+            changeType: this.changeType(),
+            bounds: this.insuredPeriodBounds(),
+            dependent: this.selectedDependent(),
+        }),
+    );
+
     submitValidation = computed(() => {
-        const type = this.changeType();
-        if (!type) {
-            return { ok: false as const, message: '異動の別を選択してください' };
+        const changeType = this.changeType();
+        const form = this.form();
+        const selected = this.selectedDependent();
+        const status = this.socialInsuranceStatus();
+
+        const validation = validateDependentProcedureSubmit(
+            changeType,
+            this.toSubmitForm(form),
+            this.procedure().id,
+            {
+                employee: this.employee(),
+                healthInsuranceStartDate: status?.healthInsuranceStartDate,
+                healthInsuranceEndDate: status?.healthInsuranceEndDate,
+                dependencyStartDate: selected?.dependencyStartDate ?? null,
+                dependencyEndDate: selected?.dependencyEndDate ?? null,
+            },
+        );
+        if (!validation.ok) return validation;
+
+        if (changeType === 'change' && !this.hasDependentInfoChanges()) {
+            return { ok: false as const, message: '変更がありません' };
         }
-        return validateDependentProcedureSubmit(type, this.toSubmitForm(this.form()));
+
+        return { ok: true as const };
     });
 
     canSubmit = computed(() => this.submitValidation().ok);
+
+    previewDueDate = computed(() => {
+        const occurredDate = this.form().occurredDate.trim();
+        if (!occurredDate) return null;
+        const dueDate = procedureDueDateFromOccurredDate(occurredDate);
+        return dueDate || null;
+    });
 
     exportProcedure = computed((): Procedure => {
         const item = this.procedure();
@@ -185,13 +240,29 @@ export class DependentProcedureComponent {
         };
     });
 
+    private initializedProcedureId: string | null = null;
+
     constructor() {
         effect(() => {
             const item = this.procedure();
+            if (this.initializedProcedureId === item.id) return;
+
+            this.initializedProcedureId = item.id;
             this.changeType.set(item.dependentChanges);
             if (item.dependentChanges) {
                 this.form.set(this.formFromProcedure(item));
+            } else {
+                this.form.set({
+                    ...this.emptyForm(),
+                    occurredDate: item.occurredDate ?? '',
+                });
             }
+            this.baselineForm.set(null);
+        });
+
+        effect(() => {
+            this.dependents();
+            this.syncBaselineForSelectedDependent();
         });
     }
 
@@ -207,37 +278,45 @@ export class DependentProcedureComponent {
         if (this.isCompleted()) return;
         this.changeType.set(type);
         this.form.set(this.emptyForm());
+        this.baselineForm.set(null);
         this.saveMessage.set('');
         this.saveErrorMessage.set('');
     }
 
     onDependentSelected(dependentId: string): void {
+        const occurredDate = this.form().occurredDate;
+
         if (!dependentId) {
-            this.form.set(this.emptyForm());
+            this.form.set({ ...this.emptyForm(), occurredDate });
+            this.baselineForm.set(null);
             return;
         }
 
         const dependent = this.activeDependents().find((d) => d.id === dependentId);
         if (!dependent) return;
 
-        this.form.set({
+        const baseline = {
             ...this.emptyForm(),
             ...dependentToFormFields(dependent),
+        };
+        this.baselineForm.set(baseline);
+        this.form.set({
+            ...baseline,
+            occurredDate,
         });
     }
 
     async saveProcedure(): Promise<void> {
         if (this.isCompleted() || this.isSaving()) return;
 
-        const type = this.changeType();
-        if (!type) {
-            this.saveErrorMessage.set(PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE);
-            return;
-        }
-
         const validation = this.submitValidation();
-        if (!validation.ok) {
-            this.saveErrorMessage.set(PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE);
+        if (!validation.ok) return;
+
+        const type = this.changeType();
+        if (!type) return;
+
+        if (!this.hasDependentInfoChanges()) {
+            this.saveErrorMessage.set('変更がありません');
             return;
         }
 
@@ -298,6 +377,7 @@ export class DependentProcedureComponent {
             const submittedDate = todayDateString();
             const procedureDates = resolveDependentChangeOccurredAndDueDate({
                 changeType: type,
+                occurredDate: form.occurredDate,
                 dependencyStartDate: form.dependencyStartDate,
                 dependencyEndDate: form.dependencyEndDate,
             });
@@ -338,11 +418,108 @@ export class DependentProcedureComponent {
     }
 
     updateForm<K extends keyof DependentFormState>(key: K, value: DependentFormState[K]): void {
-        this.form.update((current) => ({ ...current, [key]: value }));
+        this.form.update((current) => {
+            const next = { ...current, [key]: value };
+            if (key === 'dependencyStartDate' && value && !current.occurredDate) {
+                next.occurredDate = String(value);
+            }
+            if (key === 'dependencyEndDate' && value && !current.occurredDate) {
+                next.occurredDate = String(value);
+            }
+            return next;
+        });
+
+        if (
+            !this.isCompleted()
+            && (key === 'occurredDate' || key === 'dependencyStartDate' || key === 'dependencyEndDate')
+        ) {
+            void this.syncProcedureDatesIfNeeded();
+        }
+    }
+
+    private async syncProcedureDatesIfNeeded(): Promise<void> {
+        const item = this.procedure();
+        const type = this.changeType();
+        if (!type || item.status === 'completed') return;
+
+        const form = this.form();
+        const procedureDates = resolveDependentChangeOccurredAndDueDate({
+            changeType: type,
+            occurredDate: form.occurredDate,
+            dependencyStartDate: form.dependencyStartDate,
+            dependencyEndDate: form.dependencyEndDate,
+        });
+        if (!procedureDates) return;
+
+        if (
+            item.occurredDate === procedureDates.occurredDate
+            && item.dueDate === procedureDates.dueDate
+        ) {
+            return;
+        }
+
+        const updated: Procedure = {
+            ...item,
+            occurredDate: procedureDates.occurredDate,
+            dueDate: procedureDates.dueDate,
+        };
+
+        try {
+            await this.procedureService.updateProcedure(updated);
+            this.procedureUpdated.emit(updated);
+        } catch (error) {
+            console.error('届出期限の更新に失敗しました', error);
+        }
+    }
+
+    private syncBaselineForSelectedDependent(): void {
+        const type = this.changeType();
+        const form = this.form();
+        if (type !== 'change' || !form.dependentId) {
+            this.baselineForm.set(null);
+            return;
+        }
+
+        const dependent = this.activeDependents().find((d) => d.id === form.dependentId);
+        if (!dependent) return;
+
+        this.baselineForm.set({
+            ...this.emptyForm(),
+            ...dependentToFormFields(dependent),
+        });
+    }
+
+    private hasDependentInfoChanges(): boolean {
+        if (this.changeType() !== 'change') return true;
+
+        const baseline = this.baselineForm();
+        if (!baseline) return true;
+
+        return !this.areDependentInfoEqual(this.form(), baseline);
+    }
+
+    private areDependentInfoEqual(a: DependentFormState, b: DependentFormState): boolean {
+        return JSON.stringify(this.dependentInfoSnapshot(a)) === JSON.stringify(this.dependentInfoSnapshot(b));
+    }
+
+    private dependentInfoSnapshot(form: DependentFormState) {
+        return {
+            lastName: form.lastName.trim(),
+            firstName: form.firstName.trim(),
+            birthDate: form.birthDate,
+            gender: form.gender,
+            relationship: form.relationship,
+            myNumber: form.myNumber.trim(),
+            address: form.address.trim(),
+            occupation: form.occupation.trim(),
+            income: form.income === '' ? null : Number(form.income),
+            dependencyStartDate: form.dependencyStartDate,
+        };
     }
 
     private emptyForm(): DependentFormState {
         return {
+            occurredDate: '',
             dependentId: '',
             lastName: '',
             firstName: '',
@@ -362,6 +539,7 @@ export class DependentProcedureComponent {
 
     private formFromProcedure(procedure: Procedure): DependentFormState {
         return {
+            occurredDate: procedure.occurredDate,
             dependentId: procedure.dependentId ?? '',
             lastName: procedure.dependentLastName,
             firstName: procedure.dependentFirstName,
@@ -381,6 +559,7 @@ export class DependentProcedureComponent {
 
     private toSubmitForm(form: DependentFormState): DependentProcedureSubmitForm {
         return {
+            occurredDate: form.occurredDate,
             dependentId: form.dependentId,
             lastName: form.lastName,
             firstName: form.firstName,

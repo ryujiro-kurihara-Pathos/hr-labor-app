@@ -62,4 +62,17 @@ describe('procedure-due-date.util', () => {
             dueDate: '2026-08-25',
         });
     });
+
+    it('prefers explicit occurred date for dependent change', () => {
+        expect(
+            resolveDependentChangeOccurredAndDueDate({
+                changeType: 'change',
+                occurredDate: '2026-07-01',
+                dependencyStartDate: '2026-01-01',
+            }),
+        ).toEqual({
+            occurredDate: '2026-07-01',
+            dueDate: '2026-07-06',
+        });
+    });
 });

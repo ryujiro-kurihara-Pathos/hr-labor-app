@@ -1,5 +1,5 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 
 import { Company } from '../../company/models/company.model';
 import { Office } from '../../company/models/office.model';
@@ -14,11 +14,15 @@ import {
     canExportProcedureCsv,
     ProcedureCsvExportContext,
 } from '../utils/procedure-csv-export.util';
-import { PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE } from '../utils/procedure-submit-validation.util';
+import {
+    ProcedureSubmitMissingField,
+    ProcedureSubmitValidationResult,
+} from '../utils/procedure-submit-validation.util';
 
 @Component({
     selector: 'app-procedure-action-bar',
     standalone: true,
+    imports: [RouterLink],
     templateUrl: './procedure-action-bar.component.html',
 })
 export class ProcedureActionBarComponent {
@@ -34,7 +38,7 @@ export class ProcedureActionBarComponent {
     procedureForExport = input<Procedure | null>(null);
     exportContext = input<ProcedureCsvExportContext>({});
     isSubmitting = input(false);
-    submitDisabled = input(false);
+    submitValidation = input<ProcedureSubmitValidationResult>({ ok: true });
     actionErrorMessage = input('');
 
     submitClick = output<void>();
@@ -42,6 +46,7 @@ export class ProcedureActionBarComponent {
     exportMessage = signal('');
     deleteErrorMessage = signal('');
     submitBlockedMessage = signal('');
+    submitMissingFields = signal<ProcedureSubmitMissingField[]>([]);
     isDeleting = signal(false);
 
     readonly dateLabel = dateLabel;
@@ -83,17 +88,44 @@ export class ProcedureActionBarComponent {
             return;
         }
 
-        if (this.submitDisabled()) {
-            this.submitBlockedMessage.set(PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE);
+        const validation = this.submitValidation();
+        if (!validation.ok) {
+            this.submitBlockedMessage.set(validation.message);
+            this.submitMissingFields.set(validation.missingFields ?? []);
             return;
         }
 
         this.submitBlockedMessage.set('');
+        this.submitMissingFields.set([]);
 
         const confirmed = await this.confirmService.confirmSubmit();
         if (!confirmed) return;
 
         this.submitClick.emit();
+    }
+
+    navigateToMissingField(field: ProcedureSubmitMissingField, event: Event): void {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (field.routerLink) {
+            void this.router.navigate(Array.isArray(field.routerLink) ? field.routerLink : [field.routerLink], {
+                fragment: field.fragment,
+                queryParams: field.queryParams,
+            });
+            return;
+        }
+
+        if (field.fragment) {
+            void this.router.navigate([], {
+                fragment: field.fragment,
+                queryParams: field.queryParams,
+                queryParamsHandling: 'merge',
+            });
+            queueMicrotask(() => {
+                document.getElementById(field.fragment!)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        }
     }
 
     async onDelete(): Promise<void> {

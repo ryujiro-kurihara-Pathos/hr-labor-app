@@ -28,7 +28,7 @@ import {
     resolveLiveQualificationDisplayDate,
     todayDateString,
 } from '../utils/qualification-procedure-data.util';
-import { validateQualificationProcedureSubmit, PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE } from '../utils/procedure-submit-validation.util';
+import { validateQualificationProcedureSubmit } from '../utils/procedure-submit-validation.util';
 
 @Component({
     selector: 'app-qualification-procedure',
@@ -250,10 +250,7 @@ export class QualificationProcedureComponent {
         if (this.isCompleted() || this.isSubmitting()) return;
 
         const validation = this.submitValidation();
-        if (!validation.ok) {
-            this.submitErrorMessage.set(PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE);
-            return;
-        }
+        if (!validation.ok) return;
 
         const employee = this.employee();
         const office = this.office();

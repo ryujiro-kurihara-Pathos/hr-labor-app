@@ -6,7 +6,7 @@ export function insuranceJoinStatusLabel(status: insuranceJoinStatus): string {
     return status === 'active' ? '対象' : status === 'inactive' ? '対象外' : '未設定';
 }
 
-/** 資格取得手続き提出済み、または資格取得日が登録済みなら加入中とみなす */
+/** 資格取得手続き完了後、かつ各保険の資格取得日が登録済みの場合のみ加入中 */
 export function isInsuranceEnrolled(
     joinStatus: insuranceJoinStatus,
     kind: InsuranceJoinKind,
@@ -14,8 +14,7 @@ export function isInsuranceEnrolled(
     qualificationSubmitted: boolean,
 ): boolean {
     if (joinStatus !== 'active') return false;
-    if (qualificationSubmitted) return true;
-    if (!socialStatus) return false;
+    if (!qualificationSubmitted || !socialStatus) return false;
 
     switch (kind) {
         case 'health':

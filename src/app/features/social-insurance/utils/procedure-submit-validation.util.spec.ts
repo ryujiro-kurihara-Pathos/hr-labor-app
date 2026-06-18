@@ -100,7 +100,8 @@ describe('procedure-submit-validation.util', () => {
             });
             expect(result.ok).toBeFalse();
             if (!result.ok) {
-                expect(result.message).toContain('報酬月額');
+                expect(result.message).toBe('未入力の項目があります');
+                expect(result.missingFields?.[0]?.label).toContain('報酬月額');
             }
         });
     });
@@ -133,6 +134,7 @@ describe('procedure-submit-validation.util', () => {
     describe('validateDependentProcedureSubmit', () => {
         it('requires add reason for add change', () => {
             const result = validateDependentProcedureSubmit('add', {
+                occurredDate: '2026-04-01',
                 dependentId: '',
                 lastName: '山田',
                 firstName: '花子',
@@ -145,6 +147,26 @@ describe('procedure-submit-validation.util', () => {
                 deleteReason: '',
             });
             expect(result.ok).toBeFalse();
+        });
+
+        it('requires occurred date', () => {
+            const result = validateDependentProcedureSubmit('change', {
+                occurredDate: '',
+                dependentId: 'd1',
+                lastName: '山田',
+                firstName: '花子',
+                birthDate: '2020-01-01',
+                gender: 'female',
+                relationship: 'child',
+                dependencyStartDate: '',
+                addReason: '',
+                dependencyEndDate: '',
+                deleteReason: '',
+            });
+            expect(result.ok).toBeFalse();
+            if (!result.ok) {
+                expect(result.missingFields?.some((field) => field.label.includes('事象'))).toBeTrue();
+            }
         });
     });
 
@@ -160,7 +182,8 @@ describe('procedure-submit-validation.util', () => {
             });
             expect(result.ok).toBeFalse();
             if (!result.ok) {
-                expect(result.message).toContain('4月');
+                expect(result.message).toBe('未入力の項目があります');
+                expect(result.missingFields?.[0]?.label).toContain('4月');
             }
         });
     });

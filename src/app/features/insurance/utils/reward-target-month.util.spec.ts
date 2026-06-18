@@ -52,14 +52,14 @@ describe('reward-target-month.util', () => {
     });
 
     describe('isBonusPaymentDateAllowed', () => {
-        it('requires payment date within employment period and target month', () => {
+        it('requires payment date within insured period and target month', () => {
             expect(isBonusPaymentDateAllowed(employee(), '2026-04-20')).toBeTrue();
             expect(isBonusPaymentDateAllowed(employee(), '2026-03-20')).toBeFalse();
             expect(isBonusPaymentDateAllowed(employee(), '2026-04-01')).toBeFalse();
         });
 
         it('returns reason for out-of-period bonus date', () => {
-            expect(bonusPaymentDateReason(employee(), '2026-04-01')).toContain('入社');
+            expect(bonusPaymentDateReason(employee(), '2026-04-01')).toContain('資格取得日');
         });
     });
 });

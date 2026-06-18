@@ -307,10 +307,11 @@ export class SocialInsuranceProcedureService {
         );
 
         const followJoinDate = existing
-            ? shouldSyncQualificationProcedureDates(existing.status, null, {
+            ? shouldSyncQualificationProcedureDates(existing.status, params.healthInsuranceStartDate ?? null, {
                 previousJoinedDate: params.previousJoinedDate,
                 newJoinedDate: employee.joinedDate,
                 procedure: existing,
+                employee,
             })
             : true;
         const effectiveHealthInsuranceStartDate = followJoinDate
@@ -331,11 +332,12 @@ export class SocialInsuranceProcedureService {
             if (
                 !shouldSyncQualificationProcedureDates(
                     existing.status,
-                    params.healthInsuranceStartDate,
+                    params.healthInsuranceStartDate ?? null,
                     {
                         previousJoinedDate: params.previousJoinedDate,
                         newJoinedDate: employee.joinedDate,
                         procedure: existing,
+                        employee,
                     },
                 )
             ) {

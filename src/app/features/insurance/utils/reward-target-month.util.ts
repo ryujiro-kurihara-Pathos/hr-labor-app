@@ -1,6 +1,10 @@
 import { Timestamp } from 'firebase/firestore';
 
 import { Employee } from '../../employee/models/employee.models';
+import {
+    resolveInsuredPeriodBounds,
+    validateDateWithinInsuredPeriod,
+} from '../../social-insurance/utils/procedure-date-range.util';
 
 const YEAR_MONTH_PATTERN = /^\d{4}-\d{2}$/;
 
@@ -56,21 +60,46 @@ export function employmentPeriodDateReason(employee: Employee, date: string): st
     return '在籍期間外の日付です。';
 }
 
-/** 賞与支給日が入力可能な期間か（対象年月＋入社日・退職日） */
-export function isBonusPaymentDateAllowed(employee: Employee, paymentDate: string): boolean {
+/** 賞与支給日が入力可能な期間か（対象年月＋被保険者の資格期間） */
+export function isBonusPaymentDateAllowed(
+    employee: Employee,
+    paymentDate: string,
+    insuranceDates?: {
+        healthInsuranceStartDate?: string | null;
+        healthInsuranceEndDate?: string | null;
+    },
+): boolean {
     const targetYearMonth = yearMonthFromDateString(paymentDate);
     if (!targetYearMonth || !isRewardTargetMonth(employee, targetYearMonth)) return false;
-    return isDateWithinEmploymentPeriod(employee, paymentDate);
+
+    const bounds = resolveInsuredPeriodBounds({
+        employee,
+        healthInsuranceStartDate: insuranceDates?.healthInsuranceStartDate,
+        healthInsuranceEndDate: insuranceDates?.healthInsuranceEndDate,
+    });
+    return validateDateWithinInsuredPeriod(paymentDate, bounds) === null;
 }
 
-export function bonusPaymentDateReason(employee: Employee, paymentDate: string): string | null {
+export function bonusPaymentDateReason(
+    employee: Employee,
+    paymentDate: string,
+    insuranceDates?: {
+        healthInsuranceStartDate?: string | null;
+        healthInsuranceEndDate?: string | null;
+    },
+): string | null {
     const targetYearMonth = yearMonthFromDateString(paymentDate);
     if (!targetYearMonth) return '支給日の形式が正しくありません。';
 
     const monthReason = rewardTargetMonthReason(employee, targetYearMonth);
     if (monthReason) return monthReason;
 
-    return employmentPeriodDateReason(employee, paymentDate);
+    const bounds = resolveInsuredPeriodBounds({
+        employee,
+        healthInsuranceStartDate: insuranceDates?.healthInsuranceStartDate,
+        healthInsuranceEndDate: insuranceDates?.healthInsuranceEndDate,
+    });
+    return validateDateWithinInsuredPeriod(paymentDate, bounds);
 }
 
 /** 在籍中は当月、退職済みは退職月まで閲覧可能 */

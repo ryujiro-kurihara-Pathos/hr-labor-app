@@ -21,7 +21,7 @@
             [procedureForExport]="exportProcedure()"
             [exportContext]="{}"
             [isSubmitting]="isSubmitting()"
-            [submitDisabled]="!canSubmit()"
+            [submitValidation]="submitValidation()"
             [actionErrorMessage]="submitErrorMessage()"
             (submitClick)="submitProcedure()"
         />

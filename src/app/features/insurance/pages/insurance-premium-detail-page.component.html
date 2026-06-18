@@ -190,7 +190,7 @@
             </button>
         }
 
-        <div class="main-grid">
+        <div class="input-columns">
             <section class="card form-card monthly-reward-card">
                 <span class="card-type-badge monthly">月次報酬</span>
                 <h2 class="section-title">報酬入力</h2>
@@ -237,11 +237,6 @@
                                 (ngModelChange)="onRewardFormFieldChange()"
                                 [disabled]="!isRewardEditable() || isLoadingMonth()"
                             />
-                        </div>
-                        <div class="form-field form-field-total">
-                            <span class="field-label">報酬月額</span>
-                            <p class="part-time-reward-total">{{ getPartTimeMonthlyRewardTotal() | number }}円</p>
-                            <span class="part-time-total-note">月額報酬＋通勤手当＋その他手当</span>
                         </div>
                     </div>
                 } @else {
@@ -373,10 +368,19 @@
                 </div>
 
                 <div class="wage-section variable-wage-section">
-                    <h3 class="wage-section-title">変動的賃金</h3>
-                    <p class="wage-section-note">月ごとに変動する項目（残業代・インセンティブなど）。</p>
+                    <button
+                        type="button"
+                        class="variable-wage-toggle"
+                        (click)="toggleVariableWageFields()"
+                        [attr.aria-expanded]="showVariableWageFields()"
+                    >
+                        <span class="variable-wage-toggle-label">変動的賃金</span>
+                        <span class="variable-wage-toggle-hint">残業代・インセンティブなど</span>
+                        <span class="variable-wage-toggle-icon" aria-hidden="true">{{ showVariableWageFields() ? '▲' : '▼' }}</span>
+                    </button>
 
-                    <div class="reward-fields">
+                    @if (showVariableWageFields()) {
+                    <div class="reward-fields variable-wage-fields">
                         <div class="form-field">
                             <label for="overtime-pay">残業代</label>
                             <input
@@ -433,6 +437,7 @@
                             />
                         </div>
                     </div>
+                    }
                 </div>
                 }
 
@@ -452,135 +457,13 @@
                         </button>
                     </div>
                 } @else if (monthRewardStatus() === 'confirmed') {
-                    <p class="reward-locked-note">報酬は確定済みです。</p>
+                    <p class="reward-locked-note">確定済みのため変更できません。</p>
                 } @else if (!isTargetMonth()) {
                     <p class="reward-locked-note">在籍期間外のため入力できません。</p>
                 }
             </section>
 
-            <section
-                class="card month-status-panel"
-                [class.loading]="monthRewardStatus() === 'loading'"
-                [class.confirmed]="monthRewardStatus() === 'confirmed'"
-                [class.draft]="monthRewardStatus() === 'draft'"
-                [class.unregistered]="monthRewardStatus() === 'unregistered'"
-                [class.excluded]="monthRewardStatus() === 'excluded'"
-            >
-                <div class="month-status-header">
-                    <h2 class="section-title">{{ targetYearMonthLabel() }}の報酬</h2>
-                    <span
-                        class="registration-badge"
-                        [class.loading]="monthRewardStatus() === 'loading'"
-                        [class.confirmed]="monthRewardStatus() === 'confirmed'"
-                        [class.draft]="monthRewardStatus() === 'draft'"
-                        [class.unregistered]="monthRewardStatus() === 'unregistered'"
-                        [class.excluded]="monthRewardStatus() === 'excluded'"
-                    >
-                        {{ monthRewardStatusLabel() }}
-                    </span>
-                </div>
-                @if (monthRewardStatusDescription()) {
-                    <p class="month-status-description">{{ monthRewardStatusDescription() }}</p>
-                }
-
-                <dl class="status-dl">
-                    <div class="status-row">
-                        <dt>報酬月額</dt>
-                        <dd>
-                            @if (targetMonthMonthlyReward(); as monthlyReward) {
-                                {{ monthlyReward | number }}円
-                                @if (includedBonusInMonth() > 0) {
-                                    <span class="included-bonus-note">
-                                        （うち賞与算入 {{ includedBonusInMonth() | number }}円＝年間賞与合計÷12）
-                                    </span>
-                                }
-                            } @else {
-                                —
-                            }
-                        </dd>
-                    </div>
-                </dl>
-
-                @if (effectiveStandard(); as effective) {
-                    <div class="status-block">
-                        <h3 class="status-block-title">適用される標準報酬月額</h3>
-                        <p class="status-line">決定区分：{{ effective.determinationLabel }}</p>
-                        @if (effective.calculationMonths.length > 0) {
-                            <p class="status-line">算定対象月：{{ effectiveCalculationMonthsLabel() }}</p>
-                        }
-                        @if (effective.isComplete && effective.averageMonthlyReward !== null && effective.calculation) {
-                            <p class="status-line">算定報酬月額：{{ effective.averageMonthlyReward | number }}円</p>
-                            <p class="status-line">
-                                健康保険：等級{{ effective.calculation.health?.grade ?? '—' }} /
-                                標準報酬月額 {{ (effective.calculation.health?.standardMonthlyAmount ?? 0) | number }}円
-                            </p>
-                            <p class="status-line">
-                                厚生年金：等級{{ effective.calculation.pension?.grade ?? '—' }} /
-                                標準報酬月額 {{ (effective.calculation.pension?.standardMonthlyAmount ?? 0) | number }}円
-                            </p>
-                        } @else {
-                            <p class="status-line muted">{{ effective.description }}</p>
-                        }
-                    </div>
-                }
-
-                @if (revisionPreview(); as preview) {
-                    <div class="status-block">
-                        <h3 class="status-block-title">随時改定（月額変更）判定</h3>
-                        <p class="status-line">{{ preview.description }}</p>
-                        @if (revisionPreviewResult(); as result) {
-                            <p class="status-line revision-result">{{ result }}</p>
-                        }
-                    </div>
-                }
-
-                @if (monthRewardStatus() === 'unregistered' && isInputRequiredMonth()) {
-                    <p class="month-status-action">
-                        入力が必要な月です。左のフォームに報酬を入力し、保存してください。
-                    </p>
-                }
-                @if (monthRewardStatus() === 'draft') {
-                    <p class="month-status-action">下書きです。修正して下書き保存するか、画面下部の「報酬・賞与を確定」から確定してください。</p>
-                }
-
-                <div class="status-block month-bonus-status-block">
-                    <h3 class="status-block-title">賞与</h3>
-                    @if (isLoadingBonus()) {
-                        <p class="status-line muted">読み込み中...</p>
-                    } @else if (treatBonusAsMonthlyRemuneration()) {
-                        <p class="status-line">
-                            対象期間内で4回目以降の賞与のため、報酬月額に算入しています（{{ includedBonusInMonth() | number }}円／月）。
-                        </p>
-                        <p class="status-line muted">標準賞与額・賞与保険料は算定しません。</p>
-                    } @else if (monthBonuses().length > 0) {
-                        <dl class="status-dl month-bonus-status-list">
-                            @for (bonus of monthBonuses(); track bonus.id) {
-                                <div class="status-row month-bonus-status-row">
-                                    <dt>{{ bonus.paymentDate }}</dt>
-                                    <dd class="month-bonus-status-value">
-                                        <span>{{ bonus.bonusAmount | number }}円</span>
-                                        <span class="month-bonus-standard-note">
-                                            標準 {{ bonus.standardBonusAmount | number }}円
-                                        </span>
-                                        <span
-                                            class="month-bonus-status-badge"
-                                            [class.draft]="bonusStatusLabel(bonus) === '下書き'"
-                                            [class.confirmed]="bonusStatusLabel(bonus) === '確定'"
-                                        >
-                                            {{ bonusStatusLabel(bonus) }}
-                                        </span>
-                                    </dd>
-                                </div>
-                            }
-                        </dl>
-                    } @else {
-                        <p class="status-line muted">この月の賞与は未登録です。</p>
-                    }
-                </div>
-            </section>
-        </div>
-
-        <section class="card bonus-card">
+            <section class="card bonus-card">
             <span class="card-type-badge bonus">賞与</span>
             <div class="section-title-row">
                 <h2 class="section-title">賞与入力（{{ targetYearMonthLabel() }}）</h2>
@@ -665,7 +548,12 @@
                     </ul>
                 </div>
             } @else {
-                <p class="bonus-empty">この月の賞与は未登録です。</p>
+                <p class="bonus-empty">この月の賞与はありません</p>
+                @if (isBonusEditable() && !isBonusFormVisible()) {
+                    <button type="button" class="btn sub-btn bonus-add-btn" (click)="openNewBonusForm()">
+                        賞与を入力
+                    </button>
+                }
             }
 
             @if (isBonusFormVisible() && isBonusFormEditable()) {
@@ -755,50 +643,87 @@
                         </button>
                     </div>
                 </div>
+            } @else if (monthRewardStatus() === 'confirmed' && !canConfirmMonth()) {
+                <p class="reward-locked-note">確定済みのため変更できません。</p>
+            } @else if (monthRewardStatus() === 'confirmed' && canConfirmMonth()) {
+                <p class="reward-locked-note">下書きの賞与があります。下の確定ボタンで確定してください。</p>
+            }
+
+            </section>
+        </div>
+
+        <section
+            class="card reward-summary-panel"
+            [class.confirmed]="monthRewardStatus() === 'confirmed'"
+            [class.draft]="monthRewardStatus() === 'draft'"
+            [class.unregistered]="monthRewardStatus() === 'unregistered'"
+            [class.excluded]="monthRewardStatus() === 'excluded'"
+        >
+            <div class="reward-summary-head">
+                <h2 class="section-title">{{ targetYearMonthLabel() }}</h2>
+                <span
+                    class="registration-badge"
+                    [class.loading]="monthRewardStatus() === 'loading'"
+                    [class.confirmed]="monthRewardStatus() === 'confirmed'"
+                    [class.draft]="monthRewardStatus() === 'draft'"
+                    [class.unregistered]="monthRewardStatus() === 'unregistered'"
+                    [class.excluded]="monthRewardStatus() === 'excluded'"
+                >
+                    {{ monthRewardStatusLabel() }}
+                </span>
+            </div>
+
+            @if (monthRewardStatusDescription()) {
+                <p class="month-status-description">{{ monthRewardStatusDescription() }}</p>
+            }
+
+            <div class="reward-monthly-total">
+                <span class="reward-monthly-total-label">報酬月額</span>
+                <span class="reward-monthly-total-value">
+                    @if (targetMonthMonthlyReward(); as monthlyReward) {
+                        {{ monthlyReward | number }}<span class="reward-monthly-total-unit">円</span>
+                    } @else if (isPartTimeEmployee()) {
+                        {{ getPartTimeMonthlyRewardTotal() | number }}<span class="reward-monthly-total-unit">円</span>
+                        <span class="reward-monthly-total-note">（入力中）</span>
+                    } @else {
+                        —
+                    }
+                </span>
+                @if (includedBonusInMonth() > 0) {
+                    <p class="included-bonus-note">
+                        うち賞与算入 {{ includedBonusInMonth() | number }}円
+                    </p>
+                }
+            </div>
+
+            @if (effectiveStandard(); as effective) {
+                <div class="reward-summary-meta">
+                    <p class="status-line">決定区分：{{ effective.determinationLabel }}</p>
+                    @if (effective.isComplete && effective.calculation) {
+                        <p class="status-line">
+                            標準報酬月額　健 {{ effective.calculation.health?.standardMonthlyAmount | number }}円 /
+                            年 {{ effective.calculation.pension?.standardMonthlyAmount | number }}円
+                        </p>
+                    } @else {
+                        <p class="status-line muted">{{ effective.description }}</p>
+                    }
+                </div>
+            }
+
+            @if (revisionPreview(); as preview) {
+                <p class="status-line revision-result">{{ preview.description }}</p>
+            }
+
+            @if (monthRewardStatus() === 'unregistered' && isInputRequiredMonth()) {
+                <p class="month-status-action">報酬を入力して保存してください。</p>
+            }
+            @if (monthRewardStatus() === 'draft') {
+                <p class="month-status-action">下書きです。内容を確認して確定してください。</p>
             }
 
             @if (canConfirmMonth()) {
-                <section class="confirm-month-panel">
-                    <h3 class="confirm-month-title">報酬・賞与の確定</h3>
-                    <p class="confirm-month-lead">
-                        {{ targetYearMonthLabel() }}の報酬と賞与をまとめて確定します。賞与を入力していない場合は「なし」として確定されます。
-                    </p>
-                    <ul class="confirm-month-target-list">
-                        @if (willConfirmRewardInMonth()) {
-                            <li class="confirm-month-target-item">
-                                <span class="confirm-target-label">月次報酬</span>
-                                <span class="confirm-target-value">
-                                    @if (targetMonthMonthlyReward(); as amount) {
-                                        {{ amount | number }}円
-                                    } @else {
-                                        入力内容
-                                    }
-                                </span>
-                            </li>
-                            <li class="confirm-month-target-item">
-                                <span class="confirm-target-label">賞与</span>
-                                <span class="confirm-target-value">
-                                    @if (hasDraftBonusesInMonth()) {
-                                        @for (bonus of draftBonusesInMonth(); track bonus.id; let last = $last) {
-                                            {{ bonus.paymentDate }}・{{ bonus.bonusAmount | number }}円@if (!last) {、}
-                                        }
-                                    } @else {
-                                        <span class="confirm-target-none">なし</span>
-                                    }
-                                </span>
-                            </li>
-                        } @else {
-                            @for (bonus of draftBonusesInMonth(); track bonus.id) {
-                                <li class="confirm-month-target-item">
-                                    <span class="confirm-target-label">賞与</span>
-                                    <span class="confirm-target-value">
-                                        {{ bonus.paymentDate }}・{{ bonus.bonusAmount | number }}円
-                                    </span>
-                                </li>
-                            }
-                        }
-                    </ul>
-                    <p class="confirm-month-warning">確定後は報酬・賞与の内容を変更できません。</p>
+                <div class="confirm-month-panel">
+                    <p class="confirm-month-warning">確定後は報酬・賞与を変更できません</p>
                     <button
                         type="button"
                         class="btn primary-btn confirm-month-btn"
@@ -811,46 +736,24 @@
                             {{ confirmMonthButtonLabel() }}
                         }
                     </button>
-                </section>
+                </div>
             }
 
             @if (showBonusPaymentProcedureSection()) {
-                <section class="regular-decision-procedure-section bonus-payment-procedure-section">
-                    <h2 class="regular-decision-section-title">賞与支払届（{{ targetYearMonthLabel() }}）</h2>
-                    <div class="regular-decision-procedure-box">
-                        @if (bonusPaymentProcedureExists()) {
-                            <div class="regular-decision-procedure-header">
-                                <p class="regular-decision-procedure-message">賞与支払届が作成されています。</p>
-                                <span
-                                    class="procedure-status-badge"
-                                    [class.not-started]="bonusPaymentProcedureStatus() === 'notStarted'"
-                                    [class.in-progress]="bonusPaymentProcedureStatus() === 'inProgress'"
-                                    [class.completed]="bonusPaymentProcedureStatus() === 'completed'"
-                                >
-                                    {{ bonusPaymentProcedureStatusLabel(bonusPaymentProcedureStatus()) }}
-                                </span>
-                            </div>
-                        } @else {
-                            <p class="regular-decision-procedure-note">
-                                {{ targetYearMonthLabel() }}の賞与をもとに、賞与支払届を提出してください。
-                            </p>
-                        }
-                        <button
-                            type="button"
-                            class="btn primary-btn regular-decision-procedure-btn"
-                            (click)="openBonusPaymentProcedure()"
-                            [disabled]="isCreatingBonusPaymentProcedure()"
-                        >
-                            @if (isCreatingBonusPaymentProcedure()) {
-                                作成中...
-                            } @else if (bonusPaymentProcedureExists()) {
-                                賞与支払届を開く
-                            } @else {
-                                賞与支払届を作成
-                            }
-                        </button>
-                    </div>
-                </section>
+                <div class="procedure-notice bonus-procedure-notice">
+                    <span>賞与支払届</span>
+                    @if (bonusPaymentProcedureExists()) {
+                        <span class="procedure-notice-status">{{ bonusPaymentProcedureStatusLabel(bonusPaymentProcedureStatus()) }}</span>
+                    }
+                    <button
+                        type="button"
+                        class="procedure-notice-link"
+                        (click)="openBonusPaymentProcedure()"
+                        [disabled]="isCreatingBonusPaymentProcedure()"
+                    >
+                        {{ bonusPaymentProcedureExists() ? '開く' : '作成' }}
+                    </button>
+                </div>
             }
         </section>
         }
@@ -2099,6 +2002,134 @@
         width: auto;
     }
 
+    .input-columns {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 16px;
+        margin-bottom: 16px;
+        align-items: start;
+    }
+
+    @media (max-width: 900px) {
+        .input-columns {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .input-columns .monthly-reward-card,
+    .input-columns .bonus-card {
+        margin-bottom: 0;
+        height: 100%;
+    }
+
+    .reward-summary-panel {
+        margin-bottom: 16px;
+        border-top: 3px solid #64748b;
+    }
+
+    .reward-summary-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .reward-summary-head .section-title {
+        margin: 0;
+    }
+
+    .reward-monthly-total {
+        margin: 16px 0;
+        padding: 16px 20px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        text-align: center;
+    }
+
+    .reward-monthly-total-label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #64748b;
+    }
+
+    .reward-monthly-total-value {
+        display: block;
+        font-size: 32px;
+        font-weight: 700;
+        color: #0f172a;
+        line-height: 1.2;
+    }
+
+    .reward-monthly-total-unit {
+        margin-left: 4px;
+        font-size: 18px;
+        font-weight: 600;
+    }
+
+    .reward-monthly-total-note {
+        margin-left: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        color: #64748b;
+    }
+
+    .reward-summary-meta {
+        margin-bottom: 12px;
+    }
+
+    .reward-summary-panel .confirm-month-panel {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    .procedure-notice {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px 12px;
+        margin-top: 12px;
+        padding: 10px 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        background: #f9fafb;
+        font-size: 13px;
+        color: #374151;
+    }
+
+    .procedure-notice-status {
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: #e5e7eb;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .procedure-notice-link {
+        margin-left: auto;
+        padding: 4px 10px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        background: #fff;
+        color: #2563eb;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .procedure-notice-link:hover:not(:disabled) {
+        background: #eff6ff;
+        border-color: #93c5fd;
+    }
+
     .main-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -2200,9 +2231,7 @@
     }
 
     .bonus-card {
-        margin-bottom: 16px;
         border-top: 3px solid #8b5cf6;
-        background: linear-gradient(180deg, #faf5ff 0%, #fff 48px);
     }
 
     .bonus-section-note {
@@ -2496,10 +2525,48 @@
     }
 
     .variable-wage-section {
-        padding: 14px;
+        padding: 0;
         background: #fafafa;
         border: 1px dashed #d1d5db;
         border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .variable-wage-toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 14px;
+        border: none;
+        background: transparent;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .variable-wage-toggle:hover {
+        background: #f3f4f6;
+    }
+
+    .variable-wage-toggle-label {
+        font-size: 14px;
+        font-weight: 700;
+        color: #4b5563;
+    }
+
+    .variable-wage-toggle-hint {
+        font-size: 12px;
+        color: #9ca3af;
+    }
+
+    .variable-wage-toggle-icon {
+        margin-left: auto;
+        font-size: 11px;
+        color: #6b7280;
+    }
+
+    .variable-wage-fields {
+        padding: 0 14px 14px;
     }
 
     .wage-section-header {

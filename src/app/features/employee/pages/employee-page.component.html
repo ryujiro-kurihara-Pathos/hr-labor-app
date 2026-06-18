@@ -2,7 +2,7 @@
     <header class="page-header">
         <div class="page-header-main">
             <h1>従業員管理</h1>
-            <p class="page-note">従業員の一覧・検索・詳細確認ができます。カードをクリックして詳細へ進めます。</p>
+            <p class="page-note">従業員の一覧・検索・詳細確認ができます。行をクリックして詳細へ進めます。</p>
         </div>
         <a routerLink="/employees/new" class="btn primary-btn">従業員を追加</a>
     </header>
@@ -56,7 +56,10 @@
                 @if (isLoading()) {
                     読み込み中...
                 } @else {
-                    {{ filteredEmployees().length }}件
+                    {{ employeeRows().length }}件
+                    @if (pendingProcedureEmployeeCount() > 0) {
+                        <span class="procedure-hint">· 手続き要対応 {{ pendingProcedureEmployeeCount() }}名</span>
+                    }
                     @if (hasActiveFilters()) {
                         <span class="filter-hint">（絞り込み中）</span>
                     }
@@ -73,66 +76,98 @@
                 <p class="empty-title">従業員がまだ登録されていません</p>
                 <p class="empty-note">「従業員を追加」から最初の従業員を登録してください。</p>
             </div>
-        } @else if (filteredEmployees().length === 0) {
+        } @else if (employeeRows().length === 0) {
             <div class="empty-state">
                 <p class="empty-title">条件に一致する従業員がいません</p>
                 <p class="empty-note">検索キーワードや絞り込み条件を変更してください。</p>
             </div>
         } @else {
-            <div class="employee-list">
-                @for (employee of filteredEmployees(); track employee.id) {
-                    <a class="employee-card" [routerLink]="['/employees', employee.id]">
-                        <div class="employee-card-header">
-                            <div class="employee-name-block">
-                                <p class="employee-name">{{ employee.lastName }} {{ employee.firstName }}</p>
-                                @if (employee.lastNameKana || employee.firstNameKana) {
-                                    <p class="employee-kana">
-                                        {{ employee.lastNameKana }} {{ employee.firstNameKana }}
-                                    </p>
-                                }
-                            </div>
-                            <span
-                                class="status-badge"
-                                [class.before-join]="isBeforeJoin(employee)"
-                                [class.retired]="isRetiredBadge(employee)"
-                                [class.retiring-soon]="isPendingRetirement(employee)"
+            <div class="table-wrap">
+                <table class="employee-table">
+                    <thead>
+                        <tr>
+                            <th>従業員</th>
+                            <th>在籍状況</th>
+                            <th>事業所</th>
+                            <th>入社日</th>
+                            <th>雇用区分</th>
+                            <th>所属</th>
+                            <th>手続き</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (row of employeeRows(); track row.employee.id) {
+                            <tr
+                                class="clickable-row"
+                                [class.has-pending]="hasPendingProcedures(row.procedures)"
+                                [routerLink]="['/employees', row.employee.id]"
                             >
-                                {{ statusBadgeLabel(employee) }}
-                            </span>
-                        </div>
-                        <dl class="employee-meta">
-                            <div class="meta-row">
-                                <dt>社員番号</dt>
-                                <dd>{{ employee.employeeNumber || '—' }}</dd>
-                            </div>
-                            <div class="meta-row">
-                                <dt>事業所</dt>
-                                <dd>{{ officeNameById()[employee.officeId] ?? '—' }}</dd>
-                            </div>
-                            <div class="meta-row">
-                                <dt>入社日</dt>
-                                <dd>{{ formatDate(employee.joinedDate) }}</dd>
-                            </div>
-                            @if (employee.department || employee.position) {
-                                <div class="meta-row">
-                                    <dt>所属</dt>
-                                    <dd>
-                                        {{ employee.department || '—' }}
-                                        @if (employee.position) {
-                                            <span class="position">／ {{ employee.position }}</span>
+                                <td class="name-cell">
+                                    <span class="employee-name">
+                                        {{ row.employee.lastName }} {{ row.employee.firstName }}
+                                    </span>
+                                    @if (row.employee.lastNameKana || row.employee.firstNameKana) {
+                                        <span class="employee-kana">
+                                            {{ row.employee.lastNameKana }} {{ row.employee.firstNameKana }}
+                                        </span>
+                                    }
+                                    <span class="employee-number">{{ row.employee.employeeNumber || '—' }}</span>
+                                </td>
+                                <td>
+                                    <span
+                                        class="status-badge"
+                                        [class.before-join]="isBeforeJoin(row.employee)"
+                                        [class.retired]="isRetiredBadge(row.employee)"
+                                        [class.retiring-soon]="isPendingRetirement(row.employee)"
+                                    >
+                                        {{ statusBadgeLabel(row.employee) }}
+                                    </span>
+                                </td>
+                                <td>{{ officeNameById()[row.employee.officeId] || '—' }}</td>
+                                <td class="nowrap">{{ formatDate(row.employee.joinedDate) }}</td>
+                                <td>{{ employmentTypeLabel(row.employee.employmentType) }}</td>
+                                <td class="department-cell">
+                                    @if (row.employee.department || row.employee.position) {
+                                        {{ row.employee.department || '—' }}
+                                        @if (row.employee.position) {
+                                            <span class="position">／ {{ row.employee.position }}</span>
                                         }
-                                    </dd>
-                                </div>
-                            }
-                            @if (employee.employmentType) {
-                                <div class="meta-row">
-                                    <dt>雇用区分</dt>
-                                    <dd>{{ employmentTypeLabel(employee.employmentType) }}</dd>
-                                </div>
-                            }
-                        </dl>
-                    </a>
-                }
+                                    } @else {
+                                        —
+                                    }
+                                </td>
+                                <td class="procedure-cell" (click)="$event.stopPropagation()">
+                                    @if (row.procedures.length === 0) {
+                                        <span class="procedure-none">—</span>
+                                    } @else {
+                                        <ul class="procedure-list">
+                                            @for (procedure of row.visibleProcedures; track procedure.id) {
+                                                @let meta = procedureTypeMeta(procedure.procedureType);
+                                                <li>
+                                                    <a
+                                                        class="procedure-chip tone-{{ meta.tone }}"
+                                                        [class.overdue]="isOverdueProcedure(procedure)"
+                                                        [class.completed]="isCompletedProcedure(procedure)"
+                                                        [routerLink]="['/procedures', procedure.id]"
+                                                    >
+                                                        <span class="procedure-chip-label">{{ procedureChipLabel(procedure) }}</span>
+                                                        <span class="procedure-chip-status">{{ procedureStatusLabel(procedure.status) }}</span>
+                                                        @if (!isCompletedProcedure(procedure)) {
+                                                            <span class="procedure-chip-due">{{ dueDateLabel(procedure) }}</span>
+                                                        }
+                                                    </a>
+                                                </li>
+                                            }
+                                        </ul>
+                                        @if (row.hiddenProcedureCount > 0) {
+                                            <p class="procedure-more-hint">他{{ row.hiddenProcedureCount }}件…</p>
+                                        }
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
             </div>
         }
     </section>
@@ -140,7 +175,7 @@
 
 <style>
     .employees-page {
-        max-width: 900px;
+        max-width: 1200px;
         margin: 0 auto;
         padding: 24px 16px 40px;
     }
@@ -167,10 +202,9 @@
     .filter-section {
         margin-top: 24px;
         padding: 16px;
-        background: #fff;
+        background: #f9fafb;
         border: 1px solid #e5e7eb;
         border-radius: 8px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
     }
 
     .filter-grid {
@@ -199,6 +233,7 @@
         border-radius: 8px;
         font-size: 14px;
         background: #fff;
+        box-sizing: border-box;
     }
 
     .form-field select {
@@ -228,7 +263,8 @@
         font-size: 13px;
     }
 
-    .filter-hint {
+    .filter-hint,
+    .procedure-hint {
         color: #2563eb;
     }
 
@@ -263,61 +299,96 @@
         margin: 0;
     }
 
-    .employee-list {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-    }
-
-    .employee-card {
-        display: block;
-        padding: 16px;
-        background: #fff;
+    .table-wrap {
+        overflow-x: auto;
         border: 1px solid #e5e7eb;
         border-radius: 8px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-        text-decoration: none;
-        color: inherit;
+        background: #fff;
+    }
+
+    .employee-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+
+    .employee-table th,
+    .employee-table td {
+        padding: 12px 14px;
+        border-bottom: 1px solid #f3f4f6;
+        text-align: left;
+        vertical-align: middle;
+    }
+
+    .employee-table th {
+        background: #f9fafb;
+        font-size: 12px;
+        font-weight: 600;
+        color: #6b7280;
+        white-space: nowrap;
+    }
+
+    .employee-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .clickable-row {
         cursor: pointer;
-        transition: border-color 0.15s, box-shadow 0.15s;
     }
 
-    .employee-card:hover {
-        border-color: #93c5fd;
-        box-shadow: 0 4px 10px rgba(59, 130, 246, 0.12);
+    .clickable-row:hover {
+        background: #f8fafc;
     }
 
-    .employee-card-header {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 12px;
+    .clickable-row.has-pending {
+        background: #fffefb;
     }
 
-    .employee-name-block {
-        min-width: 0;
+    .clickable-row.has-pending:hover {
+        background: #fffbeb;
+    }
+
+    .name-cell {
+        min-width: 160px;
     }
 
     .employee-name {
-        margin: 0;
-        font-size: 16px;
+        display: block;
         font-weight: 600;
         color: #111827;
+        white-space: nowrap;
     }
 
-    .employee-kana {
-        margin: 4px 0 0;
+    .employee-kana,
+    .employee-number {
+        display: block;
+        margin-top: 2px;
         font-size: 12px;
+        font-weight: 400;
+        color: #6b7280;
+    }
+
+    .nowrap {
+        white-space: nowrap;
+    }
+
+    .department-cell {
+        min-width: 120px;
+        max-width: 180px;
+        color: #374151;
+    }
+
+    .position {
         color: #6b7280;
     }
 
     .status-badge {
-        flex-shrink: 0;
+        display: inline-block;
         padding: 2px 8px;
         border-radius: 999px;
-        font-size: 11px;
-        font-weight: 700;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
         background: #dcfce7;
         color: #166534;
     }
@@ -337,36 +408,106 @@
         color: #1d4ed8;
     }
 
-    .employee-meta {
-        margin: 0;
-        display: grid;
-        gap: 6px;
+    .procedure-cell {
+        min-width: 220px;
+        max-width: 320px;
     }
 
-    .meta-row {
+    .procedure-none {
+        color: #9ca3af;
+    }
+
+    .procedure-list {
         display: flex;
-        gap: 12px;
-        font-size: 13px;
-        line-height: 1.5;
+        flex-direction: column;
+        gap: 6px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
     }
 
-    .meta-row dt {
-        flex-shrink: 0;
-        width: 72px;
-        margin: 0;
+    .procedure-chip {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 8px;
+        padding: 6px 10px;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        background: #fff;
+        text-decoration: none;
+        color: inherit;
+        font-size: 12px;
+        line-height: 1.4;
+        transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .procedure-chip:hover {
+        border-color: #93c5fd;
+        box-shadow: 0 2px 6px rgba(59, 130, 246, 0.1);
+    }
+
+    .procedure-chip.overdue {
+        border-color: #fecaca;
+        background: #fff7f7;
+    }
+
+    .procedure-chip-label {
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .procedure-chip-status {
+        padding: 1px 6px;
+        border-radius: 999px;
+        background: #f3f4f6;
+        color: #4b5563;
+        font-weight: 600;
+    }
+
+    .procedure-chip.overdue .procedure-chip-status {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    .procedure-chip-due {
         color: #6b7280;
         font-weight: 500;
     }
 
-    .meta-row dd {
-        margin: 0;
-        color: #111827;
-        word-break: break-all;
+    .procedure-chip.overdue .procedure-chip-due {
+        color: #b91c1c;
+        font-weight: 600;
     }
 
-    .position {
+    .procedure-chip.completed {
+        border-color: #e5e7eb;
+        background: #f9fafb;
+    }
+
+    .procedure-chip.completed .procedure-chip-status {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .procedure-chip.completed .procedure-chip-due {
+        color: #6b7280;
+        font-weight: 500;
+    }
+
+    .procedure-more-hint {
+        margin: 4px 0 0;
+        font-size: 12px;
         color: #6b7280;
     }
+
+    .tone-blue .procedure-chip-label { color: #1d4ed8; }
+    .tone-rose .procedure-chip-label { color: #be123c; }
+    .tone-violet .procedure-chip-label { color: #6d28d9; }
+    .tone-amber .procedure-chip-label { color: #b45309; }
+    .tone-orange .procedure-chip-label { color: #c2410c; }
+    .tone-green .procedure-chip-label { color: #047857; }
+    .tone-slate .procedure-chip-label { color: #334155; }
 
     .btn {
         flex-shrink: 0;
@@ -405,6 +546,13 @@
 
         .primary-btn {
             width: 100%;
+        }
+
+        .employee-table th:nth-child(5),
+        .employee-table td:nth-child(5),
+        .employee-table th:nth-child(6),
+        .employee-table td:nth-child(6) {
+            display: none;
         }
     }
 </style>

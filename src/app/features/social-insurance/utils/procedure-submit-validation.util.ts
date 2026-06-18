@@ -8,14 +8,30 @@ import {
     Procedure,
 } from '../models/procedures.model';
 import { QualificationMonthlyReward } from './qualification-reward.util';
+import {
+    resolveInsuredPeriodBounds,
+    validateDateWithinInsuredPeriod,
+    validateDependentOccurredDate,
+    validateLossDateRange,
+    validateQualificationDateRange,
+} from './procedure-date-range.util';
+import { getQualificationDate } from '../../insurance/utils/standard-remuneration-determination.util';
+
+export type ProcedureSubmitMissingField = {
+    label: string;
+    routerLink?: string | string[];
+    fragment?: string;
+    queryParams?: Record<string, string>;
+};
 
 export type ProcedureSubmitValidationResult =
     | { ok: true }
-    | { ok: false; message: string };
+    | { ok: false; message: string; missingFields?: ProcedureSubmitMissingField[] };
 
 export const PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE = '未入力の項目があります';
 
 export type DependentProcedureSubmitForm = {
+    occurredDate: string;
     dependentId: string;
     lastName: string;
     firstName: string;
@@ -36,12 +52,47 @@ const INVALID_REVISION_REASONS = new Set([
     '等級差が2未満のため随時改定の対象外',
 ]);
 
-function failure(message: string): ProcedureSubmitValidationResult {
+function errorFailure(message: string): ProcedureSubmitValidationResult {
     return { ok: false, message };
 }
 
-function missingFieldsMessage(fields: string[]): ProcedureSubmitValidationResult {
-    return failure('未入力の項目があります');
+function missingFieldsFailure(fields: ProcedureSubmitMissingField[]): ProcedureSubmitValidationResult {
+    return {
+        ok: false,
+        message: PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE,
+        missingFields: fields,
+    };
+}
+
+function employeeLink(
+    employeeId: string,
+    label: string,
+    fragment?: string,
+): ProcedureSubmitMissingField {
+    return { label, routerLink: ['/employees', employeeId], fragment };
+}
+
+function premiumLink(
+    employeeId: string,
+    yearMonth: string,
+    label: string,
+): ProcedureSubmitMissingField {
+    return {
+        label,
+        routerLink: ['/premium', employeeId],
+        queryParams: { ym: yearMonth },
+    };
+}
+
+function procedureFormLink(
+    procedureId: string | undefined,
+    label: string,
+    fragment: string,
+): ProcedureSubmitMissingField {
+    if (!procedureId) {
+        return { label, fragment };
+    }
+    return { label, routerLink: ['/procedures', procedureId], fragment };
 }
 
 function collectMissingFields(labels: Record<string, boolean>): string[] {
@@ -50,27 +101,32 @@ function collectMissingFields(labels: Record<string, boolean>): string[] {
         .map(([label]) => label);
 }
 
-function validateOfficeFields(office: Office | null | undefined): string[] {
-    if (!office) return ['事業所情報'];
+function validateOfficeFields(office: Office | null | undefined): ProcedureSubmitMissingField[] {
+    if (!office) return [{ label: '事業所情報', routerLink: '/company' }];
+
+    const officeLink: string[] = ['/company/offices', office.id];
     return collectMissingFields({
         事業所整理記号: Boolean(office.officeSymbol?.trim()),
         事業所番号: Boolean(office.officeNumber?.trim()),
         事業所名称: Boolean(office.name?.trim()),
         都道府県: Boolean(office.prefecture?.trim()),
-    });
+    }).map((label) => ({ label, routerLink: officeLink }));
 }
 
-function validateCompanyFields(company: Company | null | undefined): string[] {
-    if (!company) return ['会社情報'];
+function validateCompanyFields(company: Company | null | undefined): ProcedureSubmitMissingField[] {
+    if (!company) return [{ label: '会社情報', routerLink: '/company' }];
+
     return collectMissingFields({
         会社名: Boolean(company.name?.trim()),
         事業主氏名: Boolean(company.representativeName?.trim()),
-    });
+    }).map((label) => ({ label, routerLink: '/company' }));
 }
 
-function validateEmployeeFields(employee: Employee | null | undefined): string[] {
-    if (!employee) return ['被保険者情報'];
-    return collectMissingFields({
+function validateEmployeeFields(employee: Employee | null | undefined): ProcedureSubmitMissingField[] {
+    if (!employee) return [{ label: '被保険者情報', routerLink: '/employees' }];
+
+    const fields: ProcedureSubmitMissingField[] = [];
+    const missing = collectMissingFields({
         氏名: Boolean(employee.lastName?.trim() && employee.firstName?.trim()),
         '氏名（カナ）': Boolean(employee.lastNameKana?.trim() && employee.firstNameKana?.trim()),
         生年月日: Boolean(employee.birthDate?.trim()),
@@ -79,6 +135,11 @@ function validateEmployeeFields(employee: Employee | null | undefined): string[]
         '住所（市区町村）': Boolean(employee.city?.trim()),
         '住所（町名・番地）': Boolean(employee.streetAddress?.trim()),
     });
+
+    for (const label of missing) {
+        fields.push(employeeLink(employee.id, label));
+    }
+    return fields;
 }
 
 function validateCommonProcedureContext(params: {
@@ -92,7 +153,13 @@ function validateCommonProcedureContext(params: {
         ...validateEmployeeFields(params.employee),
     ];
     if (missing.length === 0) return null;
-    return missingFieldsMessage(missing);
+    return missingFieldsFailure(missing);
+}
+
+function joinYearMonth(joinedDate: string | null | undefined): string | null {
+    const trimmed = joinedDate?.trim();
+    if (!trimmed || trimmed.length < 7) return null;
+    return trimmed.slice(0, 7);
 }
 
 export function validateQualificationProcedureSubmit(params: {
@@ -105,12 +172,27 @@ export function validateQualificationProcedureSubmit(params: {
     const common = validateCommonProcedureContext(params);
     if (common) return common;
 
+    const employeeId = params.employee!.id;
+
     if (!params.qualificationDate?.trim()) {
-        return failure('資格取得日が未入力です');
+        return missingFieldsFailure([employeeLink(employeeId, '資格取得日', 'social-insurance')]);
+    }
+
+    const qualificationDateReason = validateQualificationDateRange(
+        params.qualificationDate.trim(),
+        params.employee!,
+    );
+    if (qualificationDateReason) {
+        return errorFailure(qualificationDateReason);
     }
 
     if (!params.monthlyReward || params.monthlyReward.totalAmount <= 0) {
-        return failure('入社月の報酬月額が未登録です');
+        const yearMonth =
+            params.monthlyReward?.targetYearMonth ?? joinYearMonth(params.employee?.joinedDate) ?? '';
+        if (!yearMonth) {
+            return missingFieldsFailure([employeeLink(employeeId, '入社日')]);
+        }
+        return missingFieldsFailure([premiumLink(employeeId, yearMonth, '入社月の報酬月額')]);
     }
 
     return { ok: true };
@@ -122,46 +204,126 @@ export function validateLossProcedureSubmit(params: {
     company: Company | null | undefined;
     lossDate: string | null | undefined;
     lossReason: LossReason | null | undefined;
+    healthInsuranceStartDate?: string | null;
 }): ProcedureSubmitValidationResult {
     const common = validateCommonProcedureContext(params);
     if (common) return common;
 
+    const employeeId = params.employee!.id;
+    const missing: ProcedureSubmitMissingField[] = [];
+
     if (!params.lossReason) {
-        return failure('資格喪失理由が未入力です');
+        missing.push(employeeLink(employeeId, '資格喪失理由', 'retire-section'));
     }
 
     if (!params.lossDate?.trim()) {
-        if (params.lossReason === 'retirement') {
-            return failure('退職年月日が未入力です');
-        }
-        return failure('資格喪失年月日が未入力です');
+        missing.push(
+            employeeLink(
+                employeeId,
+                params.lossReason === 'retirement' ? '退職年月日' : '資格喪失年月日',
+                'retire-section',
+            ),
+        );
+    }
+
+    if (missing.length > 0) {
+        return missingFieldsFailure(missing);
+    }
+
+    const qualificationDate = getQualificationDate(
+        params.employee!,
+        params.healthInsuranceStartDate,
+    );
+    const lossDateReason = validateLossDateRange(params.lossDate!.trim(), qualificationDate);
+    if (lossDateReason) {
+        return errorFailure(lossDateReason);
     }
 
     return { ok: true };
 }
 
 export function validateDependentProcedureSubmit(
-    changeType: 'add' | 'change' | 'delete',
+    changeType: 'add' | 'change' | 'delete' | null,
     form: DependentProcedureSubmitForm,
+    procedureId?: string,
+    options?: {
+        employee?: Employee | null;
+        healthInsuranceStartDate?: string | null;
+        healthInsuranceEndDate?: string | null;
+        dependencyStartDate?: string | null;
+        dependencyEndDate?: string | null;
+    },
 ): ProcedureSubmitValidationResult {
+    if (!changeType) {
+        return missingFieldsFailure([procedureFormLink(procedureId, '異動の別', 'dependent-change-type')]);
+    }
+
+    const missing: ProcedureSubmitMissingField[] = [];
+
     if (changeType === 'change' || changeType === 'delete') {
-        if (!form.dependentId) return failure('被扶養者を選択してください');
+        if (!form.dependentId) {
+            missing.push(procedureFormLink(procedureId, '被扶養者', 'dependent-select'));
+        }
     }
 
     if (changeType === 'add' || changeType === 'change') {
-        if (!form.lastName.trim() || !form.firstName.trim()) return failure('氏名を入力してください');
-        if (!form.birthDate) return failure('生年月日を入力してください');
-        if (!form.gender) return failure('性別を選択してください');
-        if (!form.relationship) return failure('続柄を選択してください');
-        if (changeType === 'add' && !form.dependencyStartDate) {
-            return failure('被扶養者になった日を入力してください');
+        if (!form.lastName.trim() || !form.firstName.trim()) {
+            missing.push(procedureFormLink(procedureId, '氏名', 'dep-last-name'));
         }
-        if (changeType === 'add' && !form.addReason) return failure('理由を選択してください');
+        if (!form.birthDate) {
+            missing.push(procedureFormLink(procedureId, '生年月日', 'dep-birth-date'));
+        }
+        if (!form.gender) {
+            missing.push(procedureFormLink(procedureId, '性別', 'dep-gender'));
+        }
+        if (!form.relationship) {
+            missing.push(procedureFormLink(procedureId, '続柄', 'dep-relationship'));
+        }
+        if (changeType === 'add' && !form.dependencyStartDate) {
+            missing.push(procedureFormLink(procedureId, '被扶養者になった日', 'dep-start-date'));
+        }
+        if (changeType === 'add' && !form.addReason) {
+            missing.push(procedureFormLink(procedureId, '追加理由', 'dep-add-reason'));
+        }
     }
 
     if (changeType === 'delete') {
-        if (!form.dependencyEndDate) return failure('被扶養者でなくなった日を入力してください');
-        if (!form.deleteReason) return failure('理由を選択してください');
+        if (!form.dependencyEndDate) {
+            missing.push(procedureFormLink(procedureId, '被扶養者でなくなった日', 'dep-end-date'));
+        }
+        if (!form.deleteReason) {
+            missing.push(procedureFormLink(procedureId, '削除理由', 'dep-delete-reason'));
+        }
+    }
+
+    if (!form.occurredDate.trim()) {
+        missing.push(procedureFormLink(procedureId, '事象が発生した日', 'dep-occurred-date'));
+    }
+
+    if (missing.length > 0) {
+        return missingFieldsFailure(missing);
+    }
+
+    if (options?.employee) {
+        const bounds = resolveInsuredPeriodBounds({
+            employee: options.employee,
+            healthInsuranceStartDate: options.healthInsuranceStartDate,
+            healthInsuranceEndDate: options.healthInsuranceEndDate,
+        });
+        const occurredDateReason = validateDependentOccurredDate({
+            occurredDate: form.occurredDate.trim(),
+            changeType,
+            bounds,
+            dependencyStartDate:
+                options.dependencyStartDate
+                ?? (changeType === 'add' ? form.dependencyStartDate : undefined),
+            dependencyEndDate:
+                options.dependencyEndDate
+                ?? (changeType === 'delete' ? form.dependencyEndDate : undefined),
+        });
+        if (occurredDateReason) {
+            return errorFailure(occurredDateReason);
+        }
     }
 
     return { ok: true };
@@ -178,17 +340,22 @@ export function validateRegularDecisionProcedureSubmit(params: {
     const common = validateCommonProcedureContext(params);
     if (common) return common;
 
+    const employeeId = params.employee!.id;
+
     if (params.missingMonthlyRewardMonths.length > 0) {
-        const labels = params.missingMonthlyRewardMonths.map(formatYearMonthLabel).join('、');
-        return failure(`${labels}の報酬月額が未入力です`);
+        return missingFieldsFailure(
+            params.missingMonthlyRewardMonths.map((yearMonth) =>
+                premiumLink(employeeId, yearMonth, `${formatYearMonthLabel(yearMonth)}の報酬月額`),
+            ),
+        );
     }
 
     if (params.averageMonthlyReward === null || params.averageMonthlyReward === undefined) {
-        return failure('算定に必要な報酬月額が未入力です');
+        return errorFailure('算定に必要な報酬月額が未入力です');
     }
 
     if (!params.standardRemuneration) {
-        return failure('標準報酬月額を算定できません');
+        return errorFailure('標準報酬月額を算定できません');
     }
 
     return { ok: true };
@@ -205,20 +372,24 @@ export function validateRevisionProcedureSubmit(params: {
     const common = validateCommonProcedureContext(params);
     if (common) return common;
 
+    const employeeId = params.employee!.id;
+
     if (!params.targetYearMonth?.trim()) {
-        return failure('改定年月が未入力です');
+        return errorFailure('改定年月が未入力です');
     }
 
     if (params.revisionRevisedMonthlyReward === null || params.revisionRevisedMonthlyReward === undefined) {
-        return failure('改定後の報酬月額が未入力です');
+        return missingFieldsFailure([
+            premiumLink(employeeId, params.targetYearMonth, '改定後の報酬月額'),
+        ]);
     }
 
     if (!params.revisionReason?.trim()) {
-        return failure('改定理由が未入力です');
+        return errorFailure('改定理由が未入力です');
     }
 
     if (INVALID_REVISION_REASONS.has(params.revisionReason)) {
-        return failure(params.revisionReason);
+        return errorFailure(params.revisionReason);
     }
 
     return { ok: true };
@@ -230,16 +401,36 @@ export function validateBonusPaymentProcedureSubmit(params: {
     company: Company | null | undefined;
     targetYearMonth: string | null | undefined;
     bonusAmount: number | null | undefined;
+    paymentDate?: string | null;
+    healthInsuranceStartDate?: string | null;
+    healthInsuranceEndDate?: string | null;
 }): ProcedureSubmitValidationResult {
     const common = validateCommonProcedureContext(params);
     if (common) return common;
 
+    const employeeId = params.employee!.id;
+
     if (!params.targetYearMonth?.trim()) {
-        return failure('対象年月が未入力です');
+        return errorFailure('対象年月が未入力です');
     }
 
     if (params.bonusAmount === null || params.bonusAmount === undefined) {
-        return failure('賞与額が未登録です');
+        return missingFieldsFailure([
+            premiumLink(employeeId, params.targetYearMonth, '賞与額'),
+        ]);
+    }
+
+    const paymentDate = params.paymentDate?.trim();
+    if (paymentDate) {
+        const bounds = resolveInsuredPeriodBounds({
+            employee: params.employee!,
+            healthInsuranceStartDate: params.healthInsuranceStartDate,
+            healthInsuranceEndDate: params.healthInsuranceEndDate,
+        });
+        const paymentDateReason = validateDateWithinInsuredPeriod(paymentDate, bounds);
+        if (paymentDateReason) {
+            return errorFailure(paymentDateReason);
+        }
     }
 
     return { ok: true };
@@ -255,8 +446,12 @@ export function validateProcedureSubmit(
         monthlyReward?: QualificationMonthlyReward | null;
         lossDate?: string | null;
         lossReason?: LossReason | null;
+        healthInsuranceStartDate?: string | null;
+        healthInsuranceEndDate?: string | null;
         dependentChangeType?: 'add' | 'change' | 'delete' | null;
         dependentForm?: DependentProcedureSubmitForm;
+        dependentDependencyStartDate?: string | null;
+        dependentDependencyEndDate?: string | null;
         missingMonthlyRewardMonths?: string[];
         averageMonthlyReward?: number | null;
         standardRemuneration?: { health: number; pension: number } | null;
@@ -281,12 +476,33 @@ export function validateProcedureSubmit(
                 company: context.company,
                 lossDate: context.lossDate,
                 lossReason: context.lossReason ?? procedure.lossReason,
+                healthInsuranceStartDate: context.healthInsuranceStartDate,
             });
         case 'dependentChange':
-            if (!context.dependentChangeType || !context.dependentForm) {
-                return failure('異動の別を選択してください');
-            }
-            return validateDependentProcedureSubmit(context.dependentChangeType, context.dependentForm);
+            return validateDependentProcedureSubmit(
+                context.dependentChangeType ?? null,
+                context.dependentForm ?? {
+                    occurredDate: '',
+                    dependentId: '',
+                    lastName: '',
+                    firstName: '',
+                    birthDate: '',
+                    gender: '',
+                    relationship: '',
+                    dependencyStartDate: '',
+                    addReason: '',
+                    dependencyEndDate: '',
+                    deleteReason: '',
+                },
+                procedure.id,
+                {
+                    employee: context.employee,
+                    healthInsuranceStartDate: context.healthInsuranceStartDate,
+                    healthInsuranceEndDate: context.healthInsuranceEndDate,
+                    dependencyStartDate: context.dependentDependencyStartDate,
+                    dependencyEndDate: context.dependentDependencyEndDate,
+                },
+            );
         case 'regularDecision':
             return validateRegularDecisionProcedureSubmit({
                 employee: context.employee,
@@ -312,9 +528,12 @@ export function validateProcedureSubmit(
                 company: context.company,
                 targetYearMonth: procedure.targetYearMonth,
                 bonusAmount: context.bonusAmount,
+                paymentDate: procedure.occurredDate,
+                healthInsuranceStartDate: context.healthInsuranceStartDate,
+                healthInsuranceEndDate: context.healthInsuranceEndDate,
             });
         default:
-            return failure('この手続きは提出済みにできません');
+            return errorFailure('この手続きは提出済みにできません');
     }
 }
 

@@ -42,12 +42,12 @@ import { BonusRewardService } from '../../bonus/services/bonus-reward.service';
 import { SocialInsuranceStatusService } from '../services/social-insurance-status.service';
 import { StandardMonthlyReward } from '../../insurance/models/standard-monthly-reward.model';
 import { BonusReward } from '../../bonus/models/bonus-reward.model';
+import { SocialInsuranceStatus } from '../models/social-insurance-status.model';
 import { ProcedureCsvExportContext } from '../utils/procedure-csv-export.util';
 import {
     validateBonusPaymentProcedureSubmit,
     validateRegularDecisionProcedureSubmit,
     validateRevisionProcedureSubmit,
-    PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE,
 } from '../utils/procedure-submit-validation.util';
 
 type StandardRemunerationAmounts = {
@@ -86,6 +86,7 @@ export class EmployeeProcedureSheetComponent {
     company = input.required<Company>();
     formTitle = input.required<string>();
     variant = input.required<RemunerationProcedureVariant>();
+    socialInsuranceStatus = input<SocialInsuranceStatus | null>(null);
 
     procedureUpdated = output<Procedure>();
 
@@ -242,6 +243,9 @@ export class EmployeeProcedureSheetComponent {
             company: this.company(),
             targetYearMonth: procedure.targetYearMonth,
             bonusAmount: this.bonusPaymentAmount(),
+            paymentDate: procedure.occurredDate,
+            healthInsuranceStartDate: this.socialInsuranceStatus()?.healthInsuranceStartDate,
+            healthInsuranceEndDate: this.socialInsuranceStatus()?.healthInsuranceEndDate,
         });
     });
 
@@ -772,10 +776,7 @@ export class EmployeeProcedureSheetComponent {
         if (item.status === 'completed' || this.isSubmitting()) return;
 
         const validation = this.submitValidation();
-        if (!validation.ok) {
-            this.submitErrorMessage.set(PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE);
-            return;
-        }
+        if (!validation.ok) return;
 
         this.isSubmitting.set(true);
         this.submitErrorMessage.set('');
