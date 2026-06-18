@@ -17,6 +17,7 @@ import {
     resolveLossDate,
     timestampDateLabel,
 } from '../utils/procedure-display.util';
+import { validateLossProcedureSubmit, PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE } from '../utils/procedure-submit-validation.util';
 
 @Component({
     selector: 'app-loss-procedure',
@@ -60,6 +61,18 @@ export class LossProcedureComponent {
         return reason === 'retirement' || reason === null;
     });
 
+    submitValidation = computed(() =>
+        validateLossProcedureSubmit({
+            employee: this.employee(),
+            office: this.office(),
+            company: this.company(),
+            lossDate: this.lossDate(),
+            lossReason: this.procedure().lossReason,
+        }),
+    );
+
+    canSubmit = computed(() => this.submitValidation().ok);
+
     readonly statusLabel = procedureStatusLabel;
     readonly genderLabel = genderLabel;
     readonly dateLabel = dateLabel;
@@ -85,6 +98,12 @@ export class LossProcedureComponent {
     async submitProcedure(): Promise<void> {
         const item = this.procedure();
         if (item.status === 'completed' || this.isSubmitting()) return;
+
+        const validation = this.submitValidation();
+        if (!validation.ok) {
+            this.submitErrorMessage.set(PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE);
+            return;
+        }
 
         this.isSubmitting.set(true);
         this.submitErrorMessage.set('');

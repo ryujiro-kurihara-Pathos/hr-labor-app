@@ -20,6 +20,9 @@ import { EmployeeService } from '../../employee/services/employee.service';
 import { SocialInsuranceStatusService } from '../../social-insurance/services/social-insurance-status.service';
 import {
     addMonthsToYearMonth,
+    bonusPaymentDateReason,
+    clampViewableYearMonth,
+    dateStringFromTimestamp,
     isRewardTargetMonth,
     rewardTargetMonthReason,
     navigableYearMonthMax,
@@ -667,8 +670,9 @@ export class InsurancePremiumDetailPageComponent {
         return 'unregistered';
     });
 
-    /** 下書き・未登録のみ編集可能（確定後は変更不可） */
+    /** 下書き・未登録のみ編集可能（確定後・在籍期間外は変更不可） */
     isRewardEditable = computed(() => {
+        if (!this.isTargetMonth()) return false;
         const status = this.monthRewardStatus();
         return status === 'unregistered' || status === 'draft';
     });
@@ -1042,6 +1046,14 @@ export class InsurancePremiumDetailPageComponent {
         try {
             await this.loadEmployee();
             if (this.employee()) {
+                const clamped = clampViewableYearMonth(
+                    this.employee()!,
+                    initialYearMonth,
+                    this.currentYearMonth(),
+                );
+                if (clamped !== initialYearMonth) {
+                    this.setTargetYearMonth(clamped);
+                }
                 await Promise.all([this.loadEmployeeRewards(), this.loadSocialInsuranceStatus()]);
                 await this.loadStandardReward();
                 await this.loadMonthBonuses();
@@ -2086,7 +2098,30 @@ export class InsurancePremiumDetailPageComponent {
         }
     }
 
-    isBonusEditable = computed(() => !this.isLoadingMonth() && !this.isLoadingBonus());
+    isBonusEditable = computed(() =>
+        !this.isLoadingMonth() && !this.isLoadingBonus() && this.isTargetMonth(),
+    );
+
+    bonusPaymentDateMin = computed((): string | null => {
+        const employee = this.employee();
+        const targetYearMonth = this.targetYearMonth();
+        if (!employee?.joinedDate?.trim() || !targetYearMonth) return null;
+        const joinedDate = employee.joinedDate.trim();
+        return joinedDate.startsWith(targetYearMonth) ? joinedDate : `${targetYearMonth}-01`;
+    });
+
+    bonusPaymentDateMax = computed((): string | null => {
+        const employee = this.employee();
+        const targetYearMonth = this.targetYearMonth();
+        if (!targetYearMonth) return null;
+
+        const monthEnd = this.lastDayOfTargetYearMonth();
+        const retiredDate = employee ? dateStringFromTimestamp(employee.retiredDate) : null;
+        if (retiredDate?.startsWith(targetYearMonth)) {
+            return retiredDate < monthEnd ? retiredDate : monthEnd;
+        }
+        return monthEnd;
+    });
 
     editingBonus = computed((): BonusReward | null => {
         const paymentDate = this.bonusForm.paymentDate.trim();
@@ -2139,8 +2174,23 @@ export class InsurancePremiumDetailPageComponent {
 
     // 賞与の支給日を取得
     private defaultBonusPaymentDate(): string {
+        const employee = this.employee();
         const targetYearMonth = this.targetYearMonth();
-        return targetYearMonth ? `${targetYearMonth}-01` : '';
+        if (!targetYearMonth) return '';
+
+        const min = this.bonusPaymentDateMin();
+        const max = this.bonusPaymentDateMax();
+        const fallback = min ?? `${targetYearMonth}-01`;
+        if (max && fallback > max) return max;
+        return fallback;
+    }
+
+    private lastDayOfTargetYearMonth(): string {
+        const targetYearMonth = this.targetYearMonth();
+        if (!targetYearMonth) return '';
+        const [year, month] = targetYearMonth.split('-').map(Number);
+        const lastDay = new Date(year, month, 0).getDate();
+        return `${targetYearMonth}-${String(lastDay).padStart(2, '0')}`;
     }
 
     // 賞与を保存（下書き）
@@ -2222,6 +2272,11 @@ export class InsurancePremiumDetailPageComponent {
         const targetYearMonth = this.targetYearMonth();
         if (!employee?.companyId || !employeeId || !targetYearMonth) return;
 
+        if (!this.isTargetMonth()) {
+            this.bonusErrorMessage.set(this.targetMonthReason() ?? 'この月は賞与登録の対象外です。');
+            return;
+        }
+
         const paymentDate = this.bonusForm.paymentDate.trim();
         const bonusAmount = this.toNumber(this.bonusForm.bonusAmount);
 
@@ -2234,6 +2289,11 @@ export class InsurancePremiumDetailPageComponent {
         }
         if (!paymentDate.startsWith(targetYearMonth)) {
             this.bonusErrorMessage.set('支給日は対象年月（' + this.targetYearMonthLabel() + '）の日付にしてください');
+            return;
+        }
+        const periodReason = bonusPaymentDateReason(employee, paymentDate);
+        if (periodReason) {
+            this.bonusErrorMessage.set(periodReason);
             return;
         }
         if (bonusAmount <= 0) {

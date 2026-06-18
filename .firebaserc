@@ -1,5 +1,7 @@
 {
   "projects": {
     "default": "kensyu10143"
-  }
+  },
+  "targets": {},
+  "etags": {}
 }

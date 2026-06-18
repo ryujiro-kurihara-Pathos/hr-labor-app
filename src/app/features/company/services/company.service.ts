@@ -10,7 +10,10 @@ import {
     Timestamp } from 'firebase/firestore';
 import { db } from '../../../core/firebase';
 import { Company, CompanyInput, CompanyUpdateInput } from '../models/company.model';
-import { normalizeCompany } from '../utils/company-payroll-settings.util';
+import {
+    normalizeCompany,
+    resolveInsurancePremiumCollectionTiming,
+} from '../utils/company-payroll-settings.util';
 
 @Injectable({
     providedIn: 'root',
@@ -54,6 +57,9 @@ export class CompanyService {
         const docRef = doc(db, 'companies', companyId);
         await updateDoc(docRef, {
             ...input,
+            insurancePremiumCollectionTiming: resolveInsurancePremiumCollectionTiming(
+                input.payrollPaymentMonthOffset,
+            ),
             updatedAt: serverTimestamp(),
         });
     }

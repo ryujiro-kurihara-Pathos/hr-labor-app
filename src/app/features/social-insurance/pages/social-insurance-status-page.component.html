@@ -130,7 +130,6 @@
                             <th>健康保険</th>
                             <th>厚生年金</th>
                             <th>介護保険</th>
-                            <th>資格取得日</th>
                             <th>備考</th>
                         </tr>
                     </thead>
@@ -182,7 +181,6 @@
                                         {{ joinStatusLabelForRow(row, 'care') }}
                                     </span>
                                 </td>
-                                <td>{{ formatInsuranceDate(row.status?.healthInsuranceStartDate) }}</td>
                                 <td class="memo-cell">{{ memoPreview(row.status?.memo) }}</td>
                             </tr>
                         }

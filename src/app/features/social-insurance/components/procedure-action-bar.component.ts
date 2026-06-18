@@ -14,6 +14,7 @@ import {
     canExportProcedureCsv,
     ProcedureCsvExportContext,
 } from '../utils/procedure-csv-export.util';
+import { PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE } from '../utils/procedure-submit-validation.util';
 
 @Component({
     selector: 'app-procedure-action-bar',
@@ -40,6 +41,7 @@ export class ProcedureActionBarComponent {
 
     exportMessage = signal('');
     deleteErrorMessage = signal('');
+    submitBlockedMessage = signal('');
     isDeleting = signal(false);
 
     readonly dateLabel = dateLabel;
@@ -77,9 +79,16 @@ export class ProcedureActionBarComponent {
     }
 
     async onSubmit(): Promise<void> {
-        if (this.isCompleted() || this.isDeleting() || this.isSubmitting() || this.submitDisabled()) {
+        if (this.isCompleted() || this.isDeleting() || this.isSubmitting()) {
             return;
         }
+
+        if (this.submitDisabled()) {
+            this.submitBlockedMessage.set(PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE);
+            return;
+        }
+
+        this.submitBlockedMessage.set('');
 
         const confirmed = await this.confirmService.confirmSubmit();
         if (!confirmed) return;

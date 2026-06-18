@@ -19,11 +19,11 @@ export type Company = {
 
     /** 給与締日（1-31、31=末日）。未設定可 */
     payrollClosingDay: number | null;
-    /** 給与支払日（1-31、31=末日）。未設定可 */
+    /** 給与支払日（1-31、31=末日）。必須 */
     payrollPaymentDay: number | null;
     /** 支払日が当月か翌月か（0=当月、1=翌月） */
     payrollPaymentMonthOffset: 0 | 1;
-    /** 社会保険料の給与控除タイミング */
+    /** 社会保険料の給与控除タイミング（payrollPaymentMonthOffset から自動決定） */
     insurancePremiumCollectionTiming: InsurancePremiumCollectionTiming;
 
     createdAt: Timestamp;
@@ -40,5 +40,4 @@ export type CompanyUpdateInput = Pick<
     | 'payrollClosingDay'
     | 'payrollPaymentDay'
     | 'payrollPaymentMonthOffset'
-    | 'insurancePremiumCollectionTiming'
 >;

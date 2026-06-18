@@ -42,7 +42,7 @@
                 type="button"
                 class="btn submit-btn"
                 (click)="onSubmit()"
-                [disabled]="isDeleting() || isSubmitting() || submitDisabled()"
+                [disabled]="isDeleting() || isSubmitting()"
             >
                 @if (isSubmitting()) {
                     処理中...
@@ -56,6 +56,9 @@
 
 @if (exportMessage()) {
     <p class="action-note">{{ exportMessage() }}</p>
+}
+@if (submitBlockedMessage()) {
+    <p class="action-error">{{ submitBlockedMessage() }}</p>
 }
 @if (deleteErrorMessage()) {
     <p class="action-error">{{ deleteErrorMessage() }}</p>

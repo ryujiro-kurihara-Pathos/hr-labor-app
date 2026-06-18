@@ -43,6 +43,12 @@ import { SocialInsuranceStatusService } from '../services/social-insurance-statu
 import { StandardMonthlyReward } from '../../insurance/models/standard-monthly-reward.model';
 import { BonusReward } from '../../bonus/models/bonus-reward.model';
 import { ProcedureCsvExportContext } from '../utils/procedure-csv-export.util';
+import {
+    validateBonusPaymentProcedureSubmit,
+    validateRegularDecisionProcedureSubmit,
+    validateRevisionProcedureSubmit,
+    PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE,
+} from '../utils/procedure-submit-validation.util';
 
 type StandardRemunerationAmounts = {
     health: number;
@@ -203,6 +209,43 @@ export class EmployeeProcedureSheetComponent {
 
         return {};
     });
+
+    submitValidation = computed(() => {
+        const variant = this.variant();
+        const procedure = this.procedure();
+
+        if (variant === 'regularDecision') {
+            return validateRegularDecisionProcedureSubmit({
+                employee: this.employee(),
+                office: this.office(),
+                company: this.company(),
+                missingMonthlyRewardMonths: this.missingMonthlyRewardMonths(),
+                averageMonthlyReward: this.averageMonthlyReward(),
+                standardRemuneration: this.standardRemuneration(),
+            });
+        }
+
+        if (variant === 'revision') {
+            return validateRevisionProcedureSubmit({
+                employee: this.employee(),
+                office: this.office(),
+                company: this.company(),
+                targetYearMonth: procedure.targetYearMonth,
+                revisionRevisedMonthlyReward: this.revisionRevisedMonthlyReward(),
+                revisionReason: this.revisionReason(),
+            });
+        }
+
+        return validateBonusPaymentProcedureSubmit({
+            employee: this.employee(),
+            office: this.office(),
+            company: this.company(),
+            targetYearMonth: procedure.targetYearMonth,
+            bonusAmount: this.bonusPaymentAmount(),
+        });
+    });
+
+    canSubmit = computed(() => this.submitValidation().ok);
 
     constructor() {
         effect(() => {
@@ -727,6 +770,12 @@ export class EmployeeProcedureSheetComponent {
     async submitProcedure(): Promise<void> {
         const item = this.procedure();
         if (item.status === 'completed' || this.isSubmitting()) return;
+
+        const validation = this.submitValidation();
+        if (!validation.ok) {
+            this.submitErrorMessage.set(PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE);
+            return;
+        }
 
         this.isSubmitting.set(true);
         this.submitErrorMessage.set('');

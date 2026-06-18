@@ -49,11 +49,11 @@
                     <div class="payroll-settings-block">
                         <h3 class="payroll-settings-title">給与・保険料設定</h3>
                         <p class="payroll-settings-note">
-                            給与締日・支払日は任意です。保険料の給与控除表示に徴収タイミングを使用します。
+                            31日（末日）を選んだ場合、月によっては28〜30日が適用されます（例: 4月の31日設定 → 30日）。
                         </p>
                         <div class="form-field">
                             <div class="label-row">
-                                <label for="payroll-closing-day">給与締日</label>
+                                <label for="payroll-closing-day">給与締日 <span class="field-badge optional">任意</span></label>
                                 <app-field-help-tooltip
                                     title="給与締日"
                                     [lines]="payrollClosingHelpLines"
@@ -78,54 +78,46 @@
                         </div>
                         <div class="form-field">
                             <div class="label-row">
-                                <label for="payroll-payment-day">給与支払日</label>
+                                <label for="payroll-payment-month-offset">給与支払月 <span class="field-badge required">必須</span></label>
+                                <app-field-help-tooltip
+                                    title="給与支払月"
+                                    [lines]="payrollPaymentMonthHelpLines"
+                                />
+                            </div>
+                            <select
+                                id="payroll-payment-month-offset"
+                                name="payrollPaymentMonthOffset"
+                                [(ngModel)]="payrollPaymentMonthOffset"
+                                required
+                            >
+                                <option [ngValue]="0">当月</option>
+                                <option [ngValue]="1">翌月</option>
+                            </select>
+                        </div>
+                        <div class="form-field">
+                            <div class="label-row">
+                                <label for="payroll-payment-day">給与支払日 <span class="field-badge required">必須</span></label>
                                 <app-field-help-tooltip
                                     title="給与支払日"
                                     [lines]="payrollPaymentHelpLines"
                                 />
                             </div>
-                            <div class="inline-field-row">
-                                <select
-                                    id="payroll-payment-month-offset"
-                                    name="payrollPaymentMonthOffset"
-                                    [(ngModel)]="payrollPaymentMonthOffset"
-                                >
-                                    <option [ngValue]="0">当月</option>
-                                    <option [ngValue]="1">翌月</option>
-                                </select>
-                                <select
-                                    id="payroll-payment-day"
-                                    name="payrollPaymentDay"
-                                    [(ngModel)]="payrollPaymentDay"
-                                >
-                                    <option [ngValue]="''">未設定</option>
-                                    @for (day of payrollDayOptions; track day) {
-                                        <option [ngValue]="day">
-                                            @if (day === 31) {
-                                                末日
-                                            } @else {
-                                                {{ day }}日
-                                            }
-                                        </option>
-                                    }
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-field">
-                            <div class="label-row">
-                                <label for="insurance-collection-timing">保険料徴収タイミング</label>
-                                <app-field-help-tooltip
-                                    title="保険料徴収タイミング"
-                                    [lines]="insuranceCollectionHelpLines"
-                                />
-                            </div>
                             <select
-                                id="insurance-collection-timing"
-                                name="insurancePremiumCollectionTiming"
-                                [(ngModel)]="insurancePremiumCollectionTiming"
+                                id="payroll-payment-day"
+                                name="payrollPaymentDay"
+                                [(ngModel)]="payrollPaymentDay"
+                                required
                             >
-                                <option value="same_month">当月徴収（対象月の給与から控除）</option>
-                                <option value="next_month">翌月徴収（翌月の給与から控除）</option>
+                                <option [ngValue]="''" disabled>選択してください</option>
+                                @for (day of payrollDayOptions; track day) {
+                                    <option [ngValue]="day">
+                                        @if (day === 31) {
+                                            末日
+                                        } @else {
+                                            {{ day }}日
+                                        }
+                                    </option>
+                                }
                             </select>
                         </div>
                     </div>
@@ -171,12 +163,12 @@
                                 <dd>{{ formatPayrollClosingDayLabel(c.payrollClosingDay) }}</dd>
                             </div>
                             <div class="meta-row">
-                                <dt>給与支払日</dt>
-                                <dd>{{ formatPayrollPaymentDayLabel(c.payrollPaymentDay, c.payrollPaymentMonthOffset) }}</dd>
+                                <dt>給与支払月</dt>
+                                <dd>{{ c.payrollPaymentMonthOffset === 1 ? '翌月' : '当月' }}</dd>
                             </div>
                             <div class="meta-row">
-                                <dt>保険料徴収</dt>
-                                <dd>{{ insurancePremiumCollectionTimingLabel(c.insurancePremiumCollectionTiming) }}</dd>
+                                <dt>給与支払日</dt>
+                                <dd>{{ formatConfiguredPayrollDayLabel(c.payrollPaymentDay) }}</dd>
                             </div>
                         </dl>
                     </div>
@@ -206,6 +198,7 @@
                     (close)="closeOfficeModal()"
                     (submit)="onCreateOffice($event)"
                     [isLoading]="isOfficeSaving()"
+                    [serverErrorMessage]="officeCreateErrorMessage()"
                 />
             }
 
@@ -426,6 +419,26 @@
 
     .label-row label {
         margin-bottom: 0;
+    }
+
+    .field-badge {
+        margin-left: 6px;
+        padding: 1px 6px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 700;
+        vertical-align: middle;
+    }
+
+    .field-badge.required {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    .field-badge.optional {
+        background: #f3f4f6;
+        color: #6b7280;
+        font-weight: 600;
     }
 
     .company-name-row {

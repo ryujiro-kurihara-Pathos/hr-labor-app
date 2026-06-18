@@ -3,7 +3,7 @@
     "rules": "firestore.rules"
   },
   "hosting": {
-    "public": "C:\\Users\\ryujiro.kurihara\\Desktop\\hr-labor-app\\dist\\hr-labor-app\\browser",
+    "public": "dist/hr-labor-app/browser",
     "ignore": [
       "firebase.json",
       "**/.*",

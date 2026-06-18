@@ -33,6 +33,7 @@
                             @if (officeName()) {
                                 <span class="meta-chip muted">{{ officeName() }}</span>
                             }
+                            <span class="meta-chip muted">{{ genderLabel(employee()!.gender) }}</span>
                         </div>
                     }
                 </div>
@@ -67,10 +68,10 @@
                             <input id="first-name-kana" type="text" name="firstNameKana" [(ngModel)]="firstNameKana" />
                         </div>
                         <div class="form-field">
-                            <label for="gender">性別</label>
-                            <select id="gender" name="gender" [(ngModel)]="gender">
-                                <option value="male">男性</option>
-                                <option value="female">女性</option>
+                            <label for="gender">性別<span class="required-mark" aria-hidden="true">*</span></label>
+                            <select id="gender" name="gender" [(ngModel)]="gender" required>
+                                <option ngValue="male">男性</option>
+                                <option ngValue="female">女性</option>
                             </select>
                         </div>
                         <div class="form-field">

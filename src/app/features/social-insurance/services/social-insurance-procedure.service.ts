@@ -43,6 +43,7 @@ import {
 import { hasSavedQualificationData } from '../utils/qualification-procedure-data.util';
 import {
     canAutoManageQualificationProcedure,
+    resolveEffectiveHealthInsuranceStartDateForSync,
     resolveQualificationProcedureDates,
     shouldSyncQualificationProcedureDates,
 } from '../utils/qualification-procedure-data.util';
@@ -295,24 +296,46 @@ export class SocialInsuranceProcedureService {
         healthInsuranceStartDate?: string | null;
         healthInsuranceStatus?: insuranceJoinStatus;
         pensionInsuranceStatus?: insuranceJoinStatus;
+        /** 入社日変更時は変更前の入社日を渡す */
+        previousJoinedDate?: string | null;
     }): Promise<Procedure | null> {
         const { employee } = params;
-        const dates = resolveQualificationProcedureDates(
-            employee,
-            params.healthInsuranceStartDate ?? null,
-        );
-        if (!dates) return null;
-
         const existing = await this.getQualificationProcedureByEmployeeId(
             employee.id,
             employee.companyId,
         );
+
+        const followJoinDate = existing
+            ? shouldSyncQualificationProcedureDates(existing.status, null, {
+                previousJoinedDate: params.previousJoinedDate,
+                newJoinedDate: employee.joinedDate,
+                procedure: existing,
+            })
+            : true;
+        const effectiveHealthInsuranceStartDate = followJoinDate
+            ? null
+            : resolveEffectiveHealthInsuranceStartDateForSync(
+                employee,
+                params.healthInsuranceStartDate ?? null,
+                params.previousJoinedDate ?? null,
+                existing,
+            );
+        const dates = resolveQualificationProcedureDates(
+            employee,
+            effectiveHealthInsuranceStartDate,
+        );
+        if (!dates) return null;
 
         if (existing) {
             if (
                 !shouldSyncQualificationProcedureDates(
                     existing.status,
                     params.healthInsuranceStartDate,
+                    {
+                        previousJoinedDate: params.previousJoinedDate,
+                        newJoinedDate: employee.joinedDate,
+                        procedure: existing,
+                    },
                 )
             ) {
                 return existing;

@@ -47,11 +47,135 @@ export function canAutoManageQualificationProcedure(
     return healthInsuranceStatus !== 'inactive' && pensionInsuranceStatus !== 'inactive';
 }
 
+export function hasJoinDateChanged(
+    previousJoinedDate: string | null | undefined,
+    newJoinedDate: string | null | undefined,
+): boolean {
+    const previous = previousJoinedDate?.trim() ?? '';
+    const next = newJoinedDate?.trim() ?? '';
+    return next !== '' && previous !== next;
+}
+
+/** 資格取得日が入社日起点（手入力の取得日ではない）か */
+export function isQualificationDateDerivedFromJoinDate(
+    healthInsuranceStartDate: string | null | undefined,
+    previousJoinedDate: string | null | undefined,
+    procedure: Pick<Procedure, 'qualificationDate' | 'occurredDate'> | null,
+): boolean {
+    if (!healthInsuranceStartDate?.trim()) return true;
+
+    const start = healthInsuranceStartDate.trim();
+    const previousJoin = previousJoinedDate?.trim();
+    if (previousJoin && start === previousJoin) return true;
+
+    const procedureDate = procedure?.qualificationDate?.trim() || procedure?.occurredDate?.trim();
+    if (procedureDate && start === procedureDate) return true;
+
+    return false;
+}
+
 export function shouldSyncQualificationProcedureDates(
     procedureStatus: ProcedureStatus,
-    healthInsuranceStartDate: string | null | undefined,
+    _healthInsuranceStartDate: string | null | undefined,
+    options?: {
+        previousJoinedDate?: string | null;
+        newJoinedDate?: string | null;
+        procedure?: Pick<Procedure, 'qualificationDate' | 'occurredDate'> | null;
+    },
 ): boolean {
-    return procedureStatus !== 'completed' && !healthInsuranceStartDate?.trim();
+    if (procedureStatus === 'completed') return false;
+    return hasJoinDateChanged(options?.previousJoinedDate, options?.newJoinedDate);
+}
+
+/** 同期時に入社日を資格取得日のソースとして使う */
+export function resolveEffectiveHealthInsuranceStartDateForSync(
+    employee: Employee,
+    healthInsuranceStartDate: string | null | undefined,
+    previousJoinedDate: string | null | undefined,
+    procedure: Pick<Procedure, 'qualificationDate' | 'occurredDate' | 'status'> | null,
+): string | null {
+    if (procedure?.status !== 'completed' && hasJoinDateChanged(previousJoinedDate, employee.joinedDate)) {
+        return null;
+    }
+
+    const procedureDate =
+        procedure?.qualificationDate?.trim()
+        || procedure?.occurredDate?.trim();
+    const previousJoin = previousJoinedDate?.trim();
+    const newJoin = employee.joinedDate?.trim();
+
+    if (
+        previousJoin
+        && newJoin
+        && previousJoin !== newJoin
+        && procedureDate === previousJoin
+    ) {
+        return null;
+    }
+
+    if (isQualificationDateDerivedFromJoinDate(healthInsuranceStartDate, previousJoinedDate, procedure)) {
+        return null;
+    }
+
+    return healthInsuranceStartDate?.trim() || null;
+}
+
+/** 入社日変更に合わせて社会保険の開始日も更新するか */
+export function shouldUpdateInsuranceStartDatesFromJoinDate(
+    previousJoinedDate: string | null | undefined,
+    newJoinedDate: string,
+    _healthInsuranceStartDate: string | null | undefined = null,
+    _pensionInsuranceStartDate: string | null | undefined = null,
+    procedure: Pick<Procedure, 'status'> | null = null,
+): boolean {
+    if (procedure?.status === 'completed') return false;
+    return hasJoinDateChanged(previousJoinedDate, newJoinedDate);
+}
+
+/** 入社日変更後に保存する資格取得日を返す */
+export function resolveQualificationDateAfterJoinDateChange(
+    employee: Employee,
+    previousJoinedDate: string | null | undefined,
+    procedure: Pick<Procedure, 'status'> | null,
+): string | null {
+    if (!shouldUpdateInsuranceStartDatesFromJoinDate(previousJoinedDate, employee.joinedDate, null, null, procedure)) {
+        return null;
+    }
+
+    return (
+        resolveQualificationProcedureDates(employee, null)?.qualificationDate
+        ?? employee.joinedDate?.trim()
+        ?? null
+    );
+}
+
+export function resolveLiveQualificationDisplayDate(
+    employee: Employee | null,
+    healthInsuranceStartDate: string | null | undefined,
+    procedure: Pick<Procedure, 'qualificationDate' | 'occurredDate' | 'status'>,
+): string | null {
+    if (!employee) {
+        return (
+            healthInsuranceStartDate?.trim()
+            || procedure.qualificationDate?.trim()
+            || procedure.occurredDate?.trim()
+            || null
+        );
+    }
+
+    if (procedure.status === 'completed') {
+        return (
+            procedure.qualificationDate?.trim()
+            || procedure.occurredDate?.trim()
+            || null
+        );
+    }
+
+    return (
+        resolveQualificationProcedureDates(employee, null)?.qualificationDate
+        ?? employee.joinedDate?.trim()
+        ?? null
+    );
 }
 
 export function buildQualificationProcedureData(params: {

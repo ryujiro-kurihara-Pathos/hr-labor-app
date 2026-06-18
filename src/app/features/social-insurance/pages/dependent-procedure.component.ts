@@ -33,6 +33,11 @@ import {
     extractDependentProcedureData,
     hasSavedDependentData,
 } from '../utils/dependent-procedure-data.util';
+import {
+    DependentProcedureSubmitForm,
+    validateDependentProcedureSubmit,
+    PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE,
+} from '../utils/procedure-submit-validation.util';
 
 type ChangeType = 'add' | 'change' | 'delete';
 
@@ -99,6 +104,16 @@ export class DependentProcedureComponent {
     activeDependents = computed(() => this.dependents().filter((d) => d.status === 'active'));
 
     displayData = computed(() => extractDependentProcedureData(this.procedure()));
+
+    submitValidation = computed(() => {
+        const type = this.changeType();
+        if (!type) {
+            return { ok: false as const, message: '異動の別を選択してください' };
+        }
+        return validateDependentProcedureSubmit(type, this.toSubmitForm(this.form()));
+    });
+
+    canSubmit = computed(() => this.submitValidation().ok);
 
     exportProcedure = computed((): Procedure => {
         const item = this.procedure();
@@ -216,13 +231,13 @@ export class DependentProcedureComponent {
 
         const type = this.changeType();
         if (!type) {
-            this.saveErrorMessage.set('異動の別を選択してください');
+            this.saveErrorMessage.set(PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE);
             return;
         }
 
-        const error = this.validateForm(type);
-        if (error) {
-            this.saveErrorMessage.set(error);
+        const validation = this.submitValidation();
+        if (!validation.ok) {
+            this.saveErrorMessage.set(PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE);
             return;
         }
 
@@ -364,27 +379,18 @@ export class DependentProcedureComponent {
         };
     }
 
-    private validateForm(type: ChangeType): string | null {
-        const form = this.form();
-
-        if (type === 'change' || type === 'delete') {
-            if (!form.dependentId) return '被扶養者を選択してください';
-        }
-
-        if (type === 'add' || type === 'change') {
-            if (!form.lastName.trim() || !form.firstName.trim()) return '氏名を入力してください';
-            if (!form.birthDate) return '生年月日を入力してください';
-            if (!form.gender) return '性別を選択してください';
-            if (!form.relationship) return '続柄を選択してください';
-            if (!form.dependencyStartDate && type === 'add') return '被扶養者になった日を入力してください';
-            if (!form.addReason && type === 'add') return '理由を選択してください';
-        }
-
-        if (type === 'delete') {
-            if (!form.dependencyEndDate) return '被扶養者でなくなった日を入力してください';
-            if (!form.deleteReason) return '理由を選択してください';
-        }
-
-        return null;
+    private toSubmitForm(form: DependentFormState): DependentProcedureSubmitForm {
+        return {
+            dependentId: form.dependentId,
+            lastName: form.lastName,
+            firstName: form.firstName,
+            birthDate: form.birthDate,
+            gender: form.gender,
+            relationship: form.relationship,
+            dependencyStartDate: form.dependencyStartDate,
+            addReason: form.addReason,
+            dependencyEndDate: form.dependencyEndDate,
+            deleteReason: form.deleteReason,
+        };
     }
 }

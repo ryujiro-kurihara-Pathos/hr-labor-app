@@ -112,6 +112,7 @@ export class EmployeeCreatePageComponent {
             || this.isFormEmpty(this.employee.joinedDate)
             || this.isFormEmpty(this.employee.officeId)
             || this.employee.employmentType === null
+            || (this.employee.gender !== 'male' && this.employee.gender !== 'female')
         ) {
             this.errorMessage.set('必須項目を入力してください。');
             this.isLoadingEmployee.set(false);

@@ -2,23 +2,25 @@ import { Component, signal, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink, Router } from '@angular/router';
 
-import { Company, InsurancePremiumCollectionTiming } from '../models/company.model';
+import { Company } from '../models/company.model';
 import { AuthService } from '../../auth/services/auth.service';
 import { UserService } from '../../users/services/user.service';
 import { CompanyService } from '../services/company.service';
 import {
     formatPayrollClosingDayLabel,
+    formatConfiguredPayrollDayLabel,
     formatPayrollPaymentDayLabel,
-    insurancePremiumCollectionTimingLabel,
-    isValidPayrollDay,
+    isValidOptionalPayrollDay,
+    isValidRequiredPayrollDay,
+    resolveInsurancePremiumCollectionTiming,
 } from '../utils/company-payroll-settings.util';
 
 import { OfficeCreateModalComponent, OfficeFormData } from '../components/office-create-modal.component';
-import { OfficeService } from '../services/office.service';
+import { OfficeNameDuplicateError, OfficeService } from '../services/office.service';
 import { Office, OfficeCreateInput } from '../models/office.model';
 import { formatOfficeAddress } from '../utils/office-format.util';
 import { healthInsuranceTypeLabel } from '../utils/office-health-insurance.util';
-import { extractPrefectureFromAddress } from '../utils/office-prefecture.util';
+import { isDuplicateOfficeName } from '../utils/office-name.util';
 import { FieldHelpTooltipComponent } from '../../../shared/components/field-help-tooltip.component';
 
 @Component({
@@ -49,26 +51,25 @@ export class CompanyPageComponent {
     payrollClosingDay: number | '' = '';
     payrollPaymentDay: number | '' = '';
     payrollPaymentMonthOffset: 0 | 1 = 1;
-    insurancePremiumCollectionTiming: InsurancePremiumCollectionTiming = 'next_month';
 
     readonly payrollDayOptions = Array.from({ length: 31 }, (_, index) => index + 1);
     readonly formatPayrollClosingDayLabel = formatPayrollClosingDayLabel;
+    readonly formatConfiguredPayrollDayLabel = formatConfiguredPayrollDayLabel;
     readonly formatPayrollPaymentDayLabel = formatPayrollPaymentDayLabel;
-    readonly insurancePremiumCollectionTimingLabel = insurancePremiumCollectionTimingLabel;
 
     readonly payrollClosingHelpLines = [
         '毎月の給与計算の締め日です。未設定でも利用できます。',
+        '31日を選ぶと、各月の末日（28〜31日）として扱います。',
+    ];
+
+    readonly payrollPaymentMonthHelpLines = [
+        '給与を支払う月です。当月または翌月から選択します。',
+        '社会保険料の給与控除月も、この設定に連動します（当月支払→当月徴収、翌月支払→翌月徴収）。',
     ];
 
     readonly payrollPaymentHelpLines = [
-        '報酬確定の社内期限として使用します。',
-        'ホームの「期限が近い業務」にも反映されます。',
-    ];
-
-    readonly insuranceCollectionHelpLines = [
-        '社会保険料を何月の給与から控除するかを指定します。',
-        '翌月徴収の場合、4月分の保険料は5月の給与から控除され、4月の保険料画面では0円です。',
-        '保険料計算画面の控除月表示に使用します。',
+        '給与を支払う日です。1〜31日、または末日を選択します。',
+        '31日を選ぶと、各月の末日（28〜31日）として扱います。',
     ];
 
     // 事業所一覧
@@ -149,8 +150,13 @@ export class CompanyPageComponent {
             return;
         }
 
-        if (!isValidPayrollDay(payrollClosingDay) || !isValidPayrollDay(payrollPaymentDay)) {
-            this.errorMessage.set('給与締日・支払日は1〜31の範囲で入力してください');
+        if (!isValidOptionalPayrollDay(payrollClosingDay)) {
+            this.errorMessage.set('給与締日は1〜31の範囲で選択してください');
+            return;
+        }
+
+        if (!isValidRequiredPayrollDay(payrollPaymentDay)) {
+            this.errorMessage.set('給与支払日を選択してください');
             return;
         }
 
@@ -165,7 +171,6 @@ export class CompanyPageComponent {
                 payrollClosingDay,
                 payrollPaymentDay,
                 payrollPaymentMonthOffset: this.payrollPaymentMonthOffset,
-                insurancePremiumCollectionTiming: this.insurancePremiumCollectionTiming,
             });
             this.company.set({
                 ...company,
@@ -175,7 +180,9 @@ export class CompanyPageComponent {
                 payrollClosingDay,
                 payrollPaymentDay,
                 payrollPaymentMonthOffset: this.payrollPaymentMonthOffset,
-                insurancePremiumCollectionTiming: this.insurancePremiumCollectionTiming,
+                insurancePremiumCollectionTiming: resolveInsurancePremiumCollectionTiming(
+                    this.payrollPaymentMonthOffset,
+                ),
             });
             this.isEditingCompany.set(false);
         } catch (error) {
@@ -193,7 +200,6 @@ export class CompanyPageComponent {
         this.payrollClosingDay = company.payrollClosingDay ?? '';
         this.payrollPaymentDay = company.payrollPaymentDay ?? '';
         this.payrollPaymentMonthOffset = company.payrollPaymentMonthOffset;
-        this.insurancePremiumCollectionTiming = company.insurancePremiumCollectionTiming;
     }
 
     formatOfficeAddress(office: Office): string {
@@ -208,43 +214,43 @@ export class CompanyPageComponent {
     // 登録モーダル
     isOfficeModalOpen = signal<boolean>(false);
     isOfficeSaving = signal<boolean>(false);
+    officeCreateErrorMessage = signal<string>('');
 
-    // モーダルの開閉
     openOfficeModal() {
+        this.officeCreateErrorMessage.set('');
         this.isOfficeModalOpen.set(true);
     }
     closeOfficeModal() {
+        this.officeCreateErrorMessage.set('');
         this.isOfficeModalOpen.set(false);
     }
 
-    // 事業所の登録
     async onCreateOffice(form: OfficeFormData) {
-        // 会社情報の有無
         const company = this.company();
         if (!company) {
-            this.errorMessage.set('会社情報が読み込まれていません');
+            this.officeCreateErrorMessage.set('会社情報が読み込まれていません');
             return;
         }
 
-        // ローディング
+        if (isDuplicateOfficeName(this.offices(), form.name)) {
+            this.officeCreateErrorMessage.set('同じ事業所名が既に登録されています');
+            return;
+        }
+
         this.isOfficeSaving.set(true);
-        this.errorMessage.set('');
+        this.officeCreateErrorMessage.set('');
 
         try {
-            const address = form.address.trim();
-            const prefecture = extractPrefectureFromAddress(address) ?? '';
-
-            // 事業所の作成
             const office: OfficeCreateInput = {
                 companyId: company.id,
                 name: form.name,
                 postalCode: '',
-                prefecture,
-                city: '',
-                streetAddress: address,
-                buildingName: '',
+                prefecture: form.prefecture,
+                city: form.city,
+                streetAddress: form.streetAddress,
+                buildingName: form.buildingName,
                 phoneNumber: '',
-                healthInsuranceType: 'kyokai',
+                healthInsuranceType: form.healthInsuranceType,
                 regularWeeklyScheduledWorkHours: null,
                 regularMonthlyScheduledWorkHours: null,
                 regularWeeklyScheduledWorkDays: null,
@@ -253,13 +259,15 @@ export class CompanyPageComponent {
             };
 
             await this.officeService.createOffice(office);
-            // 事業所のロード
             await this.loadOffices();
-            // モーダルを閉じる
             this.closeOfficeModal();
         } catch (error) {
             console.error('事業所の登録に失敗しました。', error);
-            this.errorMessage.set('事業所の登録に失敗しました');
+            if (error instanceof OfficeNameDuplicateError) {
+                this.officeCreateErrorMessage.set(error.message);
+            } else {
+                this.officeCreateErrorMessage.set('事業所の登録に失敗しました');
+            }
         } finally {
             this.isOfficeSaving.set(false);
         }

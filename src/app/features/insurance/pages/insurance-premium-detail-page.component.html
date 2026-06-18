@@ -195,6 +195,10 @@
                 <span class="card-type-badge monthly">月次報酬</span>
                 <h2 class="section-title">報酬入力</h2>
 
+                @if (!isTargetMonth()) {
+                    <p class="period-excluded-note">{{ targetMonthReason() }}</p>
+                }
+
                 @if (isPartTimeEmployee()) {
                     <p class="wage-section-note">
                         パート・アルバイト向けの入力です。報酬月額は月額報酬＋通勤手当＋その他手当の合計です（日割りしません）。
@@ -449,6 +453,8 @@
                     </div>
                 } @else if (monthRewardStatus() === 'confirmed') {
                     <p class="reward-locked-note">報酬は確定済みです。</p>
+                } @else if (!isTargetMonth()) {
+                    <p class="reward-locked-note">在籍期間外のため入力できません。</p>
                 }
             </section>
 
@@ -601,7 +607,9 @@
                 <p class="alert alert-error">{{ bonusErrorMessage() }}</p>
             }
 
-            @if (isLoadingBonus()) {
+            @if (!isTargetMonth()) {
+                <p class="period-excluded-note">{{ targetMonthReason() }}</p>
+            } @else if (isLoadingBonus()) {
                 <p class="bonus-loading">賞与情報を読み込み中...</p>
             } @else if (monthBonuses().length > 0) {
                 <div class="bonus-list">
@@ -688,6 +696,8 @@
                                 id="bonus-payment-date"
                                 type="date"
                                 [(ngModel)]="bonusForm.paymentDate"
+                                [min]="bonusPaymentDateMin() ?? undefined"
+                                [max]="bonusPaymentDateMax() ?? undefined"
                                 [disabled]="isEditingBonus()"
                             />
                         </div>
@@ -2728,10 +2738,18 @@
         color: #6b7280;
     }
 
-    .reward-locked-note {
+    .reward-locked-note,
+    .period-excluded-note {
         margin: 12px 0 0;
         font-size: 13px;
         color: #6b7280;
+    }
+
+    .period-excluded-note {
+        padding: 10px 12px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
     }
 
     .bonus-status-badge {

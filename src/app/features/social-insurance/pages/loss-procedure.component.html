@@ -20,6 +20,7 @@
             [company]="company()"
             [exportContext]="{ lossDate: lossDate() }"
             [isSubmitting]="isSubmitting()"
+            [submitDisabled]="!canSubmit()"
             [actionErrorMessage]="submitErrorMessage()"
             (submitClick)="submitProcedure()"
         />

@@ -22,7 +22,7 @@
             [procedureForExport]="exportProcedure()"
             [exportContext]="{ dependent: exportDependent() }"
             [isSubmitting]="isSaving()"
-            [submitDisabled]="!changeType()"
+            [submitDisabled]="!canSubmit()"
             [actionErrorMessage]="saveErrorMessage()"
             (submitClick)="saveProcedure()"
         />

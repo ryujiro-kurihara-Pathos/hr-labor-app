@@ -27,6 +27,7 @@ import {
     OfficeBusinessLinkCounts,
     OfficeDeletionCheck,
 } from '../utils/office-usage.util';
+import { isDuplicateOfficeName, normalizeOfficeName } from '../utils/office-name.util';
 import { db } from '../../../core/firebase';
 
 export class OfficeDeletionError extends Error {
@@ -36,11 +37,31 @@ export class OfficeDeletionError extends Error {
     }
 }
 
+export class OfficeNameDuplicateError extends Error {
+    constructor() {
+        super('同じ事業所名が既に登録されています');
+        this.name = 'OfficeNameDuplicateError';
+    }
+}
+
 @Injectable({ providedIn: 'root' })
 
 export class OfficeService {
     // 事業所の作成
     async createOffice(officeInput: OfficeCreateInput): Promise<Office> {
+        const name = normalizeOfficeName(officeInput.name);
+        if (!name) {
+            throw new Error('事業所名を入力してください');
+        }
+        if (!officeInput.prefecture?.trim()) {
+            throw new Error('都道府県を選択してください');
+        }
+
+        const existingOffices = await this.getOfficesByCompanyId(officeInput.companyId);
+        if (isDuplicateOfficeName(existingOffices, name)) {
+            throw new OfficeNameDuplicateError();
+        }
+
         const createdAt = serverTimestamp() as Timestamp;
         const docRef = doc(collection(db, 'offices'));
         const assigned = await this.assignOfficeSymbols(officeInput.companyId);
@@ -48,12 +69,12 @@ export class OfficeService {
         const office: Office = {
             id: docRef.id,
             companyId: officeInput.companyId,
-            name: officeInput.name,
+            name,
             postalCode: officeInput.postalCode,
-            prefecture: officeInput.prefecture,
-            city: officeInput.city,
-            streetAddress: officeInput.streetAddress,
-            buildingName: officeInput.buildingName,
+            prefecture: officeInput.prefecture.trim(),
+            city: officeInput.city?.trim() ?? '',
+            streetAddress: officeInput.streetAddress?.trim() ?? '',
+            buildingName: officeInput.buildingName?.trim() ?? '',
             phoneNumber: officeInput.phoneNumber,
             healthInsuranceType: normalizeHealthInsuranceType(officeInput.healthInsuranceType),
             officeSymbol: normalizeOfficeSymbol(

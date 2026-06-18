@@ -20,14 +20,16 @@ import {
     StandardMonthlyRewardStatus,
 } from '../models/standard-monthly-reward.model';
 import { detectFixedWageChanges } from '../utils/fixed-wage-change.util';
-import { addMonthsToYearMonth } from '../utils/reward-target-month.util';
+import { addMonthsToYearMonth, isRewardTargetMonth, rewardTargetMonthReason } from '../utils/reward-target-month.util';
 import { StandardMonthlyRewardCalculatorService } from './standard-monthly-reward-calculator.service';
+import { EmployeeService } from '../../employee/services/employee.service';
 
 @Injectable({
     providedIn: 'root',
 })
 export class StandardMonthlyRewardService {
     private readonly calculator = inject(StandardMonthlyRewardCalculatorService);
+    private readonly employeeService = inject(EmployeeService);
 
     private docId(employeeId: string, targetYearMonth: string): string {
         return `${employeeId}_${targetYearMonth}`;
@@ -92,6 +94,17 @@ export class StandardMonthlyRewardService {
         input: StandardMonthlyRewardInput,
         status: Extract<StandardMonthlyRewardStatus, 'draft' | 'confirmed'>,
     ): Promise<StandardMonthlyReward> {
+        const employee = await this.employeeService.getEmployeeById(input.employeeId);
+        if (!employee) {
+            throw new Error('従業員が見つかりません');
+        }
+        if (!isRewardTargetMonth(employee, input.targetYearMonth)) {
+            throw new Error(
+                rewardTargetMonthReason(employee, input.targetYearMonth)
+                    ?? 'この月は報酬登録の対象外です',
+            );
+        }
+
         const monthlyReward = input.monthlyRewardAmount ?? this.sumRewardFields(input);
         const calc = monthlyReward > 0 ? this.calculator.calculate(monthlyReward) : null;
 

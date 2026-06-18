@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import {
     collection,
     deleteDoc,
@@ -20,11 +20,14 @@ import {
     BonusRewardStatus,
 } from '../models/bonus-reward.model';
 import { normalizeBonusStatus } from '../utils/bonus-status.util';
+import { EmployeeService } from '../../employee/services/employee.service';
+import { bonusPaymentDateReason } from '../../insurance/utils/reward-target-month.util';
 
 @Injectable({
     providedIn: 'root',
 })
 export class BonusRewardService {
+    private readonly employeeService = inject(EmployeeService);
     private readonly collectionName = 'bonusRewards';
 
     async saveDraft(input: BonusRewardInput): Promise<BonusReward> {
@@ -54,6 +57,15 @@ export class BonusRewardService {
     ): Promise<BonusReward> {
         if (status === 'confirmed' && input.bonusAmount <= 0) {
             throw new Error('賞与額を入力してください');
+        }
+
+        const employee = await this.employeeService.getEmployeeById(input.employeeId);
+        if (!employee) {
+            throw new Error('従業員が見つかりません');
+        }
+        const periodReason = bonusPaymentDateReason(employee, input.paymentDate);
+        if (periodReason) {
+            throw new Error(periodReason);
         }
 
         const standardBonusAmount = this.calculateStandardBonusAmount(input.bonusAmount);

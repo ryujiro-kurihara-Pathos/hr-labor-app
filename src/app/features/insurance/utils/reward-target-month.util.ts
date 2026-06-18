@@ -18,6 +18,61 @@ export function yearMonthFromTimestamp(ts: Timestamp | null | undefined): string
     return `${y}-${m}`;
 }
 
+export function dateStringFromTimestamp(ts: Timestamp | null | undefined): string | null {
+    if (!ts) return null;
+    const d = ts.toDate();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+/** 日付が入社日以降かつ退職日以前（在籍中は退職日チェックなし） */
+export function isDateWithinEmploymentPeriod(employee: Employee, date: string): boolean {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+
+    const joinedDate = employee.joinedDate?.trim();
+    if (joinedDate && date < joinedDate) return false;
+
+    const retiredDate = dateStringFromTimestamp(employee.retiredDate);
+    if (retiredDate && date > retiredDate) return false;
+
+    return true;
+}
+
+export function employmentPeriodDateReason(employee: Employee, date: string): string | null {
+    if (isDateWithinEmploymentPeriod(employee, date)) return null;
+
+    const joinedDate = employee.joinedDate?.trim();
+    if (joinedDate && date < joinedDate) {
+        return `${formatDateLabel(joinedDate)}入社のため、この日付は対象外です。`;
+    }
+
+    const retiredDate = dateStringFromTimestamp(employee.retiredDate);
+    if (retiredDate && date > retiredDate) {
+        return `${formatDateLabel(retiredDate)}退職のため、この日付は対象外です。`;
+    }
+
+    return '在籍期間外の日付です。';
+}
+
+/** 賞与支給日が入力可能な期間か（対象年月＋入社日・退職日） */
+export function isBonusPaymentDateAllowed(employee: Employee, paymentDate: string): boolean {
+    const targetYearMonth = yearMonthFromDateString(paymentDate);
+    if (!targetYearMonth || !isRewardTargetMonth(employee, targetYearMonth)) return false;
+    return isDateWithinEmploymentPeriod(employee, paymentDate);
+}
+
+export function bonusPaymentDateReason(employee: Employee, paymentDate: string): string | null {
+    const targetYearMonth = yearMonthFromDateString(paymentDate);
+    if (!targetYearMonth) return '支給日の形式が正しくありません。';
+
+    const monthReason = rewardTargetMonthReason(employee, targetYearMonth);
+    if (monthReason) return monthReason;
+
+    return employmentPeriodDateReason(employee, paymentDate);
+}
+
 /** 在籍中は当月、退職済みは退職月まで閲覧可能 */
 export function viewableYearMonthMax(employee: Employee, currentYearMonth: string): string {
     const retireYm = yearMonthFromTimestamp(employee.retiredDate);
@@ -124,6 +179,11 @@ export function rewardTargetMonthReason(
 function formatYearMonthLabel(ym: string): string {
     const [y, m] = ym.split('-');
     return `${y}年${Number(m)}月`;
+}
+
+function formatDateLabel(date: string): string {
+    const [y, m, d] = date.split('-');
+    return `${y}年${Number(m)}月${Number(d)}日`;
 }
 
 /** YYYY-MM に月数を加算（日は1日固定） */

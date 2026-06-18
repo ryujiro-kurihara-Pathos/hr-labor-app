@@ -25,8 +25,10 @@ import {
     buildQualificationProcedureData,
     hasSavedQualificationData,
     monthlyRewardFromProcedure,
+    resolveLiveQualificationDisplayDate,
     todayDateString,
 } from '../utils/qualification-procedure-data.util';
+import { validateQualificationProcedureSubmit, PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE } from '../utils/procedure-submit-validation.util';
 
 @Component({
     selector: 'app-qualification-procedure',
@@ -58,15 +60,14 @@ export class QualificationProcedureComponent {
         return item.status === 'completed' && hasSavedQualificationData(item);
     });
 
-    liveQualificationDate = computed(() => {
+    liveQualificationDate = computed((): string | null => {
+        const employee = this.employee();
         const status = this.socialInsuranceStatus();
         const item = this.procedure();
-        const employee = this.employee();
-        return (
-            status?.healthInsuranceStartDate ||
-            item.occurredDate ||
-            employee?.joinedDate ||
-            null
+        return resolveLiveQualificationDisplayDate(
+            employee,
+            status?.healthInsuranceStartDate,
+            item,
         );
     });
 
@@ -201,6 +202,18 @@ export class QualificationProcedureComponent {
         return this.hasDependents();
     });
 
+    submitValidation = computed(() =>
+        validateQualificationProcedureSubmit({
+            employee: this.employee(),
+            office: this.office(),
+            company: this.company(),
+            qualificationDate: this.liveQualificationDate(),
+            monthlyReward: this.liveMonthlyReward(),
+        }),
+    );
+
+    canSubmit = computed(() => this.submitValidation().ok);
+
     exportProcedure = computed((): Procedure => {
         const item = this.procedure();
         const reward = this.displayMonthlyReward();
@@ -235,6 +248,12 @@ export class QualificationProcedureComponent {
 
     async submitProcedure(): Promise<void> {
         if (this.isCompleted() || this.isSubmitting()) return;
+
+        const validation = this.submitValidation();
+        if (!validation.ok) {
+            this.submitErrorMessage.set(PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE);
+            return;
+        }
 
         const employee = this.employee();
         const office = this.office();

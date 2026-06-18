@@ -15,14 +15,15 @@ export function normalizeCompanyPayrollSettings(
     | 'payrollPaymentMonthOffset'
     | 'insurancePremiumCollectionTiming'
 > {
+    const payrollPaymentMonthOffset =
+        company.payrollPaymentMonthOffset ?? DEFAULT_COMPANY_PAYROLL_SETTINGS.payrollPaymentMonthOffset;
+
     return {
         payrollClosingDay: company.payrollClosingDay ?? DEFAULT_COMPANY_PAYROLL_SETTINGS.payrollClosingDay,
         payrollPaymentDay: company.payrollPaymentDay ?? DEFAULT_COMPANY_PAYROLL_SETTINGS.payrollPaymentDay,
-        payrollPaymentMonthOffset:
-            company.payrollPaymentMonthOffset ?? DEFAULT_COMPANY_PAYROLL_SETTINGS.payrollPaymentMonthOffset,
+        payrollPaymentMonthOffset,
         insurancePremiumCollectionTiming:
-            company.insurancePremiumCollectionTiming
-            ?? DEFAULT_COMPANY_PAYROLL_SETTINGS.insurancePremiumCollectionTiming,
+            resolveInsurancePremiumCollectionTiming(payrollPaymentMonthOffset),
     };
 }
 
@@ -42,6 +43,11 @@ export function formatPayrollClosingDayLabel(day: number | null): string {
     return `毎月${formatPayrollDay(day)}`;
 }
 
+export function formatConfiguredPayrollDayLabel(day: number | null): string {
+    if (day === null) return '未設定';
+    return formatPayrollDay(day);
+}
+
 export function formatPayrollPaymentDayLabel(
     day: number | null,
     monthOffset: 0 | 1,
@@ -55,6 +61,13 @@ export function insurancePremiumCollectionTimingLabel(
     timing: InsurancePremiumCollectionTiming,
 ): string {
     return timing === 'same_month' ? '当月徴収' : '翌月徴収';
+}
+
+/** 保険料徴収タイミングは給与支払月に連動（当月支払→当月徴収、翌月支払→翌月徴収） */
+export function resolveInsurancePremiumCollectionTiming(
+    payrollPaymentMonthOffset: 0 | 1,
+): InsurancePremiumCollectionTiming {
+    return payrollPaymentMonthOffset === 1 ? 'next_month' : 'same_month';
 }
 
 /**
@@ -104,6 +117,60 @@ export function formatPremiumCollectionSummary(
 }
 
 export function isValidPayrollDay(day: number | null): boolean {
+    return isValidOptionalPayrollDay(day);
+}
+
+/** 給与締日（未設定可） */
+export function isValidOptionalPayrollDay(day: number | null): boolean {
     if (day === null) return true;
     return Number.isInteger(day) && day >= 1 && day <= 31;
+}
+
+/** 給与支払日（必須） */
+export function isValidRequiredPayrollDay(day: number | null): boolean {
+    return day !== null && Number.isInteger(day) && day >= 1 && day <= 31;
+}
+
+/** 指定年月の末日（month は 1〜12） */
+export function lastDayOfMonth(year: number, month: number): number {
+    return new Date(year, month, 0).getDate();
+}
+
+/**
+ * 設定日（1〜31、31=末日）を、その月の暦日に解決する。
+ * 設定日がその月に存在しない場合は月末日とする（例: 31日設定かつ4月 → 30日）。
+ */
+export function resolvePayrollDayInMonth(
+    configuredDay: number,
+    year: number,
+    month: number,
+): number {
+    if (!Number.isInteger(configuredDay) || configuredDay < 1 || configuredDay > 31) {
+        throw new Error('Invalid payroll day');
+    }
+    return Math.min(configuredDay, lastDayOfMonth(year, month));
+}
+
+/** 設定日を YYYY-MM-DD に解決する（month は 1〜12） */
+export function resolvePayrollDateInMonth(
+    configuredDay: number,
+    year: number,
+    month: number,
+): string {
+    const day = resolvePayrollDayInMonth(configuredDay, year, month);
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/** 設定日を YYYY-MM-DD に解決する（yearMonth は YYYY-MM） */
+export function resolvePayrollDateInYearMonth(
+    configuredDay: number,
+    yearMonth: string,
+): string {
+    const [yearText, monthText] = yearMonth.split('-');
+    const year = Number(yearText);
+    const month = Number(monthText);
+    if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+        throw new Error('Invalid year month');
+    }
+    return resolvePayrollDateInMonth(configuredDay, year, month);
 }

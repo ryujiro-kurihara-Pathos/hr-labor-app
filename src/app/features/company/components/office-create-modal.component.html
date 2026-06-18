@@ -1,33 +1,66 @@
 <div class="modal-backdrop" (click)="onBackdropClick($event)">
     <div class="modal-card" role="dialog" aria-labelledby="office-modal-title">
         <h1 id="office-modal-title">事業所を登録</h1>
-        <p class="modal-note">登録後、詳細画面で住所や社会保険番号などを編集できます。</p>
+        <p class="modal-note">登録後、詳細画面で電話番号や社会保険番号などを編集できます。</p>
 
         <div class="form-field">
-            <label for="office-name">事業所名</label>
+            <label for="office-name">事業所名 <span class="required">必須</span></label>
             <input
                 id="office-name"
                 type="text"
                 name="name"
                 [(ngModel)]="name"
                 placeholder="例：本社"
+                required
             />
         </div>
 
         <div class="form-field">
-            <label for="office-address">所在地</label>
+            <label for="office-prefecture">都道府県 <span class="required">必須</span></label>
+            <select id="office-prefecture" name="prefecture" [(ngModel)]="prefecture" required>
+                <option value="">選択してください</option>
+                @for (item of prefectures; track item) {
+                    <option [value]="item">{{ item }}</option>
+                }
+            </select>
+        </div>
+
+        <div class="form-field">
+            <label for="office-city">市区町村 <span class="optional">任意</span></label>
             <input
-                id="office-address"
+                id="office-city"
                 type="text"
-                name="address"
-                [(ngModel)]="address"
-                placeholder="例：東京都千代田区..."
+                name="city"
+                [(ngModel)]="city"
+                placeholder="例：千代田区"
+            />
+        </div>
+
+        <div class="form-field">
+            <label for="office-street-address">町名・番地 <span class="optional">任意</span></label>
+            <input
+                id="office-street-address"
+                type="text"
+                name="streetAddress"
+                [(ngModel)]="streetAddress"
+                placeholder="例：永田町1-7-1"
+            />
+        </div>
+
+        <div class="form-field">
+            <label for="office-building-name">建物名 <span class="optional">任意</span></label>
+            <input
+                id="office-building-name"
+                type="text"
+                name="buildingName"
+                [(ngModel)]="buildingName"
+                placeholder="例：永田町ビル101号室"
             />
         </div>
 
         <div class="form-field">
             <div class="label-row">
-                <label>健康保険</label>
+                <label>健康保険の種類</label>
                 <app-field-help-tooltip
                     title="健康保険"
                     [lines]="healthInsuranceHelpLines"
@@ -36,8 +69,8 @@
             <p class="fixed-value">協会けんぽ</p>
         </div>
 
-        @if(errorMessage()) {
-            <p class="error-message">{{ errorMessage() }}</p>
+        @if (displayErrorMessage()) {
+            <p class="error-message" role="alert">{{ displayErrorMessage() }}</p>
         }
 
         <div class="button-area">
@@ -45,7 +78,7 @@
                 キャンセル
             </button>
             <button type="button" class="form-btn" (click)="onSubmit()" [disabled]="isLoading()">
-                @if(isLoading()) {
+                @if (isLoading()) {
                     <span class="loading-content">
                         <span class="spinner"></span>
                         登録中
@@ -72,7 +105,7 @@
 
     .modal-card {
         width: 100%;
-        max-width: 420px;
+        max-width: 480px;
         padding: 28px 32px;
         background: #fff;
         border-radius: 12px;
@@ -110,6 +143,28 @@
         font-weight: 600;
     }
 
+    .required {
+        margin-left: 4px;
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: #fee2e2;
+        color: #b91c1c;
+        font-size: 10px;
+        font-weight: 700;
+        vertical-align: middle;
+    }
+
+    .optional {
+        margin-left: 4px;
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: #f3f4f6;
+        color: #6b7280;
+        font-size: 10px;
+        font-weight: 600;
+        vertical-align: middle;
+    }
+
     .fixed-value {
         margin: 0;
         padding: 10px 12px;
@@ -121,12 +176,18 @@
         color: #1e293b;
     }
 
-    input {
+    input,
+    select {
         height: 40px;
         padding: 0 12px;
         border: 1px solid #d1d5db;
         border-radius: 8px;
         font-size: 14px;
+        background: #fff;
+    }
+
+    select {
+        cursor: pointer;
     }
 
     .error-message {
