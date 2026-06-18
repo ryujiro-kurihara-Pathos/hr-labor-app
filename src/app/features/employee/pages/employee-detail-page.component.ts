@@ -31,7 +31,6 @@ import {
     computeInsurancePremiumPeriod,
     lossDateFromRetirementDate,
 } from '../../social-insurance/utils/insurance-premium-period.util';
-import { resolveLossProcedureOccurredAndDueDate } from '../../social-insurance/utils/procedure-due-date.util';
 import {
     judgeHealthInsuranceJoinStatus,
     judgePensionInsuranceJoinStatus,
@@ -517,26 +516,11 @@ export class EmployeeDetailPageComponent {
         this.errorMessage.set('');
 
         try {
-            const retirementDate = this.retiredDateString(employee.retiredDate);
-            const { occurredDate, dueDate } = resolveLossProcedureOccurredAndDueDate({
-                retirementDate,
-                lossReason: 'retirement',
-            });
-            const procedure = await this.procedureService.createProcedure({
-                companyId: employee.companyId,
-                officeId: employee.officeId,
-                employeeId: employee.id,
-                procedureType: 'loss',
-                status: 'notStarted',
-                occurredDate,
-                dueDate,
-                completedDate: null,
-                submittedDate: null,
-                targetYearMonth: null,
-                memo: '',
-                lossReason: 'retirement',
-                dependentChanges: null,
-            });
+            const procedure = await this.procedureService.syncLossProcedureForEmployee(employee);
+            if (!procedure) {
+                this.errorMessage.set('資格喪失手続きの作成に失敗しました');
+                return;
+            }
             this.lossProcedure.set(procedure);
             this.router.navigate(['/procedures', procedure.id]);
         } catch (error) {
@@ -867,7 +851,8 @@ export class EmployeeDetailPageComponent {
                 this.syncFormFromSocialInsuranceStatus(status);
             }
 
-            await this.loadLossProcedure();
+            const lossProcedure = await this.procedureService.syncLossProcedureForEmployee(updatedEmployee);
+            this.lossProcedure.set(lossProcedure);
         } catch (error) {
             console.error('退職処理に失敗しました', error);
             this.errorMessage.set('退職処理に失敗しました');

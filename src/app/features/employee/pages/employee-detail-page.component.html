@@ -683,7 +683,7 @@
                 @if (hasRetiredDate()) {
                     @if (needsLossProcedurePrompt()) {
                         <p class="insurance-judgment-note" role="note">
-                            退職日が設定されています。資格喪失届の手続きをしてください。
+                            退職日が設定されています。資格喪失届の内容を確認し、手続きを進めてください。
                         </p>
                     }
 
@@ -693,7 +693,7 @@
                             <div class="qualification-procedure-header">
                                 @if (needsLossProcedurePrompt()) {
                                     <p class="qualification-procedure-message">
-                                        退職日が設定されていますが、まだ手続きが完了していません。手続きをしてください。
+                                        資格喪失届を作成しました。内容を確認して手続きを進めてください。
                                     </p>
                                 } @else {
                                     <p class="qualification-procedure-message">資格喪失手続きが完了しています。</p>
@@ -709,7 +709,7 @@
                             </div>
                         } @else {
                             <p class="section-note">
-                                退職日（{{ formatRetiredDate(employee()!.retiredDate) }}）が設定されています。資格喪失届の手続きをしてください。
+                                退職日（{{ formatRetiredDate(employee()!.retiredDate) }}）が設定されています。資格喪失届を作成してください。
                             </p>
                         }
                         <button

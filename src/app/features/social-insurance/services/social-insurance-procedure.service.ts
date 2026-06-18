@@ -51,6 +51,7 @@ import { Employee } from '../../employee/models/employee.models';
 import { EmployeeService } from '../../employee/services/employee.service';
 import { insuranceJoinStatus } from '../models/social-insurance-status.model';
 import { dateStringFromTimestamp } from '../utils/insurance-premium-period.util';
+import { resolveLossProcedureOccurredAndDueDate } from '../utils/procedure-due-date.util';
 import { resolveLossDate, todayDateString } from '../utils/procedure-display.util';
 import { SocialInsuranceStatusService } from './social-insurance-status.service';
 
@@ -384,6 +385,63 @@ export class SocialInsuranceProcedureService {
             lossReason: null,
             dependentChanges: null,
             qualificationDate: dates.qualificationDate ?? '',
+        });
+    }
+
+    /** 退職日に合わせて資格喪失届を自動作成、または未完了手続きの対象日を更新する */
+    async syncLossProcedureForEmployee(employee: Employee): Promise<Procedure | null> {
+        const retirementDate = dateStringFromTimestamp(employee.retiredDate);
+        if (!retirementDate) return null;
+
+        const existing = await this.getLossProcedureByEmployeeId(
+            employee.id,
+            employee.companyId,
+        );
+
+        const { occurredDate, dueDate } = resolveLossProcedureOccurredAndDueDate({
+            retirementDate,
+            lossReason: 'retirement',
+        });
+        if (!occurredDate) return existing;
+
+        if (existing) {
+            if (existing.status === 'completed') {
+                return existing;
+            }
+
+            const updated: Procedure = {
+                ...existing,
+                occurredDate,
+                dueDate,
+                lossReason: existing.lossReason ?? 'retirement',
+            };
+
+            if (
+                updated.occurredDate === existing.occurredDate
+                && updated.dueDate === existing.dueDate
+                && updated.lossReason === existing.lossReason
+            ) {
+                return existing;
+            }
+
+            await this.updateProcedure(updated);
+            return updated;
+        }
+
+        return this.createProcedure({
+            companyId: employee.companyId,
+            officeId: employee.officeId,
+            employeeId: employee.id,
+            procedureType: 'loss',
+            status: 'notStarted',
+            occurredDate,
+            dueDate,
+            completedDate: null,
+            submittedDate: null,
+            targetYearMonth: null,
+            memo: '',
+            lossReason: 'retirement',
+            dependentChanges: null,
         });
     }
 
