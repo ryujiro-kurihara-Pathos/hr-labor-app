@@ -6,14 +6,23 @@
     } @else {
         <header class="page-header">
             <a [routerLink]="listBackRoute()" class="back-link">← 一覧に戻る</a>
-            <h1>{{ pageMode() === 'input' ? '報酬入力' : '保険料' }}</h1>
-            <p class="employee-meta">
-                <a [routerLink]="['/employees', employee()!.id]">{{ employee()!.lastName }} {{ employee()!.firstName }}</a>
-                @if (office()?.prefecture) {
-                    <span class="meta-separator">·</span>
-                    <a [routerLink]="['/company/offices', office()!.id]">事業所：{{ office()!.prefecture }}</a>
-                }
-            </p>
+            <div class="page-header-main">
+                <h1>{{ pageMode() === 'input' ? '報酬入力' : '保険料' }}</h1>
+                <div class="context-links">
+                    <a [routerLink]="['/employees', employee()!.id]" class="context-link">
+                        <span class="context-link-avatar" aria-hidden="true">{{ employeeInitial(employee()!) }}</span>
+                        <span class="context-link-value">{{ employee()!.lastName }} {{ employee()!.firstName }}</span>
+                    </a>
+                    @if (office(); as off) {
+                        <a [routerLink]="['/company/offices', off.id]" class="context-link">
+                            <span class="context-link-value">{{ off.name }}</span>
+                            @if (off.prefecture) {
+                                <span class="context-link-sub">{{ off.prefecture }}</span>
+                            }
+                        </a>
+                    }
+                </div>
+            </div>
         </header>
 
         <nav class="page-tabs" aria-label="報酬入力と保険料の切り替え">
@@ -71,6 +80,16 @@
                     [disabled]="isLoadingMonth()"
                 />
                 <span class="month-display">{{ targetYearMonthLabel() }}</span>
+                @if (pageMode() === 'input' && showOldestUnregisteredLink()) {
+                    <button
+                        type="button"
+                        class="oldest-month-jump"
+                        title="未入力で最も古い月（{{ oldestUnregisteredYearMonthLabel() }}）へ移動"
+                        (click)="goToOldestUnregisteredMonth()"
+                    >
+                        未入力<span class="oldest-month-jump-sep">·</span>{{ oldestUnregisteredYearMonthLabel() }}へ
+                    </button>
+                }
             </div>
             <button
                 type="button"
@@ -82,13 +101,6 @@
                 →
             </button>
         </div>
-        @if (pageMode() === 'input' && showOldestUnregisteredLink()) {
-            <p class="oldest-unregistered-link-wrap">
-                <button type="button" class="oldest-unregistered-link" (click)="goToOldestUnregisteredMonth()">
-                    未入力で最も古い月（{{ oldestUnregisteredYearMonthLabel() }}）へ移動
-                </button>
-            </p>
-        }
         @if (isLoadingMonth()) {
             <p class="month-loading">報酬情報を読み込み中...</p>
         }
@@ -1554,18 +1566,80 @@
     }
 
     h1 {
-        margin: 0 0 6px;
+        margin: 0 0 8px;
         font-size: 22px;
     }
 
-    .employee-meta {
-        margin: 0;
-        font-size: 14px;
-        color: #6b7280;
+    .page-header-main {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
     }
 
-    .meta-separator {
-        margin: 0 6px;
+    .context-links {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .context-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        max-width: 100%;
+        padding: 4px 10px 4px 6px;
+        border: 1px solid #e5e7eb;
+        border-radius: 999px;
+        background: #fafafa;
+        color: inherit;
+        font-size: 12px;
+        line-height: 1.3;
+        text-decoration: none;
+        transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .context-link:hover {
+        border-color: #bfdbfe;
+        background: #f8fafc;
+        box-shadow: 0 1px 3px rgba(37, 99, 235, 0.08);
+    }
+
+    .context-link:hover .context-link-value {
+        color: #2563eb;
+    }
+
+    .context-link-avatar {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        width: 20px;
+        height: 20px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+        color: #1d4ed8;
+        font-size: 10px;
+        font-weight: 800;
+    }
+
+    .context-link-value {
+        font-weight: 600;
+        color: #374151;
+        white-space: nowrap;
+        transition: color 0.15s ease;
+    }
+
+    .context-link-sub {
+        color: #9ca3af;
+        font-size: 11px;
+        white-space: nowrap;
+    }
+
+    .context-link-sub::before {
+        content: '·';
+        margin: 0 4px;
+        color: #d1d5db;
     }
 
     .alert {
@@ -1710,31 +1784,39 @@
         display: flex;
         align-items: center;
         gap: 12px;
-        margin-bottom: 8px;
-        padding: 16px;
+        margin: 0 0 12px;
+        padding: 12px 14px;
         background: #f9fafb;
         border: 1px solid #e5e7eb;
         border-radius: 12px;
     }
 
-    .oldest-unregistered-link-wrap {
-        margin: 0 0 12px;
-    }
-
-    .oldest-unregistered-link {
-        padding: 0;
-        border: none;
-        background: none;
-        color: #2563eb;
-        font-size: 13px;
+    .oldest-month-jump {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        height: 30px;
+        padding: 0 10px;
+        border: 1px solid #fde68a;
+        border-radius: 999px;
+        background: #fffbeb;
+        color: #92400e;
+        font-size: 11px;
         font-weight: 600;
+        white-space: nowrap;
         cursor: pointer;
-        text-decoration: underline;
-        text-underline-offset: 2px;
+        transition: border-color 0.15s ease, background 0.15s ease;
     }
 
-    .oldest-unregistered-link:hover {
-        color: #1d4ed8;
+    .oldest-month-jump-sep {
+        margin: 0 4px;
+        color: #fbbf24;
+        font-weight: 400;
+    }
+
+    .oldest-month-jump:hover {
+        border-color: #fcd34d;
+        background: #fef3c7;
     }
 
     .month-nav-btn {

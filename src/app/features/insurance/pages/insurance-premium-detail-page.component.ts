@@ -2692,6 +2692,12 @@ export class InsurancePremiumDetailPageComponent {
         return Number((rate * 100).toFixed(3)).toString();
     }
 
+    employeeInitial(employee: Employee): string {
+        const initial =
+            (employee.lastName?.[0] ?? '') + (employee.firstName?.[0] ?? '');
+        return initial || '?';
+    }
+
     updateManualRateFormField<K extends keyof ManualInsurancePremiumRateForm>(
         field: K,
         value: ManualInsurancePremiumRateForm[K],
