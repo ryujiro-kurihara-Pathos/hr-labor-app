@@ -18,12 +18,20 @@ export function normalizeCompanyPayrollSettings(
     const payrollPaymentMonthOffset =
         company.payrollPaymentMonthOffset ?? DEFAULT_COMPANY_PAYROLL_SETTINGS.payrollPaymentMonthOffset;
 
+    const storedTiming = company.insurancePremiumCollectionTiming;
+    let insurancePremiumCollectionTiming =
+        storedTiming
+        ?? resolveInsurancePremiumCollectionTiming(payrollPaymentMonthOffset);
+
+    if (!isValidInsurancePremiumCollectionSetting(payrollPaymentMonthOffset, insurancePremiumCollectionTiming)) {
+        insurancePremiumCollectionTiming = resolveInsurancePremiumCollectionTiming(payrollPaymentMonthOffset);
+    }
+
     return {
         payrollClosingDay: company.payrollClosingDay ?? DEFAULT_COMPANY_PAYROLL_SETTINGS.payrollClosingDay,
         payrollPaymentDay: company.payrollPaymentDay ?? DEFAULT_COMPANY_PAYROLL_SETTINGS.payrollPaymentDay,
         payrollPaymentMonthOffset,
-        insurancePremiumCollectionTiming:
-            resolveInsurancePremiumCollectionTiming(payrollPaymentMonthOffset),
+        insurancePremiumCollectionTiming,
     };
 }
 
@@ -68,6 +76,41 @@ export function resolveInsurancePremiumCollectionTiming(
     payrollPaymentMonthOffset: 0 | 1,
 ): InsurancePremiumCollectionTiming {
     return payrollPaymentMonthOffset === 1 ? 'next_month' : 'same_month';
+}
+
+/**
+ * 給与支払月・保険料徴収の組み合わせが有効か。
+ * 保険料対象月は給与支払月以前である必要があり、
+ * 給与を翌月支払いにしつつ当月徴収（支払月分の保険料を先に控除）は不可。
+ */
+export function isValidInsurancePremiumCollectionSetting(
+    payrollPaymentMonthOffset: 0 | 1,
+    timing: InsurancePremiumCollectionTiming,
+): boolean {
+    if (payrollPaymentMonthOffset === 1 && timing === 'same_month') {
+        return false;
+    }
+    return true;
+}
+
+export function insurancePremiumCollectionSettingErrorMessage(
+    payrollPaymentMonthOffset: 0 | 1,
+    timing: InsurancePremiumCollectionTiming,
+): string | null {
+    if (isValidInsurancePremiumCollectionSetting(payrollPaymentMonthOffset, timing)) {
+        return null;
+    }
+    return '給与支払が翌月の場合、当月徴収（支払月の保険料を控除）は選べません。翌月徴収を選択してください。';
+}
+
+/** 給与支払月に応じて選択可能な保険料徴収タイミング */
+export function allowedInsurancePremiumCollectionTimings(
+    payrollPaymentMonthOffset: 0 | 1,
+): InsurancePremiumCollectionTiming[] {
+    if (payrollPaymentMonthOffset === 1) {
+        return ['next_month'];
+    }
+    return ['same_month', 'next_month'];
 }
 
 /**

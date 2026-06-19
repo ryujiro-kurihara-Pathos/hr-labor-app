@@ -2,6 +2,8 @@ import {
     formatPayrollDeductionNote,
     formatPremiumCollectionSummary,
     insurancePremiumCollectionTimingLabel,
+    isValidInsurancePremiumCollectionSetting,
+    allowedInsurancePremiumCollectionTimings,
     lastDayOfMonth,
     resolveInsurancePremiumCollectionTiming,
     resolvePayrollDateInMonth,
@@ -75,9 +77,36 @@ describe('company-payroll-settings.util', () => {
     });
 
     describe('resolveInsurancePremiumCollectionTiming', () => {
-        it('follows payroll payment month offset', () => {
+        it('returns default timing from payroll payment month offset', () => {
             expect(resolveInsurancePremiumCollectionTiming(0)).toBe('same_month');
             expect(resolveInsurancePremiumCollectionTiming(1)).toBe('next_month');
+        });
+    });
+
+    describe('isValidInsurancePremiumCollectionSetting', () => {
+        it('allows same month and next month collection when payroll is same month', () => {
+            expect(isValidInsurancePremiumCollectionSetting(0, 'same_month')).toBeTrue();
+            expect(isValidInsurancePremiumCollectionSetting(0, 'next_month')).toBeTrue();
+        });
+
+        it('allows only next month collection when payroll is next month', () => {
+            expect(isValidInsurancePremiumCollectionSetting(1, 'next_month')).toBeTrue();
+            expect(isValidInsurancePremiumCollectionSetting(1, 'same_month')).toBeFalse();
+        });
+
+        it('lists allowed timings per payroll payment month', () => {
+            expect(allowedInsurancePremiumCollectionTimings(0)).toEqual(['same_month', 'next_month']);
+            expect(allowedInsurancePremiumCollectionTimings(1)).toEqual(['next_month']);
+        });
+    });
+
+    describe('resolvePremiumLiabilityYearMonth constraint', () => {
+        it('never returns a liability month after the payroll deduction month', () => {
+            for (const timing of ['same_month', 'next_month'] as const) {
+                const payYearMonth = '2026-05';
+                const liability = resolvePremiumLiabilityYearMonth(payYearMonth, timing);
+                expect(liability <= payYearMonth).toBeTrue();
+            }
         });
     });
 

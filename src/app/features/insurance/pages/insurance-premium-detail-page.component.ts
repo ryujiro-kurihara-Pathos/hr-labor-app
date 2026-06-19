@@ -36,6 +36,7 @@ import {
     FIXED_WAGE_FIELD_KEYS,
     FIXED_WAGE_FIELD_LABELS,
     FixedWageFieldKey,
+    sumFixedWageFields,
 } from '../utils/fixed-wage-change.util';
 import { findLatestRegisteredRewardBefore } from '../utils/latest-reward.util';
 import { confirmedRewardsByYearMonth, normalizeRewardStatus, savedRewardsForPremiumCalculation } from '../utils/reward-status.util';
@@ -44,6 +45,7 @@ import {
     getFirstRegularDeterminationYearMonth,
     getPaymentBaseDays,
     getQualificationDate,
+    isRegularDecisionProcedureRequiredForBaseYear,
 } from '../utils/standard-remuneration-determination.util';
 import {
     evaluateRevisionAtOrigin,
@@ -470,6 +472,26 @@ export class InsurancePremiumDetailPageComponent {
         return `${payLabel}の報酬に基づき、${payLabel}に控除する保険料を表示しています。`;
     });
 
+    /** 保険料算出の根拠月の報酬が未入力のときの案内 */
+    premiumTabLeadRewardHint = computed((): string | null => {
+        if (this.isPremiumEnrollmentUndetermined()) return null;
+        if (this.liabilityMonthHasConfirmedReward()) return null;
+
+        const basisLabel = this.premiumLiabilityYearMonthLabel();
+        if (!basisLabel) return null;
+
+        return `${basisLabel}の給与を入力してください。`;
+    });
+
+    hasUndeterminedPremiumDueToMissingReward = computed(
+        (): boolean => this.premiumTabLeadRewardHint() !== null,
+    );
+
+    rewardInputQueryParamsForPremiumBasis = computed((): { ym?: string } => {
+        const ym = this.premiumLiabilityYearMonth() ?? this.targetYearMonth();
+        return ym ? { ym } : {};
+    });
+
     premiumSummaryKicker = computed(
         () => `${this.targetYearMonthLabel()}に払う保険料`,
     );
@@ -601,6 +623,9 @@ export class InsurancePremiumDetailPageComponent {
     regularDecisionProcedure = signal<Procedure | null>(null);
     isCreatingRegularDecisionProcedure = signal(false);
 
+    qualificationProcedure = signal<Procedure | null>(null);
+    isCreatingQualificationProcedure = signal(false);
+
     isRegularDecisionBaseMonth = computed((): boolean => {
         const yearMonth = this.targetYearMonth();
         if (!/^\d{4}-\d{2}$/.test(yearMonth)) return false;
@@ -667,9 +692,92 @@ export class InsurancePremiumDetailPageComponent {
     showRevisionProcedureSection = computed(() => this.revisionProcedureContext() !== null);
 
     /** 算定基礎届と重なる月は月額変更届を優先 */
-    showRegularDecisionProcedureSection = computed(
-        () => this.isRegularDecisionBaseMonth() && !this.showRevisionProcedureSection(),
+    showRegularDecisionProcedureSection = computed(() => {
+        if (!this.isRegularDecisionBaseMonth() || this.showRevisionProcedureSection()) return false;
+
+        const qualificationDate = this.resolvedQualificationDate();
+        const yearMonth = this.targetYearMonth();
+        if (!qualificationDate || !yearMonth) return false;
+
+        const baseYear = Number(yearMonth.slice(0, 4));
+        return isRegularDecisionProcedureRequiredForBaseYear(qualificationDate, baseYear);
+    });
+
+    isQualificationMonth = computed((): boolean => {
+        const employee = this.employee();
+        const yearMonth = this.targetYearMonth();
+        const qualificationDate = this.resolvedQualificationDate();
+        if (!employee || !yearMonth || !qualificationDate) return false;
+        if (!isRewardTargetMonth(employee, yearMonth)) return false;
+
+        const qualificationYearMonth = yearMonthFromDateString(qualificationDate);
+        return qualificationYearMonth === yearMonth;
+    });
+
+    /** 入社月は見込み給与を反映した固定的賃金を変更不可 */
+    isJoinMonthFixedWageLocked = computed(
+        () => this.isQualificationMonth() && !this.isPartTimeEmployee(),
     );
+
+    /** 入社月は見込み給与を反映した月額報酬を変更不可（パート） */
+    isJoinMonthPartTimePayLocked = computed(
+        () => this.isQualificationMonth() && this.isPartTimeEmployee(),
+    );
+
+    joinMonthFixedWageTotal = computed((): number => {
+        this.formRewardRevision();
+        const form = this.rewardForm;
+        return sumFixedWageFields({
+            basicSalary: this.toNumber(form.basicSalary),
+            commutingAllowance: this.toNumber(form.commutingAllowance),
+            positionAllowance: this.toNumber(form.positionAllowance),
+            housingAllowance: this.toNumber(form.housingAllowance),
+            fixedOvertimePay: this.toNumber(form.fixedOvertimePay),
+            otherFixedAllowance: this.toNumber(form.otherFixedAllowance),
+        });
+    });
+
+    joinMonthPartTimeMonthlyPay = computed((): number => {
+        this.formRewardRevision();
+        return this.toNumber(this.rewardForm.basicSalary);
+    });
+
+    isHealthInsuranceEligible = computed((): boolean => {
+        const status = this.socialInsuranceStatus();
+        if (!status) return false;
+
+        if (status.healthInsuranceStatus === 'active' && status.pensionInsuranceStatus === 'active') {
+            return true;
+        }
+        if (status.healthInsuranceStatus === 'inactive' || status.pensionInsuranceStatus === 'inactive') {
+            return false;
+        }
+
+        return (
+            this.healthInsuranceJoinStatus() === 'active' &&
+            this.pensionInsuranceJoinStatus() === 'active'
+        );
+    });
+
+    showQualificationProcedureSection = computed(
+        () => this.isQualificationMonth() && this.isHealthInsuranceEligible(),
+    );
+
+    qualificationMonthLabel = computed((): string => {
+        const qualificationDate = this.resolvedQualificationDate();
+        if (!qualificationDate) return '入社月';
+
+        const qualificationYearMonth = yearMonthFromDateString(qualificationDate);
+        if (!qualificationYearMonth) return '入社月';
+
+        return `${formatYearMonthLabel(qualificationYearMonth)}（入社月）`;
+    });
+
+    qualificationProcedureExists = computed(() => this.qualificationProcedure() !== null);
+
+    qualificationProcedureStatus = computed((): ProcedureStatus => {
+        return this.qualificationProcedure()?.status ?? 'notStarted';
+    });
 
     revisionProcedure = signal<Procedure | null>(null);
     isCreatingRevisionProcedure = signal(false);
@@ -1343,12 +1451,31 @@ export class InsurancePremiumDetailPageComponent {
                 this.loadStandardReward(),
                 this.loadManualRates(),
                 this.loadMonthBonuses(),
+                this.loadQualificationProcedure(),
                 this.loadRegularDecisionProcedure(),
                 this.loadRevisionProcedure(),
                 this.loadBonusPaymentProcedure(),
             ]);
         } finally {
             this.isLoadingMonth.set(false);
+        }
+    }
+
+    async loadQualificationProcedure(): Promise<void> {
+        this.qualificationProcedure.set(null);
+
+        const employee = this.employee();
+        if (!employee || !this.showQualificationProcedureSection()) return;
+
+        try {
+            const procedure = await this.procedureService.getQualificationProcedureByEmployeeId(
+                employee.id,
+                employee.companyId,
+            );
+            this.qualificationProcedure.set(procedure);
+        } catch (error) {
+            console.error('資格取得届の取得に失敗しました', error);
+            this.errorMessage.set('資格取得届の取得に失敗しました');
         }
     }
 
@@ -1442,7 +1569,11 @@ export class InsurancePremiumDetailPageComponent {
     }
 
     canCopyFromLatestRegistered(): boolean {
-        return Boolean(this.latestRegisteredReward()) && this.isRewardEditable();
+        return (
+            Boolean(this.latestRegisteredReward())
+            && this.isRewardEditable()
+            && !this.isQualificationMonth()
+        );
     }
 
     copyFromLatestRegistered() {
@@ -1691,8 +1822,11 @@ export class InsurancePremiumDetailPageComponent {
     /** パートの報酬月額（月額報酬＋通勤手当＋その他手当） */
     getPartTimeMonthlyRewardTotal(): number {
         const form = this.rewardForm;
+        const basicSalary = this.isJoinMonthPartTimePayLocked()
+            ? this.lockedPartTimeMonthlyPay()
+            : this.toNumber(form.basicSalary);
         return partTimeMonthlyRewardTotal(
-            this.toNumber(form.basicSalary),
+            basicSalary,
             this.toNumber(form.commutingAllowance),
             this.toNumber(form.otherFixedAllowance),
         );
@@ -1757,15 +1891,24 @@ export class InsurancePremiumDetailPageComponent {
         };
 
         if (this.isPartTimeEmployee()) {
-            const monthlyRewardAmount = this.getPartTimeMonthlyRewardTotal();
+            const basicSalary = this.isJoinMonthPartTimePayLocked()
+                ? this.lockedPartTimeMonthlyPay()
+                : this.toNumber(this.rewardForm.basicSalary);
+            const commutingAllowance = this.toNumber(this.rewardForm.commutingAllowance);
+            const otherFixedAllowance = this.toNumber(this.rewardForm.otherFixedAllowance);
+            const monthlyRewardAmount = partTimeMonthlyRewardTotal(
+                basicSalary,
+                commutingAllowance,
+                otherFixedAllowance,
+            );
             return {
                 ...base,
-                basicSalary: this.toNumber(this.rewardForm.basicSalary),
-                commutingAllowance: this.toNumber(this.rewardForm.commutingAllowance),
+                basicSalary,
+                commutingAllowance,
                 positionAllowance: 0,
                 housingAllowance: 0,
                 fixedOvertimePay: 0,
-                otherFixedAllowance: this.toNumber(this.rewardForm.otherFixedAllowance),
+                otherFixedAllowance,
                 overtimePay: 0,
                 holidayPay: 0,
                 nightPay: 0,
@@ -1777,18 +1920,60 @@ export class InsurancePremiumDetailPageComponent {
 
         return {
             ...base,
-            basicSalary: this.toNumber(this.rewardForm.basicSalary),
-            commutingAllowance: this.toNumber(this.rewardForm.commutingAllowance),
-            positionAllowance: this.toNumber(this.rewardForm.positionAllowance),
-            housingAllowance: this.toNumber(this.rewardForm.housingAllowance),
-            fixedOvertimePay: this.toNumber(this.rewardForm.fixedOvertimePay),
-            otherFixedAllowance: this.toNumber(this.rewardForm.otherFixedAllowance),
+            ...this.resolveFixedWageFieldsForSave(),
             overtimePay: this.toNumber(this.rewardForm.overtimePay),
             holidayPay: this.toNumber(this.rewardForm.holidayPay),
             nightPay: this.toNumber(this.rewardForm.nightPay),
             commissionPay: this.toNumber(this.rewardForm.commissionPay),
             otherVariablePay: this.toNumber(this.rewardForm.otherVariablePay),
         };
+    }
+
+    private resolveFixedWageFieldsForSave(): Pick<
+        StandardMonthlyRewardInput,
+        FixedWageFieldKey
+    > {
+        if (this.isJoinMonthFixedWageLocked()) {
+            return this.lockedFixedWageFields();
+        }
+
+        return {
+            basicSalary: this.toNumber(this.rewardForm.basicSalary),
+            commutingAllowance: this.toNumber(this.rewardForm.commutingAllowance),
+            positionAllowance: this.toNumber(this.rewardForm.positionAllowance),
+            housingAllowance: this.toNumber(this.rewardForm.housingAllowance),
+            fixedOvertimePay: this.toNumber(this.rewardForm.fixedOvertimePay),
+            otherFixedAllowance: this.toNumber(this.rewardForm.otherFixedAllowance),
+        };
+    }
+
+    private lockedFixedWageFields(): Pick<StandardMonthlyRewardInput, FixedWageFieldKey> {
+        const saved = this.standardReward();
+        if (saved) {
+            return {
+                basicSalary: saved.basicSalary,
+                commutingAllowance: saved.commutingAllowance,
+                positionAllowance: saved.positionAllowance,
+                housingAllowance: saved.housingAllowance,
+                fixedOvertimePay: saved.fixedOvertimePay,
+                otherFixedAllowance: saved.otherFixedAllowance,
+            };
+        }
+
+        return {
+            basicSalary: this.toNumber(this.rewardForm.basicSalary),
+            commutingAllowance: this.toNumber(this.rewardForm.commutingAllowance),
+            positionAllowance: this.toNumber(this.rewardForm.positionAllowance),
+            housingAllowance: this.toNumber(this.rewardForm.housingAllowance),
+            fixedOvertimePay: this.toNumber(this.rewardForm.fixedOvertimePay),
+            otherFixedAllowance: this.toNumber(this.rewardForm.otherFixedAllowance),
+        };
+    }
+
+    private lockedPartTimeMonthlyPay(): number {
+        const saved = this.standardReward();
+        if (saved) return saved.basicSalary;
+        return this.toNumber(this.rewardForm.basicSalary);
     }
 
     private buildPreviewRewardForTargetMonth(): StandardMonthlyReward | null {
@@ -2113,6 +2298,7 @@ export class InsurancePremiumDetailPageComponent {
 
     canShowPremiumSummary = computed(() => {
         if (this.isPremiumEnrollmentUndetermined()) return false;
+        if (this.hasUndeterminedPremiumDueToMissingReward()) return true;
         if (this.hasMonthlyPremiumDisplay() || this.isMonthlyPremiumNotSubject()) {
             return true;
         }
@@ -2164,6 +2350,19 @@ export class InsurancePremiumDetailPageComponent {
         rate: number | null,
         label: string,
     ): InsurancePremiumAmountDisplay {
+        if (
+            this.hasUndeterminedPremiumDueToMissingReward()
+            && isPremiumMonth
+            && joinStatus === 'active'
+        ) {
+            const basisLabel = this.premiumLiabilityYearMonthLabel();
+            return {
+                kind: 'undetermined',
+                message: basisLabel
+                    ? `${basisLabel}の給与を入力してください。`
+                    : '給与を入力してください。',
+            };
+        }
         if (
             needsManualRate
             && isPremiumMonth
@@ -2289,6 +2488,7 @@ export class InsurancePremiumDetailPageComponent {
 
     // 社会保険料の合計（本人負担）
     socialInsurancePremium = computed((): number | null => {
+        if (this.hasUndeterminedPremiumDueToMissingReward()) return null;
         if (this.hasUndeterminedPremiumDueToMissingManualRates()) return null;
         const healthPremium = this.healthInsurancePremium() ?? 0;
         const pensionPremium = this.pensionInsurancePremium() ?? 0;
@@ -2298,6 +2498,7 @@ export class InsurancePremiumDetailPageComponent {
 
     // 社会保険料の合計（会社負担）
     socialInsuranceEmployerPremium = computed((): number | null => {
+        if (this.hasUndeterminedPremiumDueToMissingReward()) return null;
         if (this.hasUndeterminedPremiumDueToMissingManualRates()) return null;
         const healthPremium = this.healthInsuranceEmployerPremium() ?? 0;
         const pensionPremium = this.pensionInsuranceEmployerPremium() ?? 0;
@@ -2879,6 +3080,7 @@ export class InsurancePremiumDetailPageComponent {
 
     readonly regularDecisionProcedureStatusLabel = procedureStatusLabel;
     readonly revisionProcedureStatusLabel = procedureStatusLabel;
+    readonly qualificationProcedureStatusLabel = procedureStatusLabel;
     readonly bonusPaymentProcedureStatusLabel = procedureStatusLabel;
 
     async openBonusPaymentProcedure(): Promise<void> {
@@ -2964,6 +3166,43 @@ export class InsurancePremiumDetailPageComponent {
             this.errorMessage.set('月額変更届の作成に失敗しました');
         } finally {
             this.isCreatingRevisionProcedure.set(false);
+        }
+    }
+
+    async openQualificationProcedure(): Promise<void> {
+        const employee = this.employee();
+        if (!employee || !this.isHealthInsuranceEligible() || this.isCreatingQualificationProcedure()) {
+            return;
+        }
+
+        const existing = this.qualificationProcedure();
+        if (existing) {
+            this.router.navigate(['/procedures', existing.id]);
+            return;
+        }
+
+        this.isCreatingQualificationProcedure.set(true);
+        this.errorMessage.set('');
+
+        try {
+            const status = this.socialInsuranceStatus();
+            const procedure = await this.procedureService.syncQualificationProcedureForEmployee({
+                employee,
+                healthInsuranceStartDate: status?.healthInsuranceStartDate ?? null,
+                healthInsuranceStatus: status?.healthInsuranceStatus,
+                pensionInsuranceStatus: status?.pensionInsuranceStatus,
+            });
+            if (!procedure) {
+                this.errorMessage.set('資格取得届を作成できませんでした');
+                return;
+            }
+            this.qualificationProcedure.set(procedure);
+            this.router.navigate(['/procedures', procedure.id]);
+        } catch (error) {
+            console.error('資格取得届の作成に失敗しました', error);
+            this.errorMessage.set('資格取得届の作成に失敗しました');
+        } finally {
+            this.isCreatingQualificationProcedure.set(false);
         }
     }
 

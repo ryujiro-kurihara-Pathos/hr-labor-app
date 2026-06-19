@@ -224,6 +224,17 @@
                         </span>
                     </div>
                     <div class="summary-card">
+                        <span class="summary-card-label">介護保険</span>
+                        <span
+                            class="summary-card-value"
+                            [class.ok]="careInsuranceJoinStatus() === 'active'"
+                            [class.ng]="careInsuranceJoinStatus() === 'inactive'"
+                            [class.pending]="careInsuranceJoinStatus() === 'unknown'"
+                        >
+                            {{ displayInsuranceStatus(careInsuranceJoinStatus()) }}
+                        </span>
+                    </div>
+                    <div class="summary-card">
                         <span class="summary-card-label">被扶養者</span>
                         <span class="summary-card-value neutral">
                             {{ activeDependentCount() }}人
@@ -687,7 +698,7 @@
                 <p class="insurance-date-note">介護保険は資格日と生年月日から自動算出されます。</p>
                 <dl class="detail-list">
                     <div class="detail-row">
-                        <dt>対象日</dt>
+                        <dt>介護保険 対象日</dt>
                         @let careStart = formatCareStartDateDisplay();
                         <dd>
                             {{ careStart.main }}
@@ -697,7 +708,7 @@
                         </dd>
                     </div>
                     <div class="detail-row">
-                        <dt>喪失日</dt>
+                        <dt>介護保険 喪失日</dt>
                         @let careEnd = formatCareEndDateDisplay();
                         <dd>
                             {{ careEnd.main }}
@@ -760,7 +771,7 @@
                         </dd>
                     </div>
                     <div class="detail-row">
-                        <dt>対象日</dt>
+                        <dt>介護保険 対象日</dt>
                         @let careStartView = formatCareStartDateDisplay();
                         <dd>
                             {{ careStartView.main }}
@@ -770,7 +781,7 @@
                         </dd>
                     </div>
                     <div class="detail-row">
-                        <dt>喪失日</dt>
+                        <dt>介護保険 喪失日</dt>
                         @let careEndView = formatCareEndDateDisplay();
                         <dd>
                             {{ careEndView.main }}
@@ -1069,7 +1080,7 @@
 
     .summary-strip {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(5, minmax(0, 1fr));
         gap: 10px;
         margin-bottom: 16px;
     }

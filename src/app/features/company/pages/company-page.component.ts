@@ -10,10 +10,14 @@ import {
     formatPayrollClosingDayLabel,
     formatConfiguredPayrollDayLabel,
     formatPayrollPaymentDayLabel,
+    insurancePremiumCollectionTimingLabel,
+    isValidInsurancePremiumCollectionSetting,
+    insurancePremiumCollectionSettingErrorMessage,
+    allowedInsurancePremiumCollectionTimings,
     isValidOptionalPayrollDay,
     isValidRequiredPayrollDay,
-    resolveInsurancePremiumCollectionTiming,
 } from '../utils/company-payroll-settings.util';
+import { InsurancePremiumCollectionTiming } from '../models/company.model';
 
 import { OfficeCreateModalComponent, OfficeFormData } from '../components/office-create-modal.component';
 import { OfficeNameDuplicateError, OfficeService } from '../services/office.service';
@@ -51,11 +55,13 @@ export class CompanyPageComponent {
     payrollClosingDay: number | '' = '';
     payrollPaymentDay: number | '' = '';
     payrollPaymentMonthOffset: 0 | 1 = 1;
+    insurancePremiumCollectionTiming: InsurancePremiumCollectionTiming = 'next_month';
 
     readonly payrollDayOptions = Array.from({ length: 31 }, (_, index) => index + 1);
     readonly formatPayrollClosingDayLabel = formatPayrollClosingDayLabel;
     readonly formatConfiguredPayrollDayLabel = formatConfiguredPayrollDayLabel;
     readonly formatPayrollPaymentDayLabel = formatPayrollPaymentDayLabel;
+    readonly insurancePremiumCollectionTimingLabel = insurancePremiumCollectionTimingLabel;
 
     readonly payrollClosingHelpLines = [
         '毎月の給与計算の締め日です。未設定でも利用できます。',
@@ -64,7 +70,12 @@ export class CompanyPageComponent {
 
     readonly payrollPaymentMonthHelpLines = [
         '給与を支払う月です。当月または翌月から選択します。',
-        '社会保険料の給与控除月も、この設定に連動します（当月支払→当月徴収、翌月支払→翌月徴収）。',
+    ];
+
+    readonly insurancePremiumCollectionHelpLines = [
+        '給与から控除する保険料の対象月（当月徴収 / 翌月徴収）です。',
+        '保険料対象月は給与支払月以前である必要があります。',
+        '給与支払が翌月の場合、当月徴収（支払月の保険料を先に控除）は選べません。',
     ];
 
     readonly payrollPaymentHelpLines = [
@@ -160,6 +171,15 @@ export class CompanyPageComponent {
             return;
         }
 
+        const insuranceSettingError = insurancePremiumCollectionSettingErrorMessage(
+            this.payrollPaymentMonthOffset,
+            this.insurancePremiumCollectionTiming,
+        );
+        if (insuranceSettingError) {
+            this.errorMessage.set(insuranceSettingError);
+            return;
+        }
+
         this.isSavingCompany.set(true);
         this.errorMessage.set('');
 
@@ -171,6 +191,7 @@ export class CompanyPageComponent {
                 payrollClosingDay,
                 payrollPaymentDay,
                 payrollPaymentMonthOffset: this.payrollPaymentMonthOffset,
+                insurancePremiumCollectionTiming: this.insurancePremiumCollectionTiming,
             });
             this.company.set({
                 ...company,
@@ -180,9 +201,7 @@ export class CompanyPageComponent {
                 payrollClosingDay,
                 payrollPaymentDay,
                 payrollPaymentMonthOffset: this.payrollPaymentMonthOffset,
-                insurancePremiumCollectionTiming: resolveInsurancePremiumCollectionTiming(
-                    this.payrollPaymentMonthOffset,
-                ),
+                insurancePremiumCollectionTiming: this.insurancePremiumCollectionTiming,
             });
             this.isEditingCompany.set(false);
         } catch (error) {
@@ -200,6 +219,17 @@ export class CompanyPageComponent {
         this.payrollClosingDay = company.payrollClosingDay ?? '';
         this.payrollPaymentDay = company.payrollPaymentDay ?? '';
         this.payrollPaymentMonthOffset = company.payrollPaymentMonthOffset;
+        this.insurancePremiumCollectionTiming = company.insurancePremiumCollectionTiming;
+    }
+
+    isInsurancePremiumCollectionTimingAllowed(timing: InsurancePremiumCollectionTiming): boolean {
+        return allowedInsurancePremiumCollectionTimings(this.payrollPaymentMonthOffset).includes(timing);
+    }
+
+    onPayrollPaymentMonthOffsetChange(): void {
+        if (!this.isInsurancePremiumCollectionTimingAllowed(this.insurancePremiumCollectionTiming)) {
+            this.insurancePremiumCollectionTiming = 'next_month';
+        }
     }
 
     formatOfficeAddress(office: Office): string {

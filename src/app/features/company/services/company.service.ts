@@ -12,7 +12,7 @@ import { db } from '../../../core/firebase';
 import { Company, CompanyInput, CompanyUpdateInput } from '../models/company.model';
 import {
     normalizeCompany,
-    resolveInsurancePremiumCollectionTiming,
+    isValidInsurancePremiumCollectionSetting,
 } from '../utils/company-payroll-settings.util';
 
 @Injectable({
@@ -54,12 +54,18 @@ export class CompanyService {
     }
 
     async updateCompany(companyId: string, input: CompanyUpdateInput): Promise<void> {
+        if (
+            !isValidInsurancePremiumCollectionSetting(
+                input.payrollPaymentMonthOffset,
+                input.insurancePremiumCollectionTiming,
+            )
+        ) {
+            throw new Error('Invalid insurance premium collection setting');
+        }
+
         const docRef = doc(db, 'companies', companyId);
         await updateDoc(docRef, {
             ...input,
-            insurancePremiumCollectionTiming: resolveInsurancePremiumCollectionTiming(
-                input.payrollPaymentMonthOffset,
-            ),
             updatedAt: serverTimestamp(),
         });
     }

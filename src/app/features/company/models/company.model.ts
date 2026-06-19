@@ -40,4 +40,5 @@ export type CompanyUpdateInput = Pick<
     | 'payrollClosingDay'
     | 'payrollPaymentDay'
     | 'payrollPaymentMonthOffset'
+    | 'insurancePremiumCollectionTiming'
 >;

@@ -35,6 +35,15 @@ describe('revision-determination.util', () => {
             ).toBeFalse();
         });
 
+        it('2等級下がりでも true', () => {
+            expect(
+                hasRevisionGradeDifference(
+                    { health: { grade: 22 }, pension: { grade: 20 } },
+                    { health: { grade: 20 }, pension: { grade: 20 } },
+                ),
+            ).toBeTrue();
+        });
+
         it('カスタム threshold を受け取れる', () => {
             expect(
                 hasRevisionGradeDifference(

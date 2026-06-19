@@ -2,7 +2,7 @@ import { Component, signal, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
-import { EmployeeInput, EmploymentType, createEmptyEmployeeInput, toEmployeeInput } from '../models/employee.models';
+import { EmployeeInput, createEmptyEmployeeInput, toEmployeeInput } from '../models/employee.models';
 import { EmployeeService } from '../services/employee.service';
 import { AuthService } from '../../auth/services/auth.service';
 import { UserService } from '../../users/services/user.service';
@@ -11,11 +11,19 @@ import { SocialInsuranceProcedureService } from '../../social-insurance/services
 import { ConfirmService } from '../../../shared/services/confirm.service';
 import { OfficeService } from '../../company/services/office.service';
 import { Office } from '../../company/models/office.model';
-import { insuranceJoinStatus, SocialInsuranceStatusInput } from '../../social-insurance/models/social-insurance-status.model';
+import { SocialInsuranceStatusInput } from '../../social-insurance/models/social-insurance-status.model';
 import {
     judgeHealthInsuranceJoinStatus,
     judgePensionInsuranceJoinStatus,
 } from '../../social-insurance/utils/age-premium-period.util';
+import {
+    isPartTimeEmployment,
+    parseJudgmentNumber,
+} from '../../social-insurance/utils/part-time-insurance-judgment.util';
+import {
+    judgeSocialInsuranceEmploymentStatus,
+    SocialInsuranceJoinJudgmentContext,
+} from '../../social-insurance/utils/social-insurance-join-status.util';
 import { EmployeeInviteService } from '../../invitations/services/employee-invite.service';
 import { normalizeAuthEmail } from '../../auth/utils/email-link-auth.util';
 import { PostalCodeLookupService } from '../../../shared/services/postal-code-lookup.service';
@@ -62,6 +70,11 @@ export class EmployeeCreatePageComponent {
     offices = signal<Office[]>([]);
     employee: EmployeeInput = createEmptyEmployeeInput();
     expectedMonthlySalary: number | '' = '';
+    weeklyScheduledWorkHours: number | '' = '';
+    monthlyScheduledWorkDays: number | '' = '';
+    prescribedWage: number | '' = '';
+    isStudent = false;
+    expectedEmploymentOver2Months = false;
     readonly prefectures = PREFECTURES;
 
     async ngOnInit(): Promise<void> {
@@ -145,14 +158,14 @@ export class EmployeeCreatePageComponent {
             const employee = await this.employeeService.createEmployee(this.employee);
             if (!employee) return;
 
-            const employmentStatus = this.resolveEmploymentJoinStatus(employee.employmentType);
+            const employmentStatus = judgeSocialInsuranceEmploymentStatus(this.buildJoinJudgmentContext());
             const socialInsuranceStatusInput: SocialInsuranceStatusInput = {
                 employeeId: employee.id,
-                weeklyScheduledWorkHours: null,
-                monthlyScheduledWorkDays: null,
-                prescribedWage: null,
-                isStudent: false,
-                expectedEmploymentOver2Months: false,
+                weeklyScheduledWorkHours: parseJudgmentNumber(this.weeklyScheduledWorkHours),
+                monthlyScheduledWorkDays: parseJudgmentNumber(this.monthlyScheduledWorkDays),
+                prescribedWage: parseJudgmentNumber(this.prescribedWage),
+                isStudent: this.isStudent,
+                expectedEmploymentOver2Months: this.expectedEmploymentOver2Months,
                 healthInsuranceStatus: judgeHealthInsuranceJoinStatus(employmentStatus, employee.birthDate),
                 pensionInsuranceStatus: judgePensionInsuranceJoinStatus(employmentStatus, employee.birthDate),
                 careInsuranceStatus: 'unknown',
@@ -224,6 +237,28 @@ export class EmployeeCreatePageComponent {
         }
     }
 
+    isPartTimeEmployment(): boolean {
+        return isPartTimeEmployment(this.employee.employmentType);
+    }
+
+    selectedOffice(): Office | undefined {
+        return this.offices().find((office) => office.id === this.employee.officeId);
+    }
+
+    displayOfficeNumber(value: number | null | undefined): string {
+        return value !== null && value !== undefined ? String(value) : '—';
+    }
+
+    onEmploymentTypeChange(): void {
+        if (!this.isPartTimeEmployment()) {
+            this.weeklyScheduledWorkHours = '';
+            this.monthlyScheduledWorkDays = '';
+            this.prescribedWage = '';
+            this.isStudent = false;
+            this.expectedEmploymentOver2Months = false;
+        }
+    }
+
     onKanaFieldChange(field: 'lastNameKana' | 'firstNameKana'): void {
         const label = field === 'lastNameKana' ? '姓（カナ）' : '名（カナ）';
         const trimmed = this.employee[field].trim();
@@ -253,10 +288,21 @@ export class EmployeeCreatePageComponent {
         }
     }
 
-    private resolveEmploymentJoinStatus(employmentType: EmploymentType): insuranceJoinStatus {
-        if (employmentType === 'full-time') return 'active';
-        if (employmentType === 'part-time') return 'unknown';
-        return 'unknown';
+    private buildJoinJudgmentContext(): SocialInsuranceJoinJudgmentContext {
+        const office = this.selectedOffice();
+        return {
+            employmentType: this.employee.employmentType,
+            birthDate: this.employee.birthDate,
+            partTimeInput: {
+                weeklyScheduledWorkHours: parseJudgmentNumber(this.weeklyScheduledWorkHours),
+                monthlyScheduledWorkDays: parseJudgmentNumber(this.monthlyScheduledWorkDays),
+                prescribedWage: parseJudgmentNumber(this.prescribedWage),
+            },
+            officeRegularWeeklyHours: office?.regularWeeklyScheduledWorkHours ?? null,
+            officeRegularMonthlyWorkDays: office?.regularMonthlyScheduledWorkDays ?? null,
+            isStudent: this.isStudent,
+            expectedEmploymentOver2Months: this.expectedEmploymentOver2Months,
+        };
     }
 
     private generateMyNumber(): string {

@@ -7,7 +7,7 @@
                 <div>
                     <a routerLink="/employees" class="back-link">← 従業員一覧</a>
                     <h1>従業員を追加</h1>
-                    <p class="page-note">必須項目を入力して登録してください。その他の基本情報は任意です。登録後も編集できます。</p>
+                    <p class="page-note">必須項目を入力して登録してください。性別・住所・パートの労働条件など手続き用の項目もここで入力できます（任意）。登録後も編集できます。</p>
                 </div>
             </header>
 
@@ -43,6 +43,7 @@
                                 id="employment-type"
                                 name="employmentType"
                                 [(ngModel)]="employee.employmentType"
+                                (ngModelChange)="onEmploymentTypeChange()"
                                 required
                             >
                                 <option [ngValue]="null" disabled>選択してください</option>
@@ -141,6 +142,7 @@
                                 <option ngValue="male">男性</option>
                                 <option ngValue="female">女性</option>
                             </select>
+                            <p class="field-note">資格取得届などの手続き提出時に必要です。</p>
                         </div>
                         <div class="form-field">
                             <label for="birth-date">生年月日 <span class="required">必須</span></label>
@@ -156,7 +158,9 @@
 
                 <section class="form-section">
                     <h2 class="section-title">連絡先・住所</h2>
-                    <p class="section-lead">メールアドレスは登録後のログイン招待にも使えます。</p>
+                    <p class="section-lead">
+                        メールアドレスは登録後のログイン招待にも使えます。都道府県・市区町村・丁目番地は資格取得届などの手続き提出時に必要です。
+                    </p>
                     <div class="form-grid">
                         <div class="form-field">
                             <label for="email">メールアドレス</label>
@@ -229,6 +233,90 @@
                         </div>
                     </div>
                 </section>
+
+                @if (isPartTimeEmployment()) {
+                    <section class="form-section">
+                        <h2 class="section-title">社会保険（パート・アルバイト）</h2>
+                        <p class="section-lead">
+                            加入要件の判定と手続きに使います。未入力の場合は登録後に従業員詳細で入力できます。
+                        </p>
+                        <div class="office-baseline-box">
+                            <p class="subsection-title">事業所の通常の労働者（比較基準）</p>
+                            <dl class="baseline-list">
+                                <div class="baseline-row">
+                                    <dt>週の所定労働時間</dt>
+                                    <dd>{{ displayOfficeNumber(selectedOffice()?.regularWeeklyScheduledWorkHours) }}</dd>
+                                </div>
+                                <div class="baseline-row">
+                                    <dt>月の所定労働日数</dt>
+                                    <dd>{{ displayOfficeNumber(selectedOffice()?.regularMonthlyScheduledWorkDays) }}</dd>
+                                </div>
+                            </dl>
+                            @if (selectedOffice()) {
+                                <a [routerLink]="['/company/offices', selectedOffice()!.id]" class="office-link">事業所設定で編集</a>
+                            }
+                        </div>
+                        <div class="form-grid">
+                            <div class="form-field">
+                                <label for="weekly-hours">週の所定労働時間（本人）</label>
+                                <input
+                                    id="weekly-hours"
+                                    type="number"
+                                    name="weeklyScheduledWorkHours"
+                                    min="0"
+                                    step="0.5"
+                                    [(ngModel)]="weeklyScheduledWorkHours"
+                                    placeholder="例: 20"
+                                />
+                            </div>
+                            <div class="form-field">
+                                <label for="monthly-days">月の所定労働日数（本人）</label>
+                                <input
+                                    id="monthly-days"
+                                    type="number"
+                                    name="monthlyScheduledWorkDays"
+                                    min="0"
+                                    step="1"
+                                    [(ngModel)]="monthlyScheduledWorkDays"
+                                    placeholder="例: 11"
+                                />
+                            </div>
+                            <div class="form-field">
+                                <label for="prescribed-wage">所定内賃金（月額）</label>
+                                <input
+                                    id="prescribed-wage"
+                                    type="number"
+                                    name="prescribedWage"
+                                    min="0"
+                                    step="1"
+                                    [(ngModel)]="prescribedWage"
+                                    placeholder="例: 88000"
+                                />
+                                <p class="field-note">見込み給与と異なる場合はこちらに入力してください。</p>
+                            </div>
+                        </div>
+                        <div class="judgment-conditions-box">
+                            <p class="subsection-title">短時間労働者の加入要件</p>
+                            <p class="judgment-sub-note">4分の3基準を満たさない場合に参照します</p>
+                            <div class="form-field checkbox-field">
+                                <label>
+                                    <input type="checkbox" name="isStudent" [(ngModel)]="isStudent" />
+                                    学生
+                                </label>
+                            </div>
+                            <div class="form-field checkbox-field">
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        name="expectedEmploymentOver2Months"
+                                        [(ngModel)]="expectedEmploymentOver2Months"
+                                    />
+                                    雇用見込みが2か月超
+                                </label>
+                            </div>
+                        </div>
+                    </section>
+                }
 
                 @if (errorMessage()) {
                     <p class="error-message" role="alert">{{ errorMessage() }}</p>
@@ -310,6 +398,79 @@
         font-size: 13px;
         color: #6b7280;
         line-height: 1.5;
+    }
+
+    .subsection-title {
+        margin: 0 0 8px;
+        font-size: 13px;
+        font-weight: 700;
+        color: #374151;
+    }
+
+    .judgment-sub-note {
+        margin: 0 0 10px;
+        font-size: 12px;
+        color: #6b7280;
+    }
+
+    .office-baseline-box,
+    .judgment-conditions-box {
+        margin-bottom: 16px;
+        padding: 12px 14px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+    }
+
+    .baseline-list {
+        margin: 0;
+        display: grid;
+        gap: 8px;
+    }
+
+    .baseline-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 13px;
+    }
+
+    .baseline-row dt {
+        color: #6b7280;
+    }
+
+    .baseline-row dd {
+        margin: 0;
+        font-weight: 600;
+        color: #111827;
+    }
+
+    .office-link {
+        display: inline-block;
+        margin-top: 8px;
+        font-size: 12px;
+        color: #2563eb;
+        text-decoration: none;
+    }
+
+    .office-link:hover {
+        text-decoration: underline;
+    }
+
+    .checkbox-field label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        color: #374151;
+        cursor: pointer;
+    }
+
+    .checkbox-field input[type='checkbox'] {
+        width: 16px;
+        height: 16px;
+        margin: 0;
     }
 
     .invite-section {

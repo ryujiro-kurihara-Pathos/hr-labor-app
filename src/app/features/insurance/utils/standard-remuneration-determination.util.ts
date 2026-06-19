@@ -71,6 +71,24 @@ export function getDeterminationType(
     return targetYearMonth < firstRegularYm ? 'initial' : 'regular';
 }
 
+/**
+ * 算定基礎届（baseYear年4〜6月分）の提出が必要か。
+ * 6月1日以降に資格取得した場合、取得年の算定基礎届は不要。
+ */
+export function isRegularDecisionProcedureRequiredForBaseYear(
+    qualificationDate: string,
+    baseYear: number,
+): boolean {
+    const qualYear = Number.parseInt(qualificationDate.slice(0, 4), 10);
+    const qualMonth = Number.parseInt(qualificationDate.slice(5, 7), 10);
+    const qualDay = Number.parseInt(qualificationDate.slice(8, 10), 10);
+
+    if (qualYear > baseYear) return false;
+    if (qualYear < baseYear) return true;
+
+    return !(qualMonth > 6 || (qualMonth === 6 && qualDay >= 1));
+}
+
 /** 定時決定の算定基礎対象となる4〜6月（在籍期間内のみ） */
 export function getRegularBaseMonths(
     employee: Employee,

@@ -31,9 +31,16 @@ export function detectFixedWageChanges(
     const changedFixedWageFields = FIXED_WAGE_FIELD_KEYS.filter(
         (key) => current[key] !== previous[key],
     );
+    const totalChanged = sumFixedWageFields(current) !== sumFixedWageFields(previous);
 
     return {
-        fixedWageChanged: changedFixedWageFields.length > 0,
-        changedFixedWageFields: [...changedFixedWageFields],
+        fixedWageChanged: totalChanged,
+        changedFixedWageFields: totalChanged ? changedFixedWageFields : [],
     };
+}
+
+export function sumFixedWageFields(
+    reward: Pick<StandardMonthlyReward, FixedWageFieldKey>,
+): number {
+    return FIXED_WAGE_FIELD_KEYS.reduce((sum, key) => sum + reward[key], 0);
 }

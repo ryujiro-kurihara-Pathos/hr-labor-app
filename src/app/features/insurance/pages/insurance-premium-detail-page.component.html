@@ -116,8 +116,43 @@
             </p>
         }
 
-        @if (showRevisionProcedureSection() || showRegularDecisionProcedureSection()) {
+        @if (showQualificationProcedureSection() || showRevisionProcedureSection() || showRegularDecisionProcedureSection()) {
             <div class="procedure-nudges">
+                @if (showQualificationProcedureSection()) {
+                    <div class="procedure-nudge">
+                        <span class="procedure-nudge-icon tone-blue" aria-hidden="true">資</span>
+                        <div class="procedure-nudge-body">
+                            <span class="procedure-nudge-label">資格取得届</span>
+                            <span class="procedure-nudge-meta">{{ qualificationMonthLabel() }}</span>
+                            @if (qualificationProcedureExists()) {
+                                <span
+                                    class="procedure-nudge-badge"
+                                    [class.not-started]="qualificationProcedureStatus() === 'notStarted'"
+                                    [class.completed]="qualificationProcedureStatus() === 'completed'"
+                                >
+                                    {{ qualificationProcedureStatusLabel(qualificationProcedureStatus()) }}
+                                </span>
+                            } @else {
+                                <span class="procedure-nudge-hint">提出が必要</span>
+                            }
+                        </div>
+                        <button
+                            type="button"
+                            class="procedure-nudge-btn"
+                            (click)="openQualificationProcedure()"
+                            [disabled]="isCreatingQualificationProcedure()"
+                        >
+                            @if (isCreatingQualificationProcedure()) {
+                                作成中...
+                            } @else if (qualificationProcedureExists()) {
+                                開く
+                            } @else {
+                                作成
+                            }
+                        </button>
+                    </div>
+                }
+
                 @if (showRevisionProcedureSection()) {
                     @if (revisionProcedureContext(); as revisionCtx) {
                         <div class="procedure-nudge">
@@ -218,17 +253,24 @@
                     </p>
 
                     <div class="reward-fields part-time-reward-fields">
-                        <div class="form-field">
-                            <label for="part-time-monthly-pay">月額報酬</label>
-                            <input
-                                id="part-time-monthly-pay"
-                                type="number"
-                                placeholder="例: 88000"
-                                [(ngModel)]="rewardForm.basicSalary"
-                                (ngModelChange)="onRewardFormFieldChange()"
-                                [disabled]="!isRewardEditable() || isLoadingMonth()"
-                            />
-                        </div>
+                        @if (isJoinMonthPartTimePayLocked()) {
+                            <p class="join-month-fixed-wage-note">
+                                月額報酬は <strong>{{ joinMonthPartTimeMonthlyPay() | number }}円</strong> です
+                            </p>
+                            <p class="join-month-fixed-wage-subnote">入社月のため、見込み報酬を反映しています。</p>
+                        } @else {
+                            <div class="form-field">
+                                <label for="part-time-monthly-pay">月額報酬</label>
+                                <input
+                                    id="part-time-monthly-pay"
+                                    type="number"
+                                    placeholder="例: 88000"
+                                    [(ngModel)]="rewardForm.basicSalary"
+                                    (ngModelChange)="onRewardFormFieldChange()"
+                                    [disabled]="!isRewardEditable() || isLoadingMonth()"
+                                />
+                            </div>
+                        }
                         <div class="form-field">
                             <label for="part-time-commuting">通勤手当</label>
                             <input
@@ -251,6 +293,14 @@
                                 [disabled]="!isRewardEditable() || isLoadingMonth()"
                             />
                         </div>
+                    </div>
+                } @else {
+                @if (isJoinMonthFixedWageLocked()) {
+                    <div class="wage-section fixed-wage-section fixed-wage-readonly">
+                        <p class="join-month-fixed-wage-note">
+                            固定的賃金は <strong>{{ joinMonthFixedWageTotal() | number }}円</strong> です
+                        </p>
+                        <p class="join-month-fixed-wage-subnote">入社月のため、見込み報酬を反映しています。</p>
                     </div>
                 } @else {
                 <div class="wage-section fixed-wage-section">
@@ -381,6 +431,7 @@
                         </div>
                     </div>
                 </div>
+                }
 
                 <div class="wage-section variable-wage-section">
                     <button
@@ -789,7 +840,21 @@
 
         @if (pageMode() === 'premium') {
             <div class="premium-display-tab">
-                <p class="premium-tab-lead">{{ premiumTabLeadNote() }}</p>
+                <div class="premium-tab-lead">
+                    <p class="premium-tab-lead-text">{{ premiumTabLeadNote() }}</p>
+                    @if (premiumTabLeadRewardHint(); as hint) {
+                        <p class="premium-tab-lead-hint">
+                            {{ hint }}
+                            <a
+                                [routerLink]="rewardDetailLink()"
+                                [queryParams]="rewardInputQueryParamsForPremiumBasis()"
+                                class="premium-tab-lead-link"
+                            >
+                                報酬を入力
+                            </a>
+                        </p>
+                    }
+                </div>
 
                 @if (showManualRateInputSection() && !showManualRatesUnsetModal()) {
                     <section class="manual-rate-bar">
@@ -885,7 +950,7 @@
                             <a
                                 class="btn primary-btn"
                                 [routerLink]="rewardDetailLink()"
-                                [queryParams]="crossPageQueryParams()"
+                                [queryParams]="rewardInputQueryParamsForPremiumBasis()"
                             >
                                 報酬を入力する
                             </a>
@@ -902,6 +967,8 @@
                             <p class="premium-summary-total">
                                 @if (socialInsuranceTotalPremium() !== null) {
                                     {{ socialInsuranceTotalPremium() | number }}<span class="premium-summary-unit">円</span>
+                                } @else if (hasUndeterminedPremiumDueToMissingReward() || hasUndeterminedPremiumDueToMissingManualRates()) {
+                                    —<span class="premium-summary-unit">円</span>
                                 } @else if (isMonthlyPremiumNotSubject()) {
                                     0<span class="premium-summary-unit">円</span>
                                 } @else {
@@ -909,7 +976,9 @@
                                 }
                             </p>
                             <p class="premium-summary-sub">
-                                @if (hasMonthlyPremiumDisplay()) {
+                                @if (hasUndeterminedPremiumDueToMissingReward()) {
+                                    {{ premiumLiabilityYearMonthLabel() }}分の給与が未入力のため、保険料を算出できません
+                                } @else if (hasMonthlyPremiumDisplay()) {
                                     @if (bonusSocialInsuranceEmployeePremium() !== null && applicableHealthStandardAmount() !== null) {
                                         {{ premiumLiabilityYearMonthLabel() }}分（標準報酬月額 {{ applicableHealthStandardAmount() | number }}円）＋賞与分
                                     } @else if (bonusSocialInsuranceEmployeePremium() !== null) {
@@ -1708,6 +1777,7 @@
     .procedure-nudge-icon.tone-amber { background: #d97706; }
     .procedure-nudge-icon.tone-orange { background: #ea580c; }
     .procedure-nudge-icon.tone-green { background: #059669; }
+    .procedure-nudge-icon.tone-blue { background: #2563eb; }
 
     .procedure-nudge-body {
         display: flex;
@@ -1947,6 +2017,31 @@
         font-size: 13px;
         line-height: 1.6;
         color: #1e40af;
+    }
+
+    .premium-tab-lead-text {
+        margin: 0;
+    }
+
+    .premium-tab-lead-hint {
+        margin: 8px 0 0;
+        padding-top: 8px;
+        border-top: 1px solid #bfdbfe;
+        font-size: 13px;
+        font-weight: 600;
+        color: #92400e;
+    }
+
+    .premium-tab-lead-link {
+        margin-left: 8px;
+        color: #2563eb;
+        font-weight: 600;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+
+    .premium-tab-lead-link:hover {
+        color: #1d4ed8;
     }
 
     .manual-rate-bar {
@@ -3122,6 +3217,30 @@
         background: #f8fafc;
         border: 1px solid #dbeafe;
         border-radius: 10px;
+    }
+
+    .fixed-wage-readonly {
+        margin-bottom: 14px;
+    }
+
+    .join-month-fixed-wage-note {
+        margin: 0;
+        font-size: 14px;
+        color: #374151;
+        line-height: 1.5;
+    }
+
+    .join-month-fixed-wage-note strong {
+        font-size: 16px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .join-month-fixed-wage-subnote {
+        margin: 6px 0 0;
+        font-size: 12px;
+        color: #6b7280;
+        line-height: 1.4;
     }
 
     .variable-wage-section {

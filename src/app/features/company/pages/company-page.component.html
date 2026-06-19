@@ -88,10 +88,33 @@
                                 id="payroll-payment-month-offset"
                                 name="payrollPaymentMonthOffset"
                                 [(ngModel)]="payrollPaymentMonthOffset"
+                                (ngModelChange)="onPayrollPaymentMonthOffsetChange()"
                                 required
                             >
                                 <option [ngValue]="0">当月</option>
                                 <option [ngValue]="1">翌月</option>
+                            </select>
+                        </div>
+                        <div class="form-field">
+                            <div class="label-row">
+                                <label for="insurance-premium-collection-timing">
+                                    保険料の給与控除 <span class="field-badge required">必須</span>
+                                </label>
+                                <app-field-help-tooltip
+                                    title="保険料の給与控除"
+                                    [lines]="insurancePremiumCollectionHelpLines"
+                                />
+                            </div>
+                            <select
+                                id="insurance-premium-collection-timing"
+                                name="insurancePremiumCollectionTiming"
+                                [(ngModel)]="insurancePremiumCollectionTiming"
+                                required
+                            >
+                                @if (isInsurancePremiumCollectionTimingAllowed('same_month')) {
+                                    <option ngValue="same_month">当月徴収（支払月分を控除）</option>
+                                }
+                                <option ngValue="next_month">翌月徴収（前月分を控除）</option>
                             </select>
                         </div>
                         <div class="form-field">
@@ -165,6 +188,10 @@
                             <div class="meta-row">
                                 <dt>給与支払月</dt>
                                 <dd>{{ c.payrollPaymentMonthOffset === 1 ? '翌月' : '当月' }}</dd>
+                            </div>
+                            <div class="meta-row">
+                                <dt>保険料の給与控除</dt>
+                                <dd>{{ insurancePremiumCollectionTimingLabel(c.insurancePremiumCollectionTiming) }}</dd>
                             </div>
                             <div class="meta-row">
                                 <dt>給与支払日</dt>
