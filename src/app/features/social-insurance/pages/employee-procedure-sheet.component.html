@@ -19,6 +19,10 @@
         />
     </app-procedure-detail-header>
 
+    @if (regularDecisionSubmissionPeriodNote(); as periodNote) {
+        <p class="submission-period-note">{{ periodNote }}</p>
+    }
+
     <h2 class="section-title">事業所情報</h2>
     <div class="office-code-panel">
         <div class="office-code-group">
@@ -191,6 +195,17 @@
         border: 1px solid #e5e7eb;
         border-radius: 8px;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    }
+
+    .submission-period-note {
+        margin: 0 0 16px;
+        padding: 10px 12px;
+        border: 1px solid #fde68a;
+        border-radius: 8px;
+        background: #fffbeb;
+        color: #92400e;
+        font-size: 13px;
+        line-height: 1.5;
     }
 
     .page-header {

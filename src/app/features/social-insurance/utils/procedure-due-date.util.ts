@@ -6,6 +6,9 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 /** 事実発生から届出可能な日数（翌日から起算して5日以内の最終日 = 発生日 + 5日） */
 export const PROCEDURE_SUBMISSION_DEADLINE_DAYS = 5;
 
+/** 定時決定（算定基礎届）の提出開始日（毎年7月1日） */
+export const REGULAR_DECISION_SUBMISSION_START_MONTH_DAY = '07-01';
+
 /** 定時決定（算定基礎届）の提出期限（毎年7月10日） */
 export const REGULAR_DECISION_DUE_MONTH_DAY = '07-10';
 
@@ -34,14 +37,38 @@ export function qualificationProcedureDueDate(qualificationDate: string): string
     return procedureDueDateFromOccurredDate(qualificationDate);
 }
 
-/** 定時決定（算定基礎届）の提出期限（算定対象年の7月10日） */
-export function regularDecisionProcedureDueDate(determinationYear: number | string): string {
+function resolveRegularDecisionDeterminationYear(determinationYear: number | string): number | null {
     const year =
         typeof determinationYear === 'number'
             ? determinationYear
             : Number(String(determinationYear).slice(0, 4));
-    if (!Number.isFinite(year) || year <= 0) return '';
+    if (!Number.isFinite(year) || year <= 0) return null;
+    return year;
+}
+
+/** 定時決定（算定基礎届）の提出開始日（算定対象年の7月1日） */
+export function regularDecisionProcedureSubmissionStartDate(determinationYear: number | string): string {
+    const year = resolveRegularDecisionDeterminationYear(determinationYear);
+    if (year === null) return '';
+    return `${year}-${REGULAR_DECISION_SUBMISSION_START_MONTH_DAY}`;
+}
+
+/** 定時決定（算定基礎届）の提出期限（算定対象年の7月10日） */
+export function regularDecisionProcedureDueDate(determinationYear: number | string): string {
+    const year = resolveRegularDecisionDeterminationYear(determinationYear);
+    if (year === null) return '';
     return `${year}-${REGULAR_DECISION_DUE_MONTH_DAY}`;
+}
+
+/** 算定基礎届を提出できる期間（算定対象年の7月1日〜7月10日）か */
+export function isRegularDecisionProcedureSubmissionAllowed(
+    determinationYear: number | string,
+    referenceDate: string,
+): boolean {
+    const startDate = regularDecisionProcedureSubmissionStartDate(determinationYear);
+    const dueDate = regularDecisionProcedureDueDate(determinationYear);
+    if (!DATE_PATTERN.test(referenceDate) || !startDate || !dueDate) return false;
+    return referenceDate >= startDate && referenceDate <= dueDate;
 }
 
 export function resolveLossProcedureOccurredAndDueDate(params: {

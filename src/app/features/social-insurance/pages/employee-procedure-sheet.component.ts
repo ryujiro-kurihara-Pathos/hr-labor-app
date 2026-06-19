@@ -13,7 +13,13 @@ import {
     dateLabel,
     genderLabel,
     procedureStatusLabel,
+    todayDateString,
 } from '../utils/procedure-display.util';
+import {
+    isRegularDecisionProcedureSubmissionAllowed,
+    regularDecisionProcedureDueDate,
+    regularDecisionProcedureSubmissionStartDate,
+} from '../utils/procedure-due-date.util';
 import { StandardMonthlyRewardService } from '../../insurance/services/standard-monthly-reward.service';
 import {
     getAprJunYearMonths,
@@ -221,6 +227,7 @@ export class EmployeeProcedureSheetComponent {
                 employee: this.employee(),
                 office: this.office(),
                 company: this.company(),
+                targetYearMonth: procedure.targetYearMonth,
                 missingMonthlyRewardMonths: this.missingMonthlyRewardMonths(),
                 averageMonthlyReward: this.averageMonthlyReward(),
                 standardRemuneration: this.standardRemuneration(),
@@ -251,6 +258,21 @@ export class EmployeeProcedureSheetComponent {
     });
 
     canSubmit = computed(() => this.submitValidation().ok);
+
+    regularDecisionSubmissionPeriodNote = computed((): string | null => {
+        if (this.variant() !== 'regularDecision') return null;
+        if (this.procedure().status === 'completed') return null;
+
+        const targetYearMonth = this.procedure().targetYearMonth;
+        if (!targetYearMonth) return null;
+
+        const baseYear = getRegularDecisionProcedureBaseYear(targetYearMonth);
+        if (isRegularDecisionProcedureSubmissionAllowed(baseYear, todayDateString())) return null;
+
+        const startDate = regularDecisionProcedureSubmissionStartDate(baseYear);
+        const dueDate = regularDecisionProcedureDueDate(baseYear);
+        return `提出期間は${dateLabel(startDate)}〜${dateLabel(dueDate)}です。内容の確認・CSV出力はこの期間外でも可能です。`;
+    });
 
     constructor() {
         effect(() => {

@@ -15,7 +15,13 @@ import {
     validateLossDateRange,
     validateQualificationDateRange,
 } from './procedure-date-range.util';
-import { getQualificationDate } from '../../insurance/utils/standard-remuneration-determination.util';
+import { getQualificationDate, getRegularDecisionProcedureBaseYear } from '../../insurance/utils/standard-remuneration-determination.util';
+import {
+    isRegularDecisionProcedureSubmissionAllowed,
+    regularDecisionProcedureDueDate,
+    regularDecisionProcedureSubmissionStartDate,
+} from './procedure-due-date.util';
+import { todayDateString } from './procedure-display.util';
 
 export type ProcedureSubmitMissingField = {
     label: string;
@@ -342,12 +348,20 @@ export function validateRegularDecisionProcedureSubmit(params: {
     employee: Employee | null | undefined;
     office: Office | null | undefined;
     company: Company | null | undefined;
+    targetYearMonth: string | null | undefined;
     missingMonthlyRewardMonths: string[];
     averageMonthlyReward: number | null | undefined;
     standardRemuneration: { health: number; pension: number } | null | undefined;
+    referenceDate?: string;
 }): ProcedureSubmitValidationResult {
     const common = validateCommonProcedureContext(params);
     if (common) return common;
+
+    const submissionPeriodError = validateRegularDecisionSubmissionPeriod(
+        params.targetYearMonth,
+        params.referenceDate ?? todayDateString(),
+    );
+    if (submissionPeriodError) return submissionPeriodError;
 
     const employeeId = params.employee!.id;
 
@@ -368,6 +382,27 @@ export function validateRegularDecisionProcedureSubmit(params: {
     }
 
     return { ok: true };
+}
+
+function validateRegularDecisionSubmissionPeriod(
+    targetYearMonth: string | null | undefined,
+    referenceDate: string,
+): ProcedureSubmitValidationResult | null {
+    const trimmed = targetYearMonth?.trim() ?? '';
+    if (!trimmed) {
+        return errorFailure('算定基礎届の対象年月が未設定です');
+    }
+
+    const baseYear = getRegularDecisionProcedureBaseYear(trimmed);
+    if (isRegularDecisionProcedureSubmissionAllowed(baseYear, referenceDate)) {
+        return null;
+    }
+
+    const startDate = regularDecisionProcedureSubmissionStartDate(baseYear);
+    const dueDate = regularDecisionProcedureDueDate(baseYear);
+    return errorFailure(
+        `算定基礎届の提出期間は${startDate}〜${dueDate}です。内容の確認・CSV出力はこの期間外でも可能です。`,
+    );
 }
 
 export function validateRevisionProcedureSubmit(params: {
@@ -518,6 +553,7 @@ export function validateProcedureSubmit(
                 employee: context.employee,
                 office: context.office,
                 company: context.company,
+                targetYearMonth: procedure.targetYearMonth,
                 missingMonthlyRewardMonths: context.missingMonthlyRewardMonths ?? [],
                 averageMonthlyReward: context.averageMonthlyReward,
                 standardRemuneration: context.standardRemuneration,

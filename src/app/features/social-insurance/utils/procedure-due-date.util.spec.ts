@@ -1,7 +1,9 @@
 import {
+    isRegularDecisionProcedureSubmissionAllowed,
     procedureDueDateFromOccurredDate,
     qualificationProcedureDueDate,
     regularDecisionProcedureDueDate,
+    regularDecisionProcedureSubmissionStartDate,
     resolveDependentChangeOccurredAndDueDate,
     resolveLossProcedureOccurredAndDueDate,
 } from './procedure-due-date.util';
@@ -15,6 +17,18 @@ describe('procedure-due-date.util', () => {
     it('sets regular decision deadline to July 10 of determination year', () => {
         expect(regularDecisionProcedureDueDate(2026)).toBe('2026-07-10');
         expect(regularDecisionProcedureDueDate('2026-06')).toBe('2026-07-10');
+    });
+
+    it('sets regular decision submission start to July 1 of determination year', () => {
+        expect(regularDecisionProcedureSubmissionStartDate(2026)).toBe('2026-07-01');
+        expect(regularDecisionProcedureSubmissionStartDate('2026-06')).toBe('2026-07-01');
+    });
+
+    it('allows regular decision submission only between July 1 and July 10', () => {
+        expect(isRegularDecisionProcedureSubmissionAllowed(2026, '2026-06-30')).toBeFalse();
+        expect(isRegularDecisionProcedureSubmissionAllowed(2026, '2026-07-01')).toBeTrue();
+        expect(isRegularDecisionProcedureSubmissionAllowed(2026, '2026-07-10')).toBeTrue();
+        expect(isRegularDecisionProcedureSubmissionAllowed(2026, '2026-07-11')).toBeFalse();
     });
 
     it('uses loss date for loss procedure deadline', () => {
