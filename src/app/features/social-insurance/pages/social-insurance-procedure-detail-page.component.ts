@@ -1,5 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 
 import { SocialInsuranceProcedureService } from '../services/social-insurance-procedure.service';
 import { SocialInsuranceStatusService } from '../services/social-insurance-status.service';
@@ -27,7 +27,7 @@ import { EmployeeProcedureSheetComponent } from './employee-procedure-sheet.comp
 @Component({
     selector: 'app-social-insurance-procedure-detail-page',
     standalone: true,
-    imports: [RouterLink, QualificationProcedureComponent, LossProcedureComponent, DependentProcedureComponent, EmployeeProcedureSheetComponent],
+    imports: [QualificationProcedureComponent, LossProcedureComponent, DependentProcedureComponent, EmployeeProcedureSheetComponent],
     templateUrl: './social-insurance-procedure-detail-page.component.html',
 })
 

@@ -134,7 +134,7 @@ describe('procedure-submit-validation.util', () => {
     describe('validateDependentProcedureSubmit', () => {
         it('requires add reason for add change', () => {
             const result = validateDependentProcedureSubmit('add', {
-                occurredDate: '2026-04-01',
+                changeDate: '',
                 dependentId: '',
                 lastName: '山田',
                 firstName: '花子',
@@ -143,15 +143,16 @@ describe('procedure-submit-validation.util', () => {
                 relationship: 'child',
                 dependencyStartDate: '2026-04-01',
                 addReason: '',
+                addReasonNote: '',
                 dependencyEndDate: '',
                 deleteReason: '',
             });
             expect(result.ok).toBeFalse();
         });
 
-        it('requires occurred date', () => {
+        it('requires change date for change type', () => {
             const result = validateDependentProcedureSubmit('change', {
-                occurredDate: '',
+                changeDate: '',
                 dependentId: 'd1',
                 lastName: '山田',
                 firstName: '花子',
@@ -160,12 +161,34 @@ describe('procedure-submit-validation.util', () => {
                 relationship: 'child',
                 dependencyStartDate: '',
                 addReason: '',
+                addReasonNote: '',
                 dependencyEndDate: '',
                 deleteReason: '',
             });
             expect(result.ok).toBeFalse();
             if (!result.ok) {
-                expect(result.missingFields?.some((field) => field.label.includes('事象'))).toBeTrue();
+                expect(result.missingFields?.some((field) => field.label.includes('変更した日'))).toBeTrue();
+            }
+        });
+
+        it('requires note when add reason is other', () => {
+            const result = validateDependentProcedureSubmit('add', {
+                changeDate: '',
+                dependentId: '',
+                lastName: '山田',
+                firstName: '花子',
+                birthDate: '2020-01-01',
+                gender: 'female',
+                relationship: 'child',
+                dependencyStartDate: '2026-04-01',
+                addReason: 'other',
+                addReasonNote: '',
+                dependencyEndDate: '',
+                deleteReason: '',
+            });
+            expect(result.ok).toBeFalse();
+            if (!result.ok) {
+                expect(result.missingFields?.some((field) => field.label === '記載')).toBeTrue();
             }
         });
     });

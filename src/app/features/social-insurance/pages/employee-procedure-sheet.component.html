@@ -1,18 +1,11 @@
 @let item = procedure()!;
 
 <section class="detail-card">
-    <div class="page-header">
-        <div class="page-header-title">
-            <h1>手続き詳細</h1>
-            <span
-                class="status-badge"
-                [class.not-started]="item.status === 'notStarted'"
-                [class.in-progress]="item.status === 'inProgress'"
-                [class.completed]="item.status === 'completed'"
-            >
-                {{ statusLabel(item.status) }}
-            </span>
-        </div>
+    <app-procedure-detail-header
+        [procedure]="item"
+        [formTitle]="formTitle()"
+        [subjectLabel]="employee().lastName + ' ' + employee().firstName"
+    >
         <app-procedure-action-bar
             [procedure]="item"
             [employee]="employee()"
@@ -24,15 +17,7 @@
             [actionErrorMessage]="submitErrorMessage()"
             (submitClick)="submitProcedure()"
         />
-    </div>
-
-    <div class="title">
-        <div class="title-sub">
-            <span>健康保険</span>
-            <span>厚生年金保険</span>
-        </div>
-        <div class="title-main">{{ formTitle() }}</div>
-    </div>
+    </app-procedure-detail-header>
 
     <h2 class="section-title">事業所情報</h2>
     <div class="office-code-panel">
@@ -138,7 +123,7 @@
                             （
                             @for (yearMonth of missingMonthlyRewardMonths(); track yearMonth; let last = $last) {
                                 <a
-                                    [routerLink]="['/premium', employee().id]"
+                                    [routerLink]="['/rewards', employee().id]"
                                     [queryParams]="{ ym: yearMonth }"
                                 >{{ monthLabel(yearMonth) }}</a>@if (!last) {、}
                             }

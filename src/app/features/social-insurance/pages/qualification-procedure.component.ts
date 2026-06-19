@@ -10,6 +10,7 @@ import { Office } from '../../company/models/office.model';
 import { Company } from '../../company/models/company.model';
 import { SocialInsuranceProcedureService } from '../services/social-insurance-procedure.service';
 import { ProcedureActionBarComponent } from '../components/procedure-action-bar.component';
+import { ProcedureDetailHeaderComponent } from '../components/procedure-detail-header.component';
 import { splitOfficeSymbol } from '../../company/utils/office-format.util';
 import {
     dateLabel,
@@ -33,7 +34,7 @@ import { validateQualificationProcedureSubmit } from '../utils/procedure-submit-
 @Component({
     selector: 'app-qualification-procedure',
     standalone: true,
-    imports: [ProcedureActionBarComponent, RouterLink],
+    imports: [ProcedureActionBarComponent, ProcedureDetailHeaderComponent, RouterLink],
     templateUrl: './qualification-procedure.component.html',
 })
 export class QualificationProcedureComponent {

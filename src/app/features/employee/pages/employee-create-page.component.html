@@ -51,6 +51,25 @@
                             </select>
                         </div>
                         <div class="form-field">
+                            <label for="expected-monthly-salary">
+                                見込み給与（月額）
+                                <span class="required">必須</span>
+                            </label>
+                            <input
+                                id="expected-monthly-salary"
+                                type="number"
+                                name="expectedMonthlySalary"
+                                min="1"
+                                step="1"
+                                [(ngModel)]="expectedMonthlySalary"
+                                placeholder="280000"
+                                required
+                            />
+                            <p class="field-note">
+                                入社月の報酬入力と資格取得届の報酬月額に反映します（下書きとして登録されます）。
+                            </p>
+                        </div>
+                        <div class="form-field">
                             <label for="department">部署</label>
                             <input id="department" type="text" name="department" [(ngModel)]="employee.department" placeholder="営業部" />
                         </div>
@@ -84,16 +103,41 @@
                             <input id="first-name" type="text" name="firstName" [(ngModel)]="employee.firstName" placeholder="太郎" required />
                         </div>
                         <div class="form-field">
-                            <label for="last-name-kana">姓（カナ）</label>
-                            <input id="last-name-kana" type="text" name="lastNameKana" [(ngModel)]="employee.lastNameKana" placeholder="ヤマダ" />
+                            <label for="last-name-kana">姓（カナ） <span class="required">必須</span></label>
+                            <input
+                                id="last-name-kana"
+                                type="text"
+                                name="lastNameKana"
+                                [(ngModel)]="employee.lastNameKana"
+                                (ngModelChange)="onKanaFieldChange('lastNameKana')"
+                                placeholder="ヤマダ"
+                                required
+                                [class.field-invalid]="lastNameKanaError()"
+                            />
+                            @if (lastNameKanaError()) {
+                                <p class="field-error">{{ lastNameKanaError() }}</p>
+                            }
                         </div>
                         <div class="form-field">
-                            <label for="first-name-kana">名（カナ）</label>
-                            <input id="first-name-kana" type="text" name="firstNameKana" [(ngModel)]="employee.firstNameKana" placeholder="タロウ" />
+                            <label for="first-name-kana">名（カナ） <span class="required">必須</span></label>
+                            <input
+                                id="first-name-kana"
+                                type="text"
+                                name="firstNameKana"
+                                [(ngModel)]="employee.firstNameKana"
+                                (ngModelChange)="onKanaFieldChange('firstNameKana')"
+                                placeholder="タロウ"
+                                required
+                                [class.field-invalid]="firstNameKanaError()"
+                            />
+                            @if (firstNameKanaError()) {
+                                <p class="field-error">{{ firstNameKanaError() }}</p>
+                            }
                         </div>
                         <div class="form-field">
-                            <label for="gender">性別 <span class="required">必須</span></label>
-                            <select id="gender" name="gender" [(ngModel)]="employee.gender" required>
+                            <label for="gender">性別</label>
+                            <select id="gender" name="gender" [(ngModel)]="employee.gender">
+                                <option [ngValue]="null">未設定</option>
                                 <option ngValue="male">男性</option>
                                 <option ngValue="female">女性</option>
                             </select>
@@ -340,6 +384,19 @@
 
     .field-note.warn {
         color: #b45309;
+    }
+
+    .field-error {
+        margin: 0;
+        font-size: 12px;
+        color: #b91c1c;
+        font-weight: 600;
+    }
+
+    .form-field input.field-invalid,
+    .form-field select.field-invalid {
+        border-color: #f87171;
+        background: #fef2f2;
     }
 
     .postal-code-row {

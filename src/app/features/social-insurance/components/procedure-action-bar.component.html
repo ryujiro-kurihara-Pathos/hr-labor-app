@@ -1,13 +1,12 @@
 @if (isCompleted()) {
-    <div class="action-bar">
-        <p class="completed-note">提出済み（{{ submittedDateLabel() }}）</p>
+    <div class="action-bar action-bar-completed">
+        <p class="completed-note">
+            <span class="completed-icon" aria-hidden="true">✓</span>
+            提出済み（{{ submittedDateLabel() }}）
+        </p>
         @if (canExportCsv()) {
-            <button
-                type="button"
-                class="btn export-btn"
-                (click)="onExportCsv()"
-            >
-                エクスポート
+            <button type="button" class="btn export-btn" (click)="onExportCsv()">
+                CSVエクスポート
             </button>
         }
     </div>
@@ -18,7 +17,7 @@
                 type="button"
                 class="btn delete-btn"
                 (click)="onDelete()"
-                [disabled]="isDeleting() || isSubmitting()"
+                [disabled]="isDeleting() || isSubmitting() || isSavingDraft()"
             >
                 @if (isDeleting()) {
                     削除中...
@@ -33,16 +32,30 @@
                     type="button"
                     class="btn export-btn"
                     (click)="onExportCsv()"
-                    [disabled]="isDeleting() || isSubmitting()"
+                    [disabled]="isDeleting() || isSubmitting() || isSavingDraft()"
                 >
-                    エクスポート
+                    CSVエクスポート
+                </button>
+            }
+            @if (showDraftSave()) {
+                <button
+                    type="button"
+                    class="btn draft-btn"
+                    (click)="onDraftSave()"
+                    [disabled]="isDeleting() || isSubmitting() || isSavingDraft() || !canSaveDraft()"
+                >
+                    @if (isSavingDraft()) {
+                        保存中...
+                    } @else {
+                        下書き保存
+                    }
                 </button>
             }
             <button
                 type="button"
                 class="btn submit-btn"
                 (click)="onSubmit()"
-                [disabled]="isDeleting() || isSubmitting()"
+                [disabled]="isDeleting() || isSubmitting() || isSavingDraft()"
             >
                 @if (isSubmitting()) {
                     処理中...
@@ -59,7 +72,7 @@
 }
 @if (submitBlockedMessage()) {
     <div class="submit-blocked">
-        <p class="action-error">{{ submitBlockedMessage() }}</p>
+        <p class="submit-blocked-title">{{ submitBlockedMessage() }}</p>
         @if (submitMissingFields().length > 0) {
             <ul class="missing-field-list">
                 @for (field of submitMissingFields(); track field.label) {
@@ -96,8 +109,12 @@
         flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
-        gap: 8px;
+        gap: 10px;
         width: 100%;
+    }
+
+    .action-bar-completed {
+        gap: 12px;
     }
 
     .action-bar-end {
@@ -116,6 +133,7 @@
         font-weight: 600;
         cursor: pointer;
         white-space: nowrap;
+        transition: background 0.15s, border-color 0.15s, color 0.15s;
     }
 
     .btn:disabled {
@@ -134,6 +152,17 @@
         border-color: #9ca3af;
     }
 
+    .draft-btn {
+        background: #fff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+    }
+
+    .draft-btn:hover:not(:disabled) {
+        background: #eff6ff;
+        border-color: #93c5fd;
+    }
+
     .delete-btn {
         background: #fff;
         color: #b91c1c;
@@ -148,6 +177,7 @@
     .submit-btn {
         background: #2563eb;
         color: #fff;
+        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
     }
 
     .submit-btn:hover:not(:disabled) {
@@ -155,6 +185,9 @@
     }
 
     .completed-note {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
         margin: 0;
         padding: 8px 12px;
         border-radius: 8px;
@@ -163,17 +196,28 @@
         color: #065f46;
         font-size: 13px;
         font-weight: 600;
-        white-space: nowrap;
         flex: 1;
         min-width: 0;
     }
 
+    .completed-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        border-radius: 999px;
+        background: #059669;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 800;
+    }
+
     .action-note,
     .action-error {
-        margin: 8px 0 0;
+        margin: 10px 0 0;
         font-size: 12px;
         line-height: 1.5;
-        text-align: right;
     }
 
     .action-note {
@@ -186,31 +230,37 @@
     }
 
     .submit-blocked {
-        margin-top: 8px;
-        text-align: right;
+        margin-top: 12px;
+        padding: 12px 14px;
+        border: 1px solid #fecaca;
+        border-radius: 10px;
+        background: #fffbfb;
     }
 
-    .submit-blocked .action-error {
-        margin: 0;
+    .submit-blocked-title {
+        margin: 0 0 8px;
+        font-size: 13px;
+        font-weight: 700;
+        color: #b91c1c;
+        line-height: 1.5;
     }
 
     .missing-field-list {
-        margin: 8px 0 0;
+        margin: 0;
         padding: 0;
         list-style: none;
         display: flex;
-        flex-direction: column;
-        align-items: flex-end;
+        flex-wrap: wrap;
         gap: 6px;
     }
 
     .missing-field-link {
         display: inline-flex;
         align-items: center;
-        padding: 4px 10px;
+        padding: 5px 10px;
         border: 1px solid #fecaca;
         border-radius: 999px;
-        background: #fff7f7;
+        background: #fff;
         color: #b91c1c;
         font-size: 12px;
         font-weight: 600;
@@ -225,6 +275,11 @@
     }
 
     .missing-field-label {
+        display: inline-flex;
+        align-items: center;
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: #fef2f2;
         font-size: 12px;
         color: #b91c1c;
         font-weight: 600;

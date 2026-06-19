@@ -20,6 +20,9 @@ import { EmployeeInviteService } from '../../invitations/services/employee-invit
 import { normalizeAuthEmail } from '../../auth/utils/email-link-auth.util';
 import { PostalCodeLookupService } from '../../../shared/services/postal-code-lookup.service';
 import { applyPostalLookupResult } from '../../../shared/utils/postal-code-lookup.util';
+import { StandardMonthlyRewardService } from '../../insurance/services/standard-monthly-reward.service';
+import { buildJoinMonthExpectedRewardInput } from '../../insurance/utils/join-month-expected-reward.util';
+import { katakanaValidationMessage, isKatakanaOnly } from '../utils/katakana.util';
 
 const PREFECTURES = [
     '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県', '茨城県', '栃木県', '群馬県',
@@ -46,15 +49,19 @@ export class EmployeeCreatePageComponent {
     private readonly confirmService = inject(ConfirmService);
     private readonly employeeInviteService = inject(EmployeeInviteService);
     private readonly postalCodeLookupService = inject(PostalCodeLookupService);
+    private readonly rewardService = inject(StandardMonthlyRewardService);
 
     isLoading = signal(false);
     isLoadingEmployee = signal(false);
     isPostalLookupLoading = signal(false);
     postalLookupError = signal('');
     errorMessage = signal('');
+    lastNameKanaError = signal('');
+    firstNameKanaError = signal('');
     nextEmployeeNumber = signal('');
     offices = signal<Office[]>([]);
     employee: EmployeeInput = createEmptyEmployeeInput();
+    expectedMonthlySalary: number | '' = '';
     readonly prefectures = PREFECTURES;
 
     async ngOnInit(): Promise<void> {
@@ -104,6 +111,13 @@ export class EmployeeCreatePageComponent {
     async onCreateEmployee(): Promise<void> {
         this.isLoadingEmployee.set(true);
         this.errorMessage.set('');
+        this.lastNameKanaError.set('');
+        this.firstNameKanaError.set('');
+
+        const lastNameKanaMessage = katakanaValidationMessage(this.employee.lastNameKana, '姓（カナ）');
+        const firstNameKanaMessage = katakanaValidationMessage(this.employee.firstNameKana, '名（カナ）');
+        if (lastNameKanaMessage) this.lastNameKanaError.set(lastNameKanaMessage);
+        if (firstNameKanaMessage) this.firstNameKanaError.set(firstNameKanaMessage);
 
         if (
             this.isFormEmpty(this.employee.lastName)
@@ -112,14 +126,21 @@ export class EmployeeCreatePageComponent {
             || this.isFormEmpty(this.employee.joinedDate)
             || this.isFormEmpty(this.employee.officeId)
             || this.employee.employmentType === null
-            || (this.employee.gender !== 'male' && this.employee.gender !== 'female')
+            || this.expectedMonthlySalary === ''
+            || Number(this.expectedMonthlySalary) <= 0
+            || lastNameKanaMessage
+            || firstNameKanaMessage
         ) {
-            this.errorMessage.set('必須項目を入力してください。');
+            if (!lastNameKanaMessage && !firstNameKanaMessage) {
+                this.errorMessage.set('必須項目を入力してください。');
+            }
             this.isLoadingEmployee.set(false);
             return;
         }
 
         try {
+            this.employee.lastNameKana = this.employee.lastNameKana.trim();
+            this.employee.firstNameKana = this.employee.firstNameKana.trim();
             this.employee.email = normalizeAuthEmail(this.employee.email);
             const employee = await this.employeeService.createEmployee(this.employee);
             if (!employee) return;
@@ -150,6 +171,18 @@ export class EmployeeCreatePageComponent {
                 employmentStatus,
             );
             await this.socialInsuranceStatusService.createSocialInsuranceStatus(syncedSocialInsuranceInput);
+
+            const expectedSalary = Number(this.expectedMonthlySalary);
+            const joinMonthRewardInput = buildJoinMonthExpectedRewardInput({
+                companyId: employee.companyId,
+                employeeId: employee.id,
+                joinedDate: employee.joinedDate,
+                employmentType: employee.employmentType,
+                expectedMonthlySalary: expectedSalary,
+            });
+            if (joinMonthRewardInput) {
+                await this.rewardService.saveDraft(joinMonthRewardInput);
+            }
 
             await this.procedureService.syncQualificationProcedureForEmployee({
                 employee,
@@ -189,6 +222,22 @@ export class EmployeeCreatePageComponent {
         } finally {
             this.isLoadingEmployee.set(false);
         }
+    }
+
+    onKanaFieldChange(field: 'lastNameKana' | 'firstNameKana'): void {
+        const label = field === 'lastNameKana' ? '姓（カナ）' : '名（カナ）';
+        const trimmed = this.employee[field].trim();
+        const errorSignal = field === 'lastNameKana' ? this.lastNameKanaError : this.firstNameKanaError;
+
+        if (!trimmed) {
+            errorSignal.set('');
+            return;
+        }
+        if (!isKatakanaOnly(trimmed)) {
+            errorSignal.set(`${label}は全角カタカナで入力してください。`);
+            return;
+        }
+        errorSignal.set('');
     }
 
     private async loadOffices(companyId: string): Promise<void> {

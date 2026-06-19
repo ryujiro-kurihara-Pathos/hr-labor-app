@@ -97,11 +97,18 @@ export class HomePageComponent {
             tone: 'green',
         },
         {
-            label: '保険料計算',
-            description: '月額・標準報酬',
+            label: '報酬入力',
+            description: '月次・賞与',
+            route: '/rewards',
+            icon: '酬',
+            tone: 'amber',
+        },
+        {
+            label: '保険料',
+            description: '給与控除',
             route: '/premium',
             icon: '算',
-            tone: 'amber',
+            tone: 'rose',
         },
         {
             label: '手続き',

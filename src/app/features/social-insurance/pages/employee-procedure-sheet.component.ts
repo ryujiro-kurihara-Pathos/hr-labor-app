@@ -6,6 +6,7 @@ import { Employee } from '../../employee/models/employee.models';
 import { Office } from '../../company/models/office.model';
 import { Company } from '../../company/models/company.model';
 import { ProcedureActionBarComponent } from '../components/procedure-action-bar.component';
+import { ProcedureDetailHeaderComponent } from '../components/procedure-detail-header.component';
 import { SocialInsuranceProcedureService } from '../services/social-insurance-procedure.service';
 import { splitOfficeSymbol } from '../../company/utils/office-format.util';
 import {
@@ -68,7 +69,7 @@ export type RemunerationProcedureVariant = 'regularDecision' | 'revision' | 'bon
 @Component({
     selector: 'app-employee-procedure-sheet',
     standalone: true,
-    imports: [ProcedureActionBarComponent, RouterLink, DecimalPipe],
+    imports: [ProcedureActionBarComponent, ProcedureDetailHeaderComponent, RouterLink, DecimalPipe],
     templateUrl: './employee-procedure-sheet.component.html',
 })
 

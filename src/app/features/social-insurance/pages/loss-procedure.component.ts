@@ -8,6 +8,7 @@ import { Procedure } from '../models/procedures.model';
 import { SocialInsuranceStatus } from '../models/social-insurance-status.model';
 import { SocialInsuranceProcedureService } from '../services/social-insurance-procedure.service';
 import { ProcedureActionBarComponent } from '../components/procedure-action-bar.component';
+import { ProcedureDetailHeaderComponent } from '../components/procedure-detail-header.component';
 import { splitOfficeSymbol } from '../../company/utils/office-format.util';
 import {
     dateLabel,
@@ -22,7 +23,7 @@ import { validateLossProcedureSubmit } from '../utils/procedure-submit-validatio
 @Component({
     selector: 'app-loss-procedure',
     standalone: true,
-    imports: [ProcedureActionBarComponent],
+    imports: [ProcedureActionBarComponent, ProcedureDetailHeaderComponent],
     templateUrl: './loss-procedure.component.html',
 })
 export class LossProcedureComponent {

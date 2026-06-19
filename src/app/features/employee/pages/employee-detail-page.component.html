@@ -45,6 +45,7 @@
                 </div>
                 @if (!isEditing()) {
                     <div class="header-actions">
+                        <a [routerLink]="['/rewards', employee()!.id]" class="btn sub-btn">報酬入力</a>
                         <a [routerLink]="['/premium', employee()!.id]" class="btn sub-btn">保険料</a>
                         @if (isActiveEmployee()) {
                             <button type="button" class="btn primary-btn" (click)="startEdit()">編集</button>

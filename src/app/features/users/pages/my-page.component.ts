@@ -179,7 +179,9 @@ export class MyPageComponent implements OnInit {
     }
 
     genderLabel(gender: Employee['gender']): string {
-        return gender === 'male' ? '男性' : '女性';
+        if (gender === 'female') return '女性';
+        if (gender === 'male') return '男性';
+        return '未設定';
     }
 
     formatAddress(employee: Employee): string {

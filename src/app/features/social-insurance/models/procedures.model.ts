@@ -58,17 +58,23 @@ export type QualificationProcedureData = {
 
 /** 扶養追加の理由 */
 export type DependentAddReason =
-    | 'birth'           // 出生
-    | 'cohabitation'    // 同居
-    | 'jobLoss'         // 離職
-    | 'incomeDecrease'  // 収入減
-    | 'other';          // その他
+    | 'birth'                      // 出生
+    | 'marriage'                   // 結婚
+    | 'jobLoss'                    // 離職
+    | 'incomeDecrease'             // 収入減少
+    | 'employmentTypeChange'       // 雇用形態変更
+    | 'unemploymentBenefitEnd'     // 失業給付終了
+    | 'dependentProviderChange'    // 扶養者変更
+    | 'other';                     // その他
 
 export const DEPENDENT_ADD_REASON_LABELS: Record<DependentAddReason, string> = {
     birth: '出生',
-    cohabitation: '同居',
+    marriage: '結婚',
     jobLoss: '離職',
-    incomeDecrease: '収入減',
+    incomeDecrease: '収入減少',
+    employmentTypeChange: '雇用形態変更',
+    unemploymentBenefitEnd: '失業給付終了',
+    dependentProviderChange: '扶養者変更',
     other: 'その他',
 };
 
@@ -102,8 +108,10 @@ export type DependentProcedureData = {
     dependentAddress: string;
     dependentOccupation: string;
     dependentIncome: number | null;
+    dependentIsDisabled: boolean;
     dependencyStartDate: string;
     dependentAddReason: DependentAddReason | '';
+    dependentAddReasonNote: string;
     dependencyEndDate: string;
     dependentDeleteReason: DependentDeleteReason | '';
 };
@@ -119,8 +127,10 @@ export const EMPTY_DEPENDENT_PROCEDURE_DATA: DependentProcedureData = {
     dependentAddress: '',
     dependentOccupation: '',
     dependentIncome: null,
+    dependentIsDisabled: false,
     dependencyStartDate: '',
     dependentAddReason: '',
+    dependentAddReasonNote: '',
     dependencyEndDate: '',
     dependentDeleteReason: '',
 };

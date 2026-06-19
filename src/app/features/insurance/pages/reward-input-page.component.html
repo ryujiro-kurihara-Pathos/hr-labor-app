@@ -1,35 +1,19 @@
-<div class="insurance-premium-page">
+<div class="reward-input-page">
     <header class="page-header">
         <div>
-            <h1>保険料</h1>
+            <h1>報酬入力</h1>
             <p class="page-note">
-                確定済みの報酬・賞与から、給与控除する保険料を確認・CSV出力できます。
+                対象年月の月次報酬・賞与の入力状況を確認できます。標準報酬月額は資格取得時決定・定時決定に基づき表示します。
             </p>
         </div>
-        @if (!isLoading() && employees().length > 0) {
-            <button
-                type="button"
-                class="btn csv-export-btn"
-                (click)="exportCsv()"
-                [disabled]="calculablePremiumRows().length === 0"
-            >
-                CSV出力
-            </button>
-        }
     </header>
-
-    @if (csvExportMessage()) {
-        <p class="csv-export-message" [class.error]="csvExportMessage().includes('できません')">
-            {{ csvExportMessage() }}
-        </p>
-    }
 
     <div class="month-toolbar">
         <button type="button" class="month-nav-btn" (click)="shiftMonth(-1)" [disabled]="isLoading()" aria-label="前月">
             ←
         </button>
         <div class="month-picker">
-            <label for="target-year-month" class="month-label">控除する月</label>
+            <label for="target-year-month" class="month-label">対象年月</label>
             <input
                 id="target-year-month"
                 type="month"
@@ -53,37 +37,20 @@
     } @else {
         <section class="summary-section">
             <p class="summary">
-                算出可能 <strong>{{ calculablePremiumRows().length }}</strong> 名
-                @if (uncalculableTargetRowCount() > 0) {
-                    <span class="summary-excluded">
-                        · 算出不可 <strong>{{ uncalculableTargetRowCount() }}</strong> 名
-                    </span>
-                }
+                登録済み <strong>{{ registeredRows().length }}</strong> 名 /
+                未入力 <strong>{{ unregisteredRows().length }}</strong> 名
                 @if (excludedRowCount() > 0) {
                     <span class="summary-excluded">
-                        · 対象外 <strong>{{ excludedRowCount() }}</strong> 名
+                        · 対象外 <strong>{{ excludedRowCount() }}</strong> 名（入社前・退職後）
                     </span>
                 }
             </p>
-            <div class="company-total-card">
-                <div class="company-total-label">会社負担合計（{{ targetYearMonthLabel() }}給与控除）</div>
-                <div class="company-total-value">{{ companyEmployerPremiumTotal() | number }} 円</div>
-                <p class="company-total-note">
-                    確定済みの報酬・賞与から算出 · {{ calculableEmployerPremiumRowCount() }} 名
-                </p>
-            </div>
         </section>
 
         <section class="list-section">
-            <h2 class="section-title">保険料一覧（{{ targetYearMonthLabel() }}給与控除）</h2>
-            @if (calculablePremiumRows().length === 0) {
-                <p class="section-empty">
-                    この月に算出できる保険料はありません。
-                    @if (unregisteredRows().length > 0) {
-                        <a routerLink="/rewards" [queryParams]="{ ym: targetYearMonth() }">報酬入力画面</a>
-                        で報酬を登録してください。
-                    }
-                </p>
+            <h2 class="section-title">登録済み（{{ targetYearMonthLabel() }}）</h2>
+            @if (registeredRows().length === 0) {
+                <p class="section-empty">この月の登録データはありません。</p>
             } @else {
                 <div class="table-wrap">
                     <table class="reward-table">
@@ -91,8 +58,7 @@
                             <tr>
                                 <th>従業員</th>
                                 <th>事業所</th>
-                                <th>本人負担</th>
-                                <th>会社負担</th>
+                                <th>決定方法</th>
                                 <th>報酬月額（基礎）</th>
                                 <th>健康保険（等級）</th>
                                 <th>健康保険（標準報酬月額）</th>
@@ -101,7 +67,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @for (row of calculablePremiumRows(); track row.employee.id) {
+                            @for (row of registeredRows(); track row.employee.id) {
                                 <tr
                                     class="clickable-row"
                                     [routerLink]="detailLink(row.employee.id)"
@@ -124,19 +90,15 @@
                                         </span>
                                     </td>
                                     <td>{{ officeNameById()[row.employee.officeId] || '—' }}</td>
-                                    <td class="num">
-                                        @if (row.calculatedPremium; as premium) {
-                                            {{ premium.totalEmployeePremium | number }} 円
-                                        } @else {
-                                            <span class="unsaved-label">—</span>
-                                        }
-                                    </td>
-                                    <td class="num">
-                                        @if (row.calculatedPremium; as premium) {
-                                            {{ premium.totalEmployerPremium | number }} 円
-                                        } @else {
-                                            <span class="unsaved-label">—</span>
-                                        }
+                                    <td>
+                                        <span
+                                            class="determination-badge"
+                                            [class.initial]="row.effective.determinationType === 'initial'"
+                                            [class.regular]="row.effective.determinationType === 'regular'"
+                                            [class.revision]="row.effective.determinationType === 'revision'"
+                                        >
+                                            {{ row.effective.determinationLabel }}
+                                        </span>
                                     </td>
                                     @if (row.effective.isComplete && row.effective.calculation) {
                                         <td class="num">{{ row.effective.averageMonthlyReward ?? 0 | number }} 円</td>
@@ -154,11 +116,48 @@
                 </div>
             }
         </section>
+
+        <section class="list-section">
+            <h2 class="section-title">未入力（{{ targetYearMonthLabel() }}）</h2>
+            @if (unregisteredRows().length === 0) {
+                <p class="section-empty">未入力の従業員はいません。</p>
+            } @else {
+                <ul class="unregistered-list">
+                    @for (row of unregisteredRows(); track row.employee.id) {
+                        <li>
+                            <a
+                                [routerLink]="detailLink(row.employee.id)"
+                                [queryParams]="detailQueryParams()"
+                                class="unregistered-card"
+                            >
+                                <span class="employee-avatar" aria-hidden="true">
+                                    {{ employeeInitial(row.employee) }}
+                                </span>
+                                <span class="unregistered-card-body">
+                                    <div class="unregistered-header">
+                                        <span class="employee-name">
+                                            {{ employeeDisplayName(row.employee) }}
+                                        </span>
+                                        <span class="status-badge">未入力</span>
+                                    </div>
+                                    <p class="employee-meta">
+                                        {{ officeNameById()[row.employee.officeId] || '—' }}
+                                        · 社員番号 {{ row.employee.employeeNumber || '—' }}
+                                    </p>
+                                    <p class="unregistered-note">{{ row.effective.description }}</p>
+                                </span>
+                                <span class="employee-link-arrow" aria-hidden="true">›</span>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
     }
 </div>
 
 <style>
-    .insurance-premium-page {
+    .reward-input-page {
         max-width: 1100px;
         margin: 0 auto;
         padding: 24px 16px 40px;
@@ -172,42 +171,6 @@
         align-items: flex-start;
         justify-content: space-between;
         gap: 16px;
-    }
-    .csv-export-btn {
-        flex-shrink: 0;
-        height: 40px;
-        padding: 0 16px;
-        border: 1px solid #d1d5db;
-        border-radius: 8px;
-        background: #fff;
-        color: #374151;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        white-space: nowrap;
-    }
-    .csv-export-btn:hover:not(:disabled) {
-        border-color: #93c5fd;
-        color: #2563eb;
-        background: #f8fafc;
-    }
-    .csv-export-btn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-    .csv-export-message {
-        margin: 0 0 16px;
-        padding: 10px 14px;
-        border-radius: 8px;
-        background: #ecfdf5;
-        border: 1px solid #a7f3d0;
-        color: #065f46;
-        font-size: 13px;
-    }
-    .csv-export-message.error {
-        background: #fef2f2;
-        border-color: #fecaca;
-        color: #b91c1c;
     }
     .page-note {
         margin: 0;
@@ -273,35 +236,6 @@
     }
     .summary-section {
         margin-bottom: 20px;
-        display: grid;
-        gap: 12px;
-    }
-    .company-total-card {
-        padding: 16px 20px;
-        border: 1px solid #bfdbfe;
-        border-radius: 12px;
-        background: #eff6ff;
-    }
-    .company-total-label {
-        font-size: 13px;
-        font-weight: 600;
-        color: #1d4ed8;
-        margin-bottom: 4px;
-    }
-    .company-total-value {
-        font-size: 28px;
-        font-weight: 700;
-        color: #1e3a8a;
-        line-height: 1.2;
-    }
-    .company-total-note {
-        margin: 8px 0 0;
-        font-size: 13px;
-        color: #3b82f6;
-    }
-    .unsaved-label {
-        color: #9ca3af;
-        font-size: 12px;
     }
     .summary {
         margin: 0;

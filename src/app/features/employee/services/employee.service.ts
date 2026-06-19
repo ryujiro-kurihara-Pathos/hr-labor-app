@@ -46,7 +46,8 @@ export class EmployeeService {
             firstNameKana: String(data['firstNameKana'] ?? ''),
             email: String(data['email'] ?? '').trim().toLowerCase(),
             myNumber: String(data['myNumber'] ?? ''),
-            gender: gender === 'female' ? 'female' : 'male',
+            gender:
+                gender === 'female' ? 'female' : gender === 'male' ? 'male' : null,
             postalCode: String(data['postalCode'] ?? ''),
             prefecture: String(data['prefecture'] ?? ''),
             city: String(data['city'] ?? ''),
@@ -201,6 +202,7 @@ export class EmployeeService {
             ...(data['address'] ? { address: String(data['address']) } : {}),
             ...(data['occupation'] ? { occupation: String(data['occupation']) } : {}),
             ...(typeof income === 'number' ? { income } : {}),
+            ...(data['isDisabled'] === true ? { isDisabled: true } : {}),
         };
     }
 
@@ -221,6 +223,7 @@ export class EmployeeService {
         if (input.address) data['address'] = input.address;
         if (input.occupation) data['occupation'] = input.occupation;
         if (input.income != null) data['income'] = input.income;
+        if (input.isDisabled) data['isDisabled'] = true;
 
         return data;
     }
@@ -272,6 +275,7 @@ export class EmployeeService {
         if (input.address !== undefined) updates['address'] = input.address;
         if (input.occupation !== undefined) updates['occupation'] = input.occupation;
         if (input.income !== undefined) updates['income'] = input.income;
+        if (input.isDisabled !== undefined) updates['isDisabled'] = input.isDisabled;
 
         await updateDoc(docRef, updates);
     }

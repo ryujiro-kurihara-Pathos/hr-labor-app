@@ -30,6 +30,7 @@ export type Dependent = {
     address?: string;               // 住所
     occupation?: string;            // 職業
     income?: number | null;         // 収入
+    isDisabled?: boolean;           // 障害者に該当
 
     memo: string;                   // メモ
 };
@@ -47,6 +48,7 @@ export type DependentInput = {
     address?: string;
     occupation?: string;
     income?: number | null;
+    isDisabled?: boolean;
     memo?: string;
 };
 
@@ -69,7 +71,7 @@ export type Employee = {
     firstNameKana: string;          // 名（カナ）
     email: string;                  // メールアドレス（ユーザー招待・ログイン用）
     myNumber: string;               // マイナンバー
-    gender: 'male' | 'female';      // 性別
+    gender: 'male' | 'female' | null;  // 性別（未設定可）
     postalCode: string;             // 郵便番号
     prefecture: string;             // 都道府県
     city: string;                   // 市区町村
@@ -113,7 +115,7 @@ export function createEmptyEmployeeInput(
         firstNameKana: '',
         email: '',
         myNumber: '',
-        gender: 'male',
+        gender: null,
         postalCode: '',
         prefecture: '',
         city: '',

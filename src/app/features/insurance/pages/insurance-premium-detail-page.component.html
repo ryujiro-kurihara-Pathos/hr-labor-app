@@ -5,8 +5,8 @@
         <p class="error-message">{{ errorMessage() }}</p>
     } @else {
         <header class="page-header">
-            <a routerLink="/premium" class="back-link">← 一覧に戻る</a>
-            <h1>社会保険</h1>
+            <a [routerLink]="listBackRoute()" class="back-link">← 一覧に戻る</a>
+            <h1>{{ pageMode() === 'input' ? '報酬入力' : '保険料' }}</h1>
             <p class="employee-meta">
                 <a [routerLink]="['/employees', employee()!.id]">{{ employee()!.lastName }} {{ employee()!.firstName }}</a>
                 @if (office()?.prefecture) {
@@ -15,6 +15,27 @@
                 }
             </p>
         </header>
+
+        <nav class="page-tabs" aria-label="報酬入力と保険料の切り替え">
+            <a
+                class="page-tab"
+                [class.active]="pageMode() === 'input'"
+                [routerLink]="rewardDetailLink()"
+                [queryParams]="crossPageQueryParams()"
+            >
+                <span class="page-tab-label">報酬入力</span>
+                <span class="page-tab-desc">月次報酬・賞与</span>
+            </a>
+            <a
+                class="page-tab"
+                [class.active]="pageMode() === 'premium'"
+                [routerLink]="premiumDetailLink()"
+                [queryParams]="crossPageQueryParams()"
+            >
+                <span class="page-tab-label">保険料</span>
+                <span class="page-tab-desc">算出結果・控除額</span>
+            </a>
+        </nav>
 
         @if (message()) {
             <p class="alert alert-success">{{ message() }}</p>
@@ -35,7 +56,7 @@
             </button>
             <div class="month-picker">
                 <label for="target-year-month" class="month-label">
-                    @if (activeTab() === 'premium') {
+                    @if (pageMode() === 'premium') {
                         控除する月
                     } @else {
                         対象年月
@@ -61,34 +82,18 @@
                 →
             </button>
         </div>
+        @if (pageMode() === 'input' && showOldestUnregisteredLink()) {
+            <p class="oldest-unregistered-link-wrap">
+                <button type="button" class="oldest-unregistered-link" (click)="goToOldestUnregisteredMonth()">
+                    未入力で最も古い月（{{ oldestUnregisteredYearMonthLabel() }}）へ移動
+                </button>
+            </p>
+        }
         @if (isLoadingMonth()) {
             <p class="month-loading">報酬情報を読み込み中...</p>
         }
 
-        <nav class="page-tabs" role="tablist" aria-label="社会保険">
-            <button
-                type="button"
-                role="tab"
-                class="page-tab"
-                [class.active]="activeTab() === 'input'"
-                [attr.aria-selected]="activeTab() === 'input'"
-                (click)="setActiveTab('input')"
-            >
-                報酬入力
-            </button>
-            <button
-                type="button"
-                role="tab"
-                class="page-tab"
-                [class.active]="activeTab() === 'premium'"
-                [attr.aria-selected]="activeTab() === 'premium'"
-                (click)="setActiveTab('premium')"
-            >
-                保険料
-            </button>
-        </nav>
-
-        @if (activeTab() === 'input') {
+        @if (pageMode() === 'input') {
         @if (
             monthRewardStatus() === 'confirmed' &&
             standardReward()?.fixedWageChanged &&
@@ -99,84 +104,80 @@
             </p>
         }
 
-        @if (showRevisionProcedureSection()) {
-            @if (revisionProcedureContext(); as revisionCtx) {
-                <section class="regular-decision-procedure-section">
-                    <h2 class="regular-decision-section-title">月額変更届（{{ revisionCtx.windowLabel }}）</h2>
-                    <div class="regular-decision-procedure-box">
-                        @if (revisionProcedureExists()) {
-                            <div class="regular-decision-procedure-header">
-                                <p class="regular-decision-procedure-message">月額変更届が作成されています。</p>
-                                <span
-                                    class="procedure-status-badge"
-                                    [class.not-started]="revisionProcedureStatus() === 'notStarted'"
-                                    [class.in-progress]="revisionProcedureStatus() === 'inProgress'"
-                                    [class.completed]="revisionProcedureStatus() === 'completed'"
-                                >
-                                    {{ revisionProcedureStatusLabel(revisionProcedureStatus()) }}
-                                </span>
+        @if (showRevisionProcedureSection() || showRegularDecisionProcedureSection()) {
+            <div class="procedure-nudges">
+                @if (showRevisionProcedureSection()) {
+                    @if (revisionProcedureContext(); as revisionCtx) {
+                        <div class="procedure-nudge">
+                            <span class="procedure-nudge-icon tone-orange" aria-hidden="true">改</span>
+                            <div class="procedure-nudge-body">
+                                <span class="procedure-nudge-label">月額変更届</span>
+                                <span class="procedure-nudge-meta">{{ revisionCtx.windowLabel }}</span>
+                                @if (revisionProcedureExists()) {
+                                    <span
+                                        class="procedure-nudge-badge"
+                                        [class.not-started]="revisionProcedureStatus() === 'notStarted'"
+                                        [class.completed]="revisionProcedureStatus() === 'completed'"
+                                    >
+                                        {{ revisionProcedureStatusLabel(revisionProcedureStatus()) }}
+                                    </span>
+                                } @else {
+                                    <span class="procedure-nudge-hint">提出が必要</span>
+                                }
                             </div>
-                        } @else {
-                            <p class="regular-decision-procedure-note">
-                                {{ revisionCtx.windowLabel }}の報酬をもとに、{{ revisionCtx.applyFromLabel }}からの月額変更届を提出してください。
-                            </p>
-                        }
+                            <button
+                                type="button"
+                                class="procedure-nudge-btn"
+                                (click)="openRevisionProcedure()"
+                                [disabled]="isCreatingRevisionProcedure()"
+                            >
+                                @if (isCreatingRevisionProcedure()) {
+                                    作成中...
+                                } @else if (revisionProcedureExists()) {
+                                    開く
+                                } @else {
+                                    作成
+                                }
+                            </button>
+                        </div>
+                    }
+                }
+
+                @if (showRegularDecisionProcedureSection()) {
+                    <div class="procedure-nudge">
+                        <span class="procedure-nudge-icon tone-amber" aria-hidden="true">算</span>
+                        <div class="procedure-nudge-body">
+                            <span class="procedure-nudge-label">算定基礎届</span>
+                            <span class="procedure-nudge-meta">{{ regularDecisionYearLabel() }}年4〜6月</span>
+                            @if (regularDecisionProcedureExists()) {
+                                <span
+                                    class="procedure-nudge-badge"
+                                    [class.not-started]="regularDecisionProcedureStatus() === 'notStarted'"
+                                    [class.completed]="regularDecisionProcedureStatus() === 'completed'"
+                                >
+                                    {{ regularDecisionProcedureStatusLabel(regularDecisionProcedureStatus()) }}
+                                </span>
+                            } @else {
+                                <span class="procedure-nudge-hint">提出が必要</span>
+                            }
+                        </div>
                         <button
                             type="button"
-                            class="btn primary-btn regular-decision-procedure-btn"
-                            (click)="openRevisionProcedure()"
-                            [disabled]="isCreatingRevisionProcedure()"
+                            class="procedure-nudge-btn"
+                            (click)="openRegularDecisionProcedure()"
+                            [disabled]="isCreatingRegularDecisionProcedure()"
                         >
-                            @if (isCreatingRevisionProcedure()) {
+                            @if (isCreatingRegularDecisionProcedure()) {
                                 作成中...
-                            } @else if (revisionProcedureExists()) {
-                                月額変更届を開く
+                            } @else if (regularDecisionProcedureExists()) {
+                                開く
                             } @else {
-                                月額変更届を作成
+                                作成
                             }
                         </button>
                     </div>
-                </section>
-            }
-        }
-
-        @if (showRegularDecisionProcedureSection()) {
-            <section class="regular-decision-procedure-section">
-                <h2 class="regular-decision-section-title">算定基礎届（{{ regularDecisionYearLabel() }}4〜6月）</h2>
-                <div class="regular-decision-procedure-box">
-                    @if (regularDecisionProcedureExists()) {
-                        <div class="regular-decision-procedure-header">
-                            <p class="regular-decision-procedure-message">算定基礎届が作成されています。</p>
-                            <span
-                                class="procedure-status-badge"
-                                [class.not-started]="regularDecisionProcedureStatus() === 'notStarted'"
-                                [class.in-progress]="regularDecisionProcedureStatus() === 'inProgress'"
-                                [class.completed]="regularDecisionProcedureStatus() === 'completed'"
-                            >
-                                {{ regularDecisionProcedureStatusLabel(regularDecisionProcedureStatus()) }}
-                            </span>
-                        </div>
-                    } @else {
-                        <p class="regular-decision-procedure-note">
-                            {{ regularDecisionYearLabel() }}4〜6月の報酬をもとに、定時決定の算定基礎届を提出してください。
-                        </p>
-                    }
-                    <button
-                        type="button"
-                        class="btn primary-btn regular-decision-procedure-btn"
-                        (click)="openRegularDecisionProcedure()"
-                        [disabled]="isCreatingRegularDecisionProcedure()"
-                    >
-                        @if (isCreatingRegularDecisionProcedure()) {
-                            作成中...
-                        } @else if (regularDecisionProcedureExists()) {
-                            算定基礎届を開く
-                        } @else {
-                            算定基礎届を作成
-                        }
-                    </button>
-                </div>
-            </section>
+                }
+            </div>
         }
 
         @if (canCopyFromLatestRegistered()) {
@@ -243,11 +244,13 @@
                 <div class="wage-section fixed-wage-section">
                     <div class="wage-section-header">
                         <h3 class="wage-section-title">固定的賃金</h3>
+                        <app-field-help-tooltip ariaLabel="固定的賃金について">
+                            毎月一定額が支給される項目。前月と異なる値は黄色で表示されます。
+                        </app-field-help-tooltip>
                         @if (hasFixedWageChangesInForm()) {
                             <span class="wage-change-hint">前月から変更あり</span>
                         }
                     </div>
-                    <p class="wage-section-note">毎月一定額が支給される項目。前月と異なる値は黄色で表示されます。</p>
 
                     <div class="reward-fields">
                         <div class="form-field" [class.field-changed]="isFixedWageFieldChanged('basicSalary')">
@@ -478,8 +481,6 @@
             <p class="bonus-section-note">
                 @if (treatBonusAsMonthlyRemuneration()) {
                     対象期間（{{ targetYearMonthLabel() }}の暦年）内で4回目以降の賞与支給があるため、当該賞与は賞与支払届の対象外です。標準報酬月額には対象期間内の賞与合計（{{ bonusTotalInTargetPeriod() | number }}円）を12で除した額（{{ includedBonusInMonth() | number }}円）を毎月加算します。標準賞与額・賞与保険料は計算しません。
-                } @else {
-                    月次報酬とは別に、賞与支給時の金額を登録します。標準賞与額は1,000円未満を切り捨てて計算されます（年3回以下の賞与は賞与支払届の対象です）。
                 }
             </p>
 
@@ -547,17 +548,10 @@
                         }
                     </ul>
                 </div>
-            } @else {
-                <p class="bonus-empty">この月の賞与はありません</p>
-                @if (isBonusEditable() && !isBonusFormVisible()) {
-                    <button type="button" class="btn sub-btn bonus-add-btn" (click)="openNewBonusForm()">
-                        賞与を入力
-                    </button>
-                }
             }
 
-            @if (isBonusFormVisible() && isBonusFormEditable()) {
-                <div class="bonus-form">
+            @if (isBonusFormVisible() && isTargetMonth() && !isLoadingBonus()) {
+                <div class="bonus-form" [class.bonus-form-readonly]="!isBonusFormEditable()">
                     <div class="bonus-form-header">
                         <h3 class="bonus-form-title">
                             @if (isEditingBonus()) {
@@ -566,7 +560,7 @@
                                 賞与を入力
                             }
                         </h3>
-                        @if (monthBonuses().length > 0) {
+                        @if (monthBonuses().length > 0 && isBonusFormEditable()) {
                             <button
                                 type="button"
                                 class="btn sub-btn bonus-close-btn"
@@ -586,7 +580,7 @@
                                 [(ngModel)]="bonusForm.paymentDate"
                                 [min]="bonusPaymentDateMin() ?? undefined"
                                 [max]="bonusPaymentDateMax() ?? undefined"
-                                [disabled]="isEditingBonus()"
+                                [disabled]="!isBonusFormEditable() || isEditingBonus()"
                             />
                         </div>
                         <div class="form-field">
@@ -596,6 +590,7 @@
                                 type="number"
                                 placeholder="例: 500000"
                                 [(ngModel)]="bonusForm.bonusAmount"
+                                [disabled]="!isBonusFormEditable()"
                             />
                         </div>
                     </div>
@@ -604,6 +599,9 @@
                         <p class="bonus-preview">標準賞与額（見込み）：{{ standardAmount | number }}円</p>
                     }
 
+                    @if (!isBonusFormEditable()) {
+                        <p class="reward-locked-note">確定済みのため変更できません。</p>
+                    } @else {
                     <div class="bonus-form-actions">
                         @if (isEditingBonus() && editingBonus(); as editing) {
                             @if (canSelectBonusForEdit(editing)) {
@@ -642,9 +640,8 @@
                             }
                         </button>
                     </div>
+                    }
                 </div>
-            } @else if (monthRewardStatus() === 'confirmed' && !canConfirmMonth()) {
-                <p class="reward-locked-note">確定済みのため変更できません。</p>
             } @else if (monthRewardStatus() === 'confirmed' && canConfirmMonth()) {
                 <p class="reward-locked-note">下書きの賞与があります。下の確定ボタンで確定してください。</p>
             }
@@ -740,35 +737,146 @@
             }
 
             @if (showBonusPaymentProcedureSection()) {
-                <div class="procedure-notice bonus-procedure-notice">
-                    <span>賞与支払届</span>
-                    @if (bonusPaymentProcedureExists()) {
-                        <span class="procedure-notice-status">{{ bonusPaymentProcedureStatusLabel(bonusPaymentProcedureStatus()) }}</span>
-                    }
-                    <button
-                        type="button"
-                        class="procedure-notice-link"
-                        (click)="openBonusPaymentProcedure()"
-                        [disabled]="isCreatingBonusPaymentProcedure()"
-                    >
-                        {{ bonusPaymentProcedureExists() ? '開く' : '作成' }}
-                    </button>
+                <div class="procedure-nudges procedure-nudges-inline">
+                    <div class="procedure-nudge">
+                        <span class="procedure-nudge-icon tone-green" aria-hidden="true">賞</span>
+                        <div class="procedure-nudge-body">
+                            <span class="procedure-nudge-label">賞与支払届</span>
+                            <span class="procedure-nudge-meta">{{ targetYearMonthLabel() }}</span>
+                            @if (bonusPaymentProcedureExists()) {
+                                <span
+                                    class="procedure-nudge-badge"
+                                    [class.not-started]="bonusPaymentProcedureStatus() === 'notStarted'"
+                                    [class.completed]="bonusPaymentProcedureStatus() === 'completed'"
+                                >
+                                    {{ bonusPaymentProcedureStatusLabel(bonusPaymentProcedureStatus()) }}
+                                </span>
+                            } @else {
+                                <span class="procedure-nudge-hint">提出が必要</span>
+                            }
+                        </div>
+                        <button
+                            type="button"
+                            class="procedure-nudge-btn"
+                            (click)="openBonusPaymentProcedure()"
+                            [disabled]="isCreatingBonusPaymentProcedure()"
+                        >
+                            @if (isCreatingBonusPaymentProcedure()) {
+                                作成中...
+                            } @else if (bonusPaymentProcedureExists()) {
+                                開く
+                            } @else {
+                                作成
+                            }
+                        </button>
+                    </div>
                 </div>
             }
         </section>
         }
 
-        @if (activeTab() === 'premium') {
+        @if (pageMode() === 'premium') {
             <div class="premium-display-tab">
                 <p class="premium-tab-lead">{{ premiumTabLeadNote() }}</p>
+
+                @if (showManualRateInputSection() && !showManualRatesUnsetModal()) {
+                    <section class="manual-rate-bar">
+                        <div class="manual-rate-bar-text">
+                            <span class="manual-rate-bar-label">
+                                料率（手動）
+                                <app-field-help-tooltip
+                                    title="手動入力が必要な理由"
+                                    ariaLabel="手動入力が必要な理由"
+                                    [lines]="manualRateHelpLines"
+                                />
+                            </span>
+                            <span class="manual-rate-bar-note">{{ premiumLiabilityYearMonthLabel() }} · 本人・会社同率</span>
+                        </div>
+                        <div class="manual-rate-bar-fields">
+                            @if (resolvedPremiumRates()?.needsManualHealthRate) {
+                                <label class="manual-rate-item" for="manual-health-rate">
+                                    <span class="manual-rate-item-name">健康</span>
+                                    <span class="manual-rate-input-wrap">
+                                        <input
+                                            id="manual-health-rate"
+                                            type="number"
+                                            min="0"
+                                            step="0.001"
+                                            placeholder="0"
+                                            [ngModel]="manualRateForm().healthRatePercent"
+                                            (ngModelChange)="updateManualRateFormField('healthRatePercent', $event)"
+                                        />
+                                        <span class="manual-rate-suffix">%</span>
+                                    </span>
+                                </label>
+                            }
+                            @if (resolvedPremiumRates()?.needsManualPensionRate) {
+                                <label class="manual-rate-item" for="manual-pension-rate">
+                                    <span class="manual-rate-item-name">厚生</span>
+                                    <span class="manual-rate-input-wrap">
+                                        <input
+                                            id="manual-pension-rate"
+                                            type="number"
+                                            min="0"
+                                            step="0.001"
+                                            placeholder="0"
+                                            [ngModel]="manualRateForm().pensionRatePercent"
+                                            (ngModelChange)="updateManualRateFormField('pensionRatePercent', $event)"
+                                        />
+                                        <span class="manual-rate-suffix">%</span>
+                                    </span>
+                                </label>
+                            }
+                            @if (resolvedPremiumRates()?.needsManualCareRate) {
+                                <label class="manual-rate-item" for="manual-care-rate">
+                                    <span class="manual-rate-item-name">介護</span>
+                                    <span class="manual-rate-input-wrap">
+                                        <input
+                                            id="manual-care-rate"
+                                            type="number"
+                                            min="0"
+                                            step="0.001"
+                                            placeholder="0"
+                                            [ngModel]="manualRateForm().careRatePercent"
+                                            (ngModelChange)="updateManualRateFormField('careRatePercent', $event)"
+                                        />
+                                        <span class="manual-rate-suffix">%</span>
+                                    </span>
+                                </label>
+                            }
+                            <button
+                                type="button"
+                                class="btn primary-btn manual-rate-save-btn"
+                                (click)="saveManualRates()"
+                                [disabled]="isSavingManualRates()"
+                            >
+                                {{ isSavingManualRates() ? '保存中…' : '保存' }}
+                            </button>
+                        </div>
+                        @if (manualRateMessage() || manualRateErrorMessage()) {
+                            <p
+                                class="manual-rate-feedback"
+                                [class.success]="!!manualRateMessage()"
+                                [class.error]="!!manualRateErrorMessage()"
+                            >
+                                {{ manualRateMessage() || manualRateErrorMessage() }}
+                            </p>
+                        }
+                    </section>
+                }
+
                 @if (!canShowPremiumSummary()) {
                     <section class="premium-empty-state">
                         <h2 class="premium-empty-title">{{ premiumEmptyStateTitle() }}</h2>
                         <p class="premium-empty-note">{{ premiumEmptyStateNote() }}</p>
                         @if (!isPremiumEnrollmentUndetermined()) {
-                            <button type="button" class="btn primary-btn" (click)="setActiveTab('input')">
+                            <a
+                                class="btn primary-btn"
+                                [routerLink]="rewardDetailLink()"
+                                [queryParams]="crossPageQueryParams()"
+                            >
                                 報酬を入力する
-                            </button>
+                            </a>
                         } @else if (employee(); as emp) {
                             <a [routerLink]="['/employees', emp.id]" fragment="social-insurance" class="btn primary-btn">
                                 加入状況を入力する
@@ -883,7 +991,7 @@
                                 </div>
                                 <div class="premium-display-meta-row">
                                     <dt>料率（本人）</dt>
-                                    <dd>{{ insuranceRatePercentLabel(pensionInsuranceRate) }}%</dd>
+                                    <dd>{{ insuranceRatePercentLabel(pensionInsuranceRate()) ?? '—' }}%</dd>
                                 </div>
                                 <div class="premium-display-meta-row">
                                     <dt>会社負担</dt>
@@ -1035,7 +1143,7 @@
                                         </div>
                                         <div class="premium-display-meta-row">
                                             <dt>料率（本人）</dt>
-                                            <dd>{{ insuranceRatePercentLabel(pensionInsuranceRate) }}%</dd>
+                                            <dd>{{ insuranceRatePercentLabel(pensionInsuranceRate()) ?? '—' }}%</dd>
                                         </div>
                                         <div class="premium-display-meta-row">
                                             <dt>会社負担</dt>
@@ -1320,6 +1428,100 @@
             </div>
         }
     }
+
+    @if (showManualRatesUnsetModal()) {
+        <div class="manual-rate-modal-backdrop" role="presentation">
+            <div
+                class="manual-rate-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="manual-rate-modal-title"
+            >
+                <h2 id="manual-rate-modal-title" class="manual-rate-modal-title">料率の手動入力</h2>
+                <p class="manual-rate-modal-message">{{ manualRatesUnsetNotice() }}</p>
+                <p class="manual-rate-modal-note">
+                    {{ premiumLiabilityYearMonthLabel() }} · 本人・会社同率
+                    <app-field-help-tooltip
+                        title="手動入力が必要な理由"
+                        ariaLabel="手動入力が必要な理由"
+                        [lines]="manualRateHelpLines"
+                    />
+                </p>
+
+                <div class="manual-rate-modal-fields">
+                    @if (resolvedPremiumRates()?.needsManualHealthRate) {
+                        <label class="manual-rate-modal-field" for="modal-manual-health-rate">
+                            <span class="manual-rate-modal-field-label">健康保険料率</span>
+                            <span class="manual-rate-input-wrap manual-rate-input-wrap-wide">
+                                <input
+                                    id="modal-manual-health-rate"
+                                    type="number"
+                                    min="0"
+                                    step="0.001"
+                                    placeholder="0"
+                                    [ngModel]="manualRateForm().healthRatePercent"
+                                    (ngModelChange)="updateManualRateFormField('healthRatePercent', $event)"
+                                />
+                                <span class="manual-rate-suffix">%</span>
+                            </span>
+                        </label>
+                    }
+                    @if (resolvedPremiumRates()?.needsManualPensionRate) {
+                        <label class="manual-rate-modal-field" for="modal-manual-pension-rate">
+                            <span class="manual-rate-modal-field-label">厚生年金保険料率</span>
+                            <span class="manual-rate-input-wrap manual-rate-input-wrap-wide">
+                                <input
+                                    id="modal-manual-pension-rate"
+                                    type="number"
+                                    min="0"
+                                    step="0.001"
+                                    placeholder="0"
+                                    [ngModel]="manualRateForm().pensionRatePercent"
+                                    (ngModelChange)="updateManualRateFormField('pensionRatePercent', $event)"
+                                />
+                                <span class="manual-rate-suffix">%</span>
+                            </span>
+                        </label>
+                    }
+                    @if (resolvedPremiumRates()?.needsManualCareRate) {
+                        <label class="manual-rate-modal-field" for="modal-manual-care-rate">
+                            <span class="manual-rate-modal-field-label">介護保険料率</span>
+                            <span class="manual-rate-input-wrap manual-rate-input-wrap-wide">
+                                <input
+                                    id="modal-manual-care-rate"
+                                    type="number"
+                                    min="0"
+                                    step="0.001"
+                                    placeholder="0"
+                                    [ngModel]="manualRateForm().careRatePercent"
+                                    (ngModelChange)="updateManualRateFormField('careRatePercent', $event)"
+                                />
+                                <span class="manual-rate-suffix">%</span>
+                            </span>
+                        </label>
+                    }
+                </div>
+
+                @if (manualRateErrorMessage()) {
+                    <p class="manual-rate-modal-feedback error">{{ manualRateErrorMessage() }}</p>
+                }
+
+                <div class="manual-rate-modal-actions">
+                    <button type="button" class="btn sub-btn" (click)="dismissManualRatesUnsetModal()">
+                        閉じる
+                    </button>
+                    <button
+                        type="button"
+                        class="btn primary-btn"
+                        (click)="saveManualRates()"
+                        [disabled]="isSavingManualRates()"
+                    >
+                        {{ isSavingManualRates() ? '保存中…' : '保存' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
 </div>
 
 <style>
@@ -1393,70 +1595,115 @@
         color: #92400e;
     }
 
-    .regular-decision-procedure-section {
+    .procedure-nudges {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
         margin-bottom: 16px;
     }
 
-    .regular-decision-section-title {
-        margin: 0 0 10px;
-        font-size: 17px;
-    }
-
-    .regular-decision-procedure-box {
-        padding: 14px 16px;
-        background: #f9fafb;
-        border: 1px solid #e5e7eb;
-        border-radius: 10px;
-    }
-
-    .regular-decision-procedure-header {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 12px;
-    }
-
-    .regular-decision-procedure-message,
-    .regular-decision-procedure-note {
-        margin: 0 0 12px;
-        font-size: 14px;
-        line-height: 1.5;
-        color: #374151;
-    }
-
-    .regular-decision-procedure-header .regular-decision-procedure-message {
+    .procedure-nudges-inline {
+        margin-top: 16px;
         margin-bottom: 0;
     }
 
-    .procedure-status-badge {
+    .procedure-nudge {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        background: #fff;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+
+    .procedure-nudge-icon {
         flex-shrink: 0;
         display: inline-flex;
         align-items: center;
-        padding: 4px 10px;
-        border-radius: 999px;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+        font-size: 13px;
+        font-weight: 800;
+        color: #fff;
+    }
+
+    .procedure-nudge-icon.tone-amber { background: #d97706; }
+    .procedure-nudge-icon.tone-orange { background: #ea580c; }
+    .procedure-nudge-icon.tone-green { background: #059669; }
+
+    .procedure-nudge-body {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px 8px;
+        min-width: 0;
+        flex: 1;
+    }
+
+    .procedure-nudge-label {
+        font-size: 13px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .procedure-nudge-meta {
         font-size: 12px;
+        color: #6b7280;
+    }
+
+    .procedure-nudge-hint {
+        font-size: 11px;
+        font-weight: 600;
+        color: #b45309;
+    }
+
+    .procedure-nudge-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 7px;
+        border-radius: 999px;
+        font-size: 11px;
         font-weight: 700;
     }
 
-    .procedure-status-badge.not-started {
+    .procedure-nudge-badge.not-started {
         background: #f3f4f6;
         color: #4b5563;
     }
 
-    .procedure-status-badge.in-progress {
-        background: #fef3c7;
-        color: #92400e;
-    }
-
-    .procedure-status-badge.completed {
+    .procedure-nudge-badge.completed {
         background: #dcfce7;
         color: #166534;
     }
 
-    .regular-decision-procedure-btn {
-        display: block;
-        width: 100%;
+    .procedure-nudge-btn {
+        flex-shrink: 0;
+        height: 30px;
+        padding: 0 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 7px;
+        background: #fff;
+        color: #374151;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+
+    .procedure-nudge-btn:hover:not(:disabled) {
+        border-color: #93c5fd;
+        color: #2563eb;
+        background: #f8fafc;
+    }
+
+    .procedure-nudge-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
     }
 
     .month-toolbar {
@@ -1468,6 +1715,26 @@
         background: #f9fafb;
         border: 1px solid #e5e7eb;
         border-radius: 12px;
+    }
+
+    .oldest-unregistered-link-wrap {
+        margin: 0 0 12px;
+    }
+
+    .oldest-unregistered-link {
+        padding: 0;
+        border: none;
+        background: none;
+        color: #2563eb;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+
+    .oldest-unregistered-link:hover {
+        color: #1d4ed8;
     }
 
     .month-nav-btn {
@@ -1520,36 +1787,69 @@
 
     .page-tabs {
         display: flex;
-        gap: 8px;
-        margin: 0 0 20px;
-        padding: 4px;
+        gap: 6px;
+        margin: 0 0 16px;
+        padding: 5px;
         border: 1px solid #e5e7eb;
-        border-radius: 12px;
-        background: #f9fafb;
+        border-radius: 14px;
+        background: #f3f4f6;
     }
 
     .page-tab {
         flex: 1;
-        height: 40px;
-        border: none;
-        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        min-height: 56px;
+        padding: 10px 12px;
+        border: 1px solid transparent;
+        border-radius: 10px;
         background: transparent;
         color: #6b7280;
+        text-decoration: none;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s, box-shadow 0.15s, border-color 0.15s;
+    }
+
+    .page-tab-label {
         font-size: 14px;
         font-weight: 700;
-        cursor: pointer;
-        transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+        line-height: 1.2;
+    }
+
+    .page-tab-desc {
+        font-size: 11px;
+        font-weight: 500;
+        line-height: 1.3;
+        color: #9ca3af;
     }
 
     .page-tab:hover {
         color: #374151;
         background: #fff;
+        border-color: #e5e7eb;
+    }
+
+    .page-tab:hover .page-tab-desc {
+        color: #6b7280;
     }
 
     .page-tab.active {
         background: #fff;
         color: #1d4ed8;
-        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+        border-color: #bfdbfe;
+        box-shadow: 0 1px 3px rgba(37, 99, 235, 0.08);
+    }
+
+    .page-tab.active .page-tab-desc {
+        color: #60a5fa;
+    }
+
+    .page-tab:focus-visible {
+        outline: 2px solid #93c5fd;
+        outline-offset: 2px;
     }
 
     .premium-display-tab {
@@ -1565,6 +1865,221 @@
         font-size: 13px;
         line-height: 1.6;
         color: #1e40af;
+    }
+
+    .manual-rate-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px 16px;
+        margin: 0 0 16px;
+        padding: 10px 14px;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        background: #f9fafb;
+    }
+
+    .manual-rate-bar-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 120px;
+    }
+
+    .manual-rate-bar-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .manual-rate-bar-note {
+        font-size: 11px;
+        color: #6b7280;
+    }
+
+    .manual-rate-bar-fields {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        flex: 1;
+    }
+
+    .manual-rate-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0;
+        cursor: pointer;
+    }
+
+    .manual-rate-item-name {
+        font-size: 12px;
+        font-weight: 600;
+        color: #4b5563;
+        white-space: nowrap;
+    }
+
+    .manual-rate-input-wrap {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        padding: 0 8px;
+        height: 32px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        background: #fff;
+    }
+
+    .manual-rate-input-wrap input {
+        width: 56px;
+        height: 100%;
+        padding: 0;
+        border: none;
+        outline: none;
+        font-size: 13px;
+        text-align: right;
+        background: transparent;
+    }
+
+    .manual-rate-input-wrap input::-webkit-outer-spin-button,
+    .manual-rate-input-wrap input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    .manual-rate-suffix {
+        font-size: 12px;
+        color: #9ca3af;
+    }
+
+    .manual-rate-save-btn {
+        height: 32px;
+        padding: 0 14px;
+        font-size: 13px;
+    }
+
+    .manual-rate-feedback {
+        flex-basis: 100%;
+        margin: 0;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .manual-rate-feedback.success {
+        color: #047857;
+    }
+
+    .manual-rate-feedback.error {
+        color: #b91c1c;
+    }
+
+    .manual-rate-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 1100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        background: rgba(15, 23, 42, 0.55);
+    }
+
+    .manual-rate-modal {
+        width: min(100%, 440px);
+        padding: 28px 28px 24px;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2);
+    }
+
+    .manual-rate-modal-title {
+        margin: 0 0 12px;
+        font-size: 20px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .manual-rate-modal-message {
+        margin: 0 0 10px;
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.65;
+        color: #92400e;
+    }
+
+    .manual-rate-modal-note {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin: 0 0 18px;
+        font-size: 12px;
+        color: #6b7280;
+    }
+
+    .manual-rate-modal-fields {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .manual-rate-modal-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin: 0;
+        cursor: pointer;
+    }
+
+    .manual-rate-modal-field-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .manual-rate-input-wrap-wide {
+        width: 100%;
+        height: 40px;
+        padding: 0 12px;
+    }
+
+    .manual-rate-input-wrap-wide input {
+        width: 100%;
+        font-size: 14px;
+        text-align: left;
+    }
+
+    .manual-rate-modal-feedback {
+        margin: 0 0 12px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .manual-rate-modal-feedback.error {
+        color: #b91c1c;
+    }
+
+    .manual-rate-modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 4px;
+    }
+
+    .manual-rate-modal-actions .sub-btn {
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
+
+    .manual-rate-modal-actions .primary-btn {
+        width: auto;
+        min-width: 96px;
+        flex-shrink: 0;
+        white-space: nowrap;
     }
 
     .premium-empty-state {
@@ -2019,7 +2534,7 @@
     .input-columns .monthly-reward-card,
     .input-columns .bonus-card {
         margin-bottom: 0;
-        height: 100%;
+        min-width: 0;
     }
 
     .reward-summary-panel {
@@ -2148,6 +2663,7 @@
         background: #fff;
         border: 1px solid #e5e7eb;
         border-radius: 12px;
+        min-width: 0;
     }
 
     .card-type-badge {
@@ -2459,11 +2975,12 @@
         height: 32px;
         padding: 0 12px;
         font-size: 12px;
+        white-space: nowrap;
     }
 
     .bonus-form-fields {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         gap: 12px 16px;
         margin-bottom: 12px;
     }
@@ -2511,6 +3028,7 @@
 
     .wage-section {
         margin-bottom: 16px;
+        min-width: 0;
     }
 
     .wage-section:last-of-type {
@@ -2574,7 +3092,7 @@
         align-items: center;
         flex-wrap: wrap;
         gap: 8px;
-        margin-bottom: 4px;
+        margin-bottom: 12px;
     }
 
     .wage-section-title {
@@ -2609,7 +3127,7 @@
 
     .reward-fields {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         gap: 12px 16px;
     }
 
@@ -2623,6 +3141,7 @@
         display: flex;
         flex-direction: column;
         gap: 6px;
+        min-width: 0;
     }
 
     .form-field label {
@@ -2654,6 +3173,9 @@
     }
 
     .form-field input {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
         height: 40px;
         padding: 0 12px;
         border: 1px solid #d1d5db;

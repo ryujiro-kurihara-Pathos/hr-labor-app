@@ -124,8 +124,10 @@ export class SocialInsuranceProcedureService {
             dependentAddress: String(data['dependentAddress'] ?? ''),
             dependentOccupation: String(data['dependentOccupation'] ?? ''),
             dependentIncome: (data['dependentIncome'] as number | null) ?? null,
+            dependentIsDisabled: data['dependentIsDisabled'] === true,
             dependencyStartDate: String(data['dependencyStartDate'] ?? ''),
             dependentAddReason: (data['dependentAddReason'] as DependentProcedureData['dependentAddReason']) ?? '',
+            dependentAddReasonNote: String(data['dependentAddReasonNote'] ?? ''),
             dependencyEndDate: String(data['dependencyEndDate'] ?? ''),
             dependentDeleteReason:
                 (data['dependentDeleteReason'] as DependentProcedureData['dependentDeleteReason']) ?? '',

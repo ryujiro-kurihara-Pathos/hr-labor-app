@@ -2,18 +2,11 @@
 @let f = form();
 
 <section class="detail-card">
-    <div class="page-header">
-        <div class="page-header-title">
-            <h1>手続き詳細</h1>
-            <span
-                class="status-badge"
-                [class.not-started]="item.status === 'notStarted'"
-                [class.in-progress]="item.status === 'inProgress'"
-                [class.completed]="item.status === 'completed'"
-            >
-                {{ statusLabel(item.status) }}
-            </span>
-        </div>
+    <app-procedure-detail-header
+        [procedure]="item"
+        formTitle="被扶養者（異動）届"
+        [subjectLabel]="employee().lastName + ' ' + employee().firstName"
+    >
         <app-procedure-action-bar
             [procedure]="item"
             [employee]="employee()"
@@ -21,20 +14,16 @@
             [company]="company()"
             [procedureForExport]="exportProcedure()"
             [exportContext]="{ dependent: exportDependent() }"
+            [showDraftSave]="true"
+            [canSaveDraft]="canSaveDraft()"
             [isSubmitting]="isSaving()"
+            [isSavingDraft]="isSavingDraft()"
             [submitValidation]="submitValidation()"
             [actionErrorMessage]="saveErrorMessage()"
+            (draftClick)="saveDraftProcedure()"
             (submitClick)="saveProcedure()"
         />
-    </div>
-
-    <div class="title">
-        <div class="title-sub">
-            <span>健康保険</span>
-            <span>厚生年金保険</span>
-        </div>
-        <div class="title-main">被扶養者（異動）届</div>
-    </div>
+    </app-procedure-detail-header>
 
     <h2 class="section-title">事業所情報</h2>
     <div class="office-code-panel">
@@ -109,6 +98,9 @@
     @if (saveErrorMessage()) {
         <p class="alert alert-error">{{ saveErrorMessage() }}</p>
     }
+    @if (!isCompleted() && useSavedData()) {
+        <p class="draft-note">下書きが保存されています。内容を確認・修正して下書き保存するか、「提出済みにする」で確定してください。</p>
+    }
 
     @if (useSavedData() && isCompleted()) {
         <article class="dependent-block">
@@ -118,8 +110,8 @@
                     <dd>{{ dependentChangeTypeLabel(item.dependentChanges) }}</dd>
                 </div>
                 <div class="meta-row">
-                    <dt>事象が発生した日</dt>
-                    <dd>{{ dateLabel(item.occurredDate) }}</dd>
+                    <dt>{{ dependentChangeEventDateLabel(item.dependentChanges) }}</dt>
+                    <dd>{{ dateLabel(dependentChangeEventDateValue(item.dependentChanges, item)) }}</dd>
                 </div>
                 <div class="meta-row">
                     <dt>対応期限</dt>
@@ -151,10 +143,6 @@
                 </div>
                 @if (item.dependentChanges === 'add' || item.dependentChanges === 'change') {
                     <div class="meta-row">
-                        <dt>被扶養者になった日</dt>
-                        <dd>{{ dateLabel(displayData().dependencyStartDate) }}</dd>
-                    </div>
-                    <div class="meta-row">
                         <dt>職業</dt>
                         <dd>{{ displayData().dependentOccupation || '—' }}</dd>
                     </div>
@@ -162,24 +150,26 @@
                         <dt>収入</dt>
                         <dd>
                             @if (displayData().dependentIncome !== null) {
-                                {{ displayData().dependentIncome | number }} 円
+                                年間 {{ displayData().dependentIncome | number }} 円
                             } @else {
                                 —
                             }
                         </dd>
                     </div>
+                    @if (displayData().dependentIsDisabled) {
+                        <div class="meta-row">
+                            <dt>障害者</dt>
+                            <dd>該当</dd>
+                        </div>
+                    }
                 }
                 @if (item.dependentChanges === 'add') {
                     <div class="meta-row">
-                        <dt>理由</dt>
-                        <dd>{{ dependentAddReasonLabel(displayData().dependentAddReason) }}</dd>
+                        <dt>扶養追加の理由</dt>
+                        <dd>{{ dependentAddReasonDisplayText(displayData().dependentAddReason, displayData().dependentAddReasonNote) }}</dd>
                     </div>
                 }
                 @if (item.dependentChanges === 'delete') {
-                    <div class="meta-row">
-                        <dt>被扶養者でなくなった日</dt>
-                        <dd>{{ dateLabel(displayData().dependencyEndDate) }}</dd>
-                    </div>
                     <div class="meta-row">
                         <dt>理由</dt>
                         <dd>{{ dependentDeleteReasonLabel(displayData().dependentDeleteReason) }}</dd>
@@ -211,26 +201,6 @@
                 >削除</button>
             </div>
 
-            @if (changeType()) {
-                <div id="dep-occurred-date" class="occurred-date-section">
-                    <div class="form-field">
-                        <label for="dep-occurred-date-input">事象が発生した日</label>
-                        <input
-                            id="dep-occurred-date-input"
-                            type="date"
-                            [ngModel]="f.occurredDate"
-                            (ngModelChange)="updateForm('occurredDate', $event)"
-                            [min]="occurredDateBounds().min ?? undefined"
-                            [max]="occurredDateBounds().max ?? undefined"
-                        />
-                        <p class="field-note">被扶養者の異動事実が発生した日（異動日）を入力してください。届出期限はその日から5日以内です。</p>
-                        @if (previewDueDate(); as dueDate) {
-                            <p class="due-date-preview">対応期限：{{ dateLabel(dueDate) }}</p>
-                        }
-                    </div>
-                </div>
-            }
-
             @if (changeType() === 'change' || changeType() === 'delete') {
                 <div class="form-field">
                     <label for="dependent-select">被扶養者を選択</label>
@@ -248,6 +218,24 @@
                     </select>
                     @if (activeDependents().length === 0) {
                         <p class="field-note">登録済みの被扶養者がありません。</p>
+                    }
+                </div>
+            }
+
+            @if (changeType() === 'change') {
+                <div class="form-field">
+                    <label for="dep-change-date">変更した日</label>
+                    <input
+                        id="dep-change-date"
+                        type="date"
+                        [ngModel]="f.changeDate"
+                        (ngModelChange)="updateForm('changeDate', $event)"
+                        [min]="changeDateBounds().min ?? undefined"
+                        [max]="changeDateBounds().max ?? undefined"
+                    />
+                    <p class="field-note">届出期限はこの日から5日以内です。</p>
+                    @if (previewDueDate(); as dueDate) {
+                        <p class="due-date-preview">対応期限：{{ dateLabel(dueDate) }}</p>
                     }
                 </div>
             }
@@ -313,8 +301,9 @@
                             id="dep-my-number"
                             type="text"
                             [ngModel]="f.myNumber"
-                            (ngModelChange)="updateForm('myNumber', $event)"
+                            readonly
                         />
+                        <p class="field-note">登録時に仮の番号を自動生成します。変更できません。</p>
                     </div>
                     <div class="form-field form-field-full">
                         <label for="dep-address">住所</label>
@@ -333,10 +322,16 @@
                                 type="date"
                                 [ngModel]="f.dependencyStartDate"
                                 (ngModelChange)="updateForm('dependencyStartDate', $event)"
+                                [min]="startDateBounds().min ?? undefined"
+                                [max]="startDateBounds().max ?? undefined"
                             />
+                            <p class="field-note">届出期限はこの日から5日以内です。</p>
+                            @if (previewDueDate(); as dueDate) {
+                                <p class="due-date-preview">対応期限：{{ dateLabel(dueDate) }}</p>
+                            }
                         </div>
                         <div class="form-field">
-                            <label for="dep-add-reason">理由</label>
+                            <label for="dep-add-reason">扶養追加の理由</label>
                             <select
                                 id="dep-add-reason"
                                 [ngModel]="f.addReason"
@@ -348,6 +343,18 @@
                                 }
                             </select>
                         </div>
+                        @if (f.addReason === 'other') {
+                            <div class="form-field form-field-full">
+                                <label for="dep-add-reason-note">記載</label>
+                                <input
+                                    id="dep-add-reason-note"
+                                    type="text"
+                                    [ngModel]="f.addReasonNote"
+                                    (ngModelChange)="updateForm('addReasonNote', $event)"
+                                    placeholder="理由を入力してください"
+                                />
+                            </div>
+                        }
                     }
                     <div class="form-field">
                         <label for="dep-occupation">職業</label>
@@ -358,8 +365,26 @@
                             (ngModelChange)="updateForm('occupation', $event)"
                         />
                     </div>
-                    <div class="form-field">
-                        <label for="dep-income">収入（円）</label>
+                    <div class="form-field form-field-full">
+                        <label class="checkbox-label">
+                            <input
+                                id="dep-is-disabled"
+                                type="checkbox"
+                                [ngModel]="f.isDisabled"
+                                (ngModelChange)="updateForm('isDisabled', $event)"
+                            />
+                            障害者に該当する
+                        </label>
+                    </div>
+                    <div class="form-field form-field-full income-field">
+                        <label for="dep-income" class="label-with-help">
+                            年間収入（円）
+                            <app-field-help-tooltip
+                                title="扶養対象の年間収入"
+                                ariaLabel="扶養対象の年間収入について"
+                                [lines]="incomeRuleAnnotationLines"
+                            />
+                        </label>
                         <input
                             id="dep-income"
                             type="number"
@@ -367,6 +392,9 @@
                             [ngModel]="f.income"
                             (ngModelChange)="updateForm('income', $event)"
                         />
+                        @if (addIncomeBlockReason(); as blockReason) {
+                            <p class="income-block-note">{{ blockReason }}</p>
+                        }
                     </div>
                 </div>
             }
@@ -380,7 +408,13 @@
                             type="date"
                             [ngModel]="f.dependencyEndDate"
                             (ngModelChange)="updateForm('dependencyEndDate', $event)"
+                            [min]="endDateBounds().min ?? undefined"
+                            [max]="endDateBounds().max ?? undefined"
                         />
+                        <p class="field-note">届出期限はこの日から5日以内です。</p>
+                        @if (previewDueDate(); as dueDate) {
+                            <p class="due-date-preview">対応期限：{{ dateLabel(dueDate) }}</p>
+                        }
                     </div>
                     <div class="form-field">
                         <label for="dep-delete-reason">理由</label>
@@ -632,6 +666,12 @@
         color: #374151;
     }
 
+    .label-with-help {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
     .form-field input,
     .form-field select {
         height: 40px;
@@ -645,6 +685,33 @@
         margin: 4px 0 0;
         font-size: 13px;
         color: #6b7280;
+    }
+
+    .checkbox-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #374151;
+        cursor: pointer;
+    }
+
+    .checkbox-label input {
+        width: 16px;
+        height: 16px;
+    }
+
+    .income-block-note {
+        margin: 8px 0 0;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #b91c1c;
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.5;
     }
 
     .occurred-date-section {
@@ -682,6 +749,17 @@
         background: #fef2f2;
         border: 1px solid #fecaca;
         color: #991b1b;
+    }
+
+    .draft-note {
+        margin: 0 0 12px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        color: #1e40af;
+        font-size: 13px;
+        line-height: 1.5;
     }
 
     .memo-text {

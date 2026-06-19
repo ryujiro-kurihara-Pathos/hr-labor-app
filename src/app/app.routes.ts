@@ -31,6 +31,8 @@ import { EmployeeDetailPageComponent } from './features/employee/pages/employee-
 
 import { InsurancePremiumPageComponent } from './features/insurance/pages/insurance-premium-page.component';
 
+import { RewardInputPageComponent } from './features/insurance/pages/reward-input-page.component';
+
 import { InsurancePremiumDetailPageComponent } from './features/insurance/pages/insurance-premium-detail-page.component';
 
 import { SocialInsuranceProceduresPageComponent } from './features/social-insurance/pages/social-insurance-procedures-page.component';
@@ -181,6 +183,28 @@ export const routes: Routes = [
 
             {
 
+                path: 'rewards',
+
+                component: RewardInputPageComponent,
+
+                canActivate: [adminGuard],
+
+            },
+
+            {
+
+                path: 'rewards/:employeeId',
+
+                component: InsurancePremiumDetailPageComponent,
+
+                canActivate: [adminGuard],
+
+                data: { premiumPageMode: 'input' },
+
+            },
+
+            {
+
                 path: 'premium',
 
                 component: InsurancePremiumPageComponent,
@@ -196,6 +220,8 @@ export const routes: Routes = [
                 component: InsurancePremiumDetailPageComponent,
 
                 canActivate: [adminGuard],
+
+                data: { premiumPageMode: 'premium' },
 
             },
 

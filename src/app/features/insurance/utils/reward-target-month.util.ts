@@ -102,30 +102,42 @@ export function bonusPaymentDateReason(
     return validateDateWithinInsuredPeriod(paymentDate, bounds);
 }
 
-/** 在籍中は当月、退職済みは退職月まで閲覧可能 */
-export function viewableYearMonthMax(employee: Employee, currentYearMonth: string): string {
-    const retireYm = yearMonthFromTimestamp(employee.retiredDate);
-    if (retireYm) return retireYm;
-    return currentYearMonth;
+export function currentYearMonth(date: Date = new Date()): string {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
-/** 矢印ナビの上限（退職月のみ。在籍中は上限なし） */
-export function navigableYearMonthMax(employee: Employee): string | null {
-    return yearMonthFromTimestamp(employee.retiredDate);
+/** 給与入力の上限：現在月の翌月。退職予定月がそれより前なら退職月まで */
+export function inputableYearMonthMax(employee: Employee, referenceYearMonth: string): string {
+    const forwardLimit = addMonthsToYearMonth(referenceYearMonth, 1);
+    const retireYm = yearMonthFromTimestamp(employee.retiredDate);
+    if (retireYm && retireYm < forwardLimit) return retireYm;
+    return forwardLimit;
+}
+
+/** 入社月〜入力上限まで閲覧・ナビ可能 */
+export function viewableYearMonthMax(employee: Employee, referenceYearMonth: string): string {
+    return inputableYearMonthMax(employee, referenceYearMonth);
+}
+
+/** 月ナビの上限（viewableYearMonthMax と同じ） */
+export function navigableYearMonthMax(
+    employee: Employee,
+    referenceYearMonth: string = currentYearMonth(),
+): string {
+    return inputableYearMonthMax(employee, referenceYearMonth);
 }
 
 export function viewableYearMonthMin(employee: Employee): string | null {
     return yearMonthFromDateString(employee.joinedDate);
 }
 
-/** 入社月〜退職月（在籍中は当月）の範囲内か */
+/** 入社月〜入力上限の範囲内か */
 export function isViewableYearMonth(
     employee: Employee,
     targetYearMonth: string,
-    currentYearMonth: string,
+    referenceYearMonth: string,
 ): boolean {
-    if (!isRewardTargetMonth(employee, targetYearMonth)) return false;
-    return targetYearMonth <= viewableYearMonthMax(employee, currentYearMonth);
+    return isRewardTargetMonth(employee, targetYearMonth, referenceYearMonth);
 }
 
 export function clampViewableYearMonth(
@@ -162,19 +174,15 @@ export function viewableYearMonthReason(
 ): string | null {
     if (isViewableYearMonth(employee, targetYearMonth, currentYearMonth)) return null;
 
-    const joinReason = rewardTargetMonthReason(employee, targetYearMonth);
-    if (joinReason) return joinReason;
-
-    const maxYm = viewableYearMonthMax(employee, currentYearMonth);
-    if (targetYearMonth > maxYm) {
-        return `${formatYearMonthLabel(maxYm)}までの期間のみ確認できます。`;
-    }
-
-    return 'この月は確認できません。';
+    return rewardTargetMonthReason(employee, targetYearMonth, currentYearMonth);
 }
 
-/** 入社月以降かつ退職月以前の年月なら報酬登録対象 */
-export function isRewardTargetMonth(employee: Employee, targetYearMonth: string): boolean {
+/** 入社月〜現在月の翌月（退職予定月があればその月まで）なら報酬登録対象 */
+export function isRewardTargetMonth(
+    employee: Employee,
+    targetYearMonth: string,
+    referenceYearMonth: string = currentYearMonth(),
+): boolean {
     if (!YEAR_MONTH_PATTERN.test(targetYearMonth)) return false;
 
     const joinYm = yearMonthFromDateString(employee.joinedDate);
@@ -183,14 +191,17 @@ export function isRewardTargetMonth(employee: Employee, targetYearMonth: string)
     const retireYm = yearMonthFromTimestamp(employee.retiredDate);
     if (retireYm && targetYearMonth > retireYm) return false;
 
+    if (targetYearMonth > inputableYearMonthMax(employee, referenceYearMonth)) return false;
+
     return true;
 }
 
 export function rewardTargetMonthReason(
     employee: Employee,
     targetYearMonth: string,
+    referenceYearMonth: string = currentYearMonth(),
 ): string | null {
-    if (isRewardTargetMonth(employee, targetYearMonth)) return null;
+    if (isRewardTargetMonth(employee, targetYearMonth, referenceYearMonth)) return null;
 
     const joinYm = yearMonthFromDateString(employee.joinedDate);
     if (joinYm && targetYearMonth < joinYm) {
@@ -200,6 +211,11 @@ export function rewardTargetMonthReason(
     const retireYm = yearMonthFromTimestamp(employee.retiredDate);
     if (retireYm && targetYearMonth > retireYm) {
         return `${formatYearMonthLabel(retireYm)}退職のため、この月は対象外です。`;
+    }
+
+    const maxYm = inputableYearMonthMax(employee, referenceYearMonth);
+    if (targetYearMonth > maxYm) {
+        return `${formatYearMonthLabel(maxYm)}まで入力できます。`;
     }
 
     return 'この月は報酬登録の対象外です。';

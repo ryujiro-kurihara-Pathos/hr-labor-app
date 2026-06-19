@@ -838,7 +838,9 @@ export class EmployeeDetailPageComponent {
     }
 
     genderLabel(gender: Employee['gender']): string {
-        return gender === 'female' ? '女性' : '男性';
+        if (gender === 'female') return '女性';
+        if (gender === 'male') return '男性';
+        return '未設定';
     }
 
     dependentStatusLabel(status: Dependent['status']): string {

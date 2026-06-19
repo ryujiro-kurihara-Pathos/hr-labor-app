@@ -31,7 +31,7 @@ export type ProcedureSubmitValidationResult =
 export const PROCEDURE_SUBMIT_MISSING_FIELDS_MESSAGE = '未入力の項目があります';
 
 export type DependentProcedureSubmitForm = {
-    occurredDate: string;
+    changeDate: string;
     dependentId: string;
     lastName: string;
     firstName: string;
@@ -40,6 +40,7 @@ export type DependentProcedureSubmitForm = {
     relationship: string;
     dependencyStartDate: string;
     addReason: DependentAddReason | '';
+    addReasonNote: string;
     dependencyEndDate: string;
     deleteReason: DependentDeleteReason | '';
 };
@@ -79,7 +80,7 @@ function premiumLink(
 ): ProcedureSubmitMissingField {
     return {
         label,
-        routerLink: ['/premium', employeeId],
+        routerLink: ['/rewards', employeeId],
         queryParams: { ym: yearMonth },
     };
 }
@@ -283,7 +284,13 @@ export function validateDependentProcedureSubmit(
             missing.push(procedureFormLink(procedureId, '被扶養者になった日', 'dep-start-date'));
         }
         if (changeType === 'add' && !form.addReason) {
-            missing.push(procedureFormLink(procedureId, '追加理由', 'dep-add-reason'));
+            missing.push(procedureFormLink(procedureId, '扶養追加の理由', 'dep-add-reason'));
+        }
+        if (changeType === 'add' && form.addReason === 'other' && !form.addReasonNote.trim()) {
+            missing.push(procedureFormLink(procedureId, '記載', 'dep-add-reason-note'));
+        }
+        if (changeType === 'change' && !form.changeDate) {
+            missing.push(procedureFormLink(procedureId, '変更した日', 'dep-change-date'));
         }
     }
 
@@ -296,10 +303,6 @@ export function validateDependentProcedureSubmit(
         }
     }
 
-    if (!form.occurredDate.trim()) {
-        missing.push(procedureFormLink(procedureId, '事象が発生した日', 'dep-occurred-date'));
-    }
-
     if (missing.length > 0) {
         return missingFieldsFailure(missing);
     }
@@ -310,8 +313,14 @@ export function validateDependentProcedureSubmit(
             healthInsuranceStartDate: options.healthInsuranceStartDate,
             healthInsuranceEndDate: options.healthInsuranceEndDate,
         });
+        const eventDate =
+            changeType === 'add'
+                ? form.dependencyStartDate.trim()
+                : changeType === 'delete'
+                  ? form.dependencyEndDate.trim()
+                  : form.changeDate.trim();
         const occurredDateReason = validateDependentOccurredDate({
-            occurredDate: form.occurredDate.trim(),
+            occurredDate: eventDate,
             changeType,
             bounds,
             dependencyStartDate:
@@ -482,7 +491,7 @@ export function validateProcedureSubmit(
             return validateDependentProcedureSubmit(
                 context.dependentChangeType ?? null,
                 context.dependentForm ?? {
-                    occurredDate: '',
+                    changeDate: '',
                     dependentId: '',
                     lastName: '',
                     firstName: '',
@@ -491,6 +500,7 @@ export function validateProcedureSubmit(
                     relationship: '',
                     dependencyStartDate: '',
                     addReason: '',
+                    addReasonNote: '',
                     dependencyEndDate: '',
                     deleteReason: '',
                 },

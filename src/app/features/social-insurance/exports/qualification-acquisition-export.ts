@@ -53,7 +53,7 @@ export function createQualificationAcquisitionCsvRow(params: {
     氏名: employee.lastName + ' ' + employee.firstName,
     フリガナ: employee.lastNameKana + ' ' + employee.firstNameKana,
     生年月日: employee.birthDate,
-    種別: employee.gender === 'male' ? '男' : '女',
+    種別: employee.gender === 'male' ? '男' : employee.gender === 'female' ? '女' : '',
     取得区分: '健保・厚年',
 
     個人番号登録状況: employee.myNumber ? '登録済み' : '未登録',

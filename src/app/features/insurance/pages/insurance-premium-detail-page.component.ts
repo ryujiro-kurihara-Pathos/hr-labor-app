@@ -1,7 +1,9 @@
 import { Component, signal, inject, computed } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DecimalPipe } from '@angular/common';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, NavigationEnd, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { filter } from 'rxjs';
 
 import {
     StandardMonthlyReward,
@@ -25,7 +27,7 @@ import {
     dateStringFromTimestamp,
     isRewardTargetMonth,
     rewardTargetMonthReason,
-    navigableYearMonthMax,
+    viewableYearMonthMax,
     viewableYearMonthMin,
     yearMonthFromDateString,
 } from '../utils/reward-target-month.util';
@@ -53,9 +55,6 @@ import { CompanyService } from '../../company/services/company.service';
 import { formatPayrollDeductionNote, formatPremiumCollectionSummary, resolvePremiumLiabilityYearMonth } from '../../company/utils/company-payroll-settings.util';
 import { OfficeService } from '../../company/services/office.service';
 import { ConfirmService } from '../../../shared/services/confirm.service';
-import { resolveOfficePrefecture } from '../../company/utils/office-prefecture.util';
-import { findCareInsuranceRate, findHealthInsuranceRate } from '../../insurance-rate/utils/insurance-rate-lookup.util';
-import { KYOKAI_HEALTH_INSURANCE_RATE_FILES } from '../../insurance-rate/data/insurance-rates';
 import { insuranceJoinStatus, SocialInsuranceStatus } from '../../social-insurance/models/social-insurance-status.model';
 import { insuranceJoinStatusLabel } from '../../social-insurance/utils/social-insurance-status-display.util';
 import {
@@ -101,6 +100,21 @@ import {
 import { SocialInsuranceProcedureService } from '../../social-insurance/services/social-insurance-procedure.service';
 import { InsurancePremiumResultService } from '../services/insurance-premium-result.service';
 import { InsurancePremiumCalculationService } from '../services/insurance-premium-calculation.service';
+import { ManualInsurancePremiumRateService } from '../services/manual-insurance-premium-rate.service';
+import {
+    EMPTY_MANUAL_INSURANCE_PREMIUM_RATE_FORM,
+    ManualInsurancePremiumRateForm,
+    ManualInsurancePremiumRates,
+} from '../models/manual-insurance-premium-rate.model';
+import {
+    AUTOMATIC_INSURANCE_RATE_AVAILABLE_FROM,
+    healthInsuranceFiscalYear,
+    manualRatePairFromPercent,
+    manualRatesMissingMessage,
+    percentInputToDecimalRate,
+    resolveInsurancePremiumRates,
+    savedRateToPercentInput,
+} from '../utils/insurance-premium-rate-resolution.util';
 import { Procedure, ProcedureStatus } from '../../social-insurance/models/procedures.model';
 import { procedureStatusLabel } from '../../social-insurance/utils/procedure-display.util';
 import {
@@ -118,9 +132,13 @@ import {
     partTimeOtherAllowanceTotal,
 } from '../utils/part-time-reward.util';
 import { FieldHelpTooltipComponent } from '../../../shared/components/field-help-tooltip.component';
+import {
+    findEmployeeOldestUnregisteredYearMonth,
+    formatYearMonthLabel as formatRewardNavigationYearMonthLabel,
+} from '../utils/reward-input-navigation.util';
 
 type MonthRewardStatus = 'loading' | 'draft' | 'confirmed' | 'unregistered' | 'excluded';
-type PremiumDetailTab = 'input' | 'premium';
+type PremiumPageMode = 'input' | 'premium';
 
 @Component({
     selector: 'app-insurance-premium-detail-page',
@@ -147,7 +165,19 @@ export class InsurancePremiumDetailPageComponent {
     private readonly procedureService = inject(SocialInsuranceProcedureService);
     private readonly premiumResultService = inject(InsurancePremiumResultService);
     private readonly premiumCalculationService = inject(InsurancePremiumCalculationService);
+    private readonly manualRateService = inject(ManualInsurancePremiumRateService);
     private readonly confirmService = inject(ConfirmService);
+
+    constructor() {
+        this.router.events
+            .pipe(
+                filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+                takeUntilDestroyed(),
+            )
+            .subscribe(() => {
+                this.pageMode.set(this.readPageModeFromRoute());
+            });
+    }
 
     readonly premiumStandardAmountHelpLines = [
         '標準報酬月額は、資格取得時・定時決定・随時改定のルールに基づき決まります。',
@@ -234,6 +264,16 @@ export class InsurancePremiumDetailPageComponent {
     message = signal<string>('');
     bonusMessage = signal<string>('');
     bonusErrorMessage = signal<string>('');
+    manualRates = signal<ManualInsurancePremiumRates | null>(null);
+    manualRateForm = signal<ManualInsurancePremiumRateForm>({ ...EMPTY_MANUAL_INSURANCE_PREMIUM_RATE_FORM });
+    isSavingManualRates = signal(false);
+    manualRateMessage = signal('');
+    manualRateErrorMessage = signal('');
+    readonly manualRateHelpLines = [
+        `${formatYearMonthLabel(AUTOMATIC_INSURANCE_RATE_AVAILABLE_FROM)}より前の根拠月は、協会けんぽ等の料率データがアプリ内にないため自動取得できません。`,
+        'その月に適用される健康保険・介護保険・厚生年金の料率（%）を入力してください。保存後、保険料の計算に使用されます。',
+        '本人負担と会社負担は折半のため、同じ料率を入力します。',
+    ];
 
     // 従業員
     employeeId = signal<string>('');
@@ -248,7 +288,30 @@ export class InsurancePremiumDetailPageComponent {
     // 対象年月
     targetYearMonth = signal<string>('');
     targetYearMonthLabel = computed(() => formatYearMonthLabel(this.targetYearMonth()));
-    activeTab = signal<PremiumDetailTab>('input');
+    pageMode = signal<PremiumPageMode>('input');
+
+    oldestUnregisteredYearMonth = computed(() => {
+        const employee = this.employee();
+        if (!employee || this.pageMode() !== 'input') return null;
+        this.employeeRewards();
+        return findEmployeeOldestUnregisteredYearMonth(
+            employee,
+            this.employeeRewards(),
+            this.targetYearMonth(),
+        );
+    });
+
+    oldestUnregisteredYearMonthLabel = computed(() => {
+        const ym = this.oldestUnregisteredYearMonth();
+        return ym ? formatRewardNavigationYearMonthLabel(ym) : '';
+    });
+
+    showOldestUnregisteredLink = computed(() => {
+        const oldest = this.oldestUnregisteredYearMonth();
+        return Boolean(oldest && oldest !== this.targetYearMonth());
+    });
+
+    listBackRoute = computed(() => (this.pageMode() === 'input' ? '/rewards' : '/premium'));
 
     payrollDeductionNote = computed(() => {
         const targetYearMonth = this.targetYearMonth();
@@ -277,6 +340,99 @@ export class InsurancePremiumDetailPageComponent {
         return ym ? formatYearMonthLabel(ym) : '';
     });
 
+    resolvedPremiumRates = computed(() => {
+        const liabilityYearMonth = this.premiumLiabilityYearMonth();
+        const employee = this.employee();
+        if (!liabilityYearMonth || !employee) return null;
+        return resolveInsurancePremiumRates({
+            liabilityYearMonth,
+            office: this.office(),
+            employee,
+            manualRates: this.manualRatesForCalculation(),
+        });
+    });
+
+    private manualRatesForCalculation = computed((): ManualInsurancePremiumRates | null => {
+        const saved = this.manualRates();
+        const form = this.manualRateForm();
+        const liabilityYearMonth = this.premiumLiabilityYearMonth();
+        const employee = this.employee();
+        if (!liabilityYearMonth || !employee) return saved;
+
+        const health = manualRatePairFromPercent(form.healthRatePercent);
+        const care = manualRatePairFromPercent(form.careRatePercent);
+        const pension = manualRatePairFromPercent(form.pensionRatePercent);
+
+        const hasFormInput =
+            health.employeeRate !== null
+            || care.employeeRate !== null
+            || pension.employeeRate !== null;
+        if (!hasFormInput) return saved;
+
+        return {
+            id: saved?.id ?? '',
+            companyId: employee.companyId,
+            employeeId: employee.id,
+            liabilityYearMonth,
+            healthEmployeeRate: health.employeeRate ?? saved?.healthEmployeeRate ?? null,
+            healthEmployerRate: health.employerRate ?? saved?.healthEmployerRate ?? null,
+            careEmployeeRate: care.employeeRate ?? saved?.careEmployeeRate ?? null,
+            careEmployerRate: care.employerRate ?? saved?.careEmployerRate ?? null,
+            pensionEmployeeRate: pension.employeeRate ?? saved?.pensionEmployeeRate ?? null,
+            pensionEmployerRate: pension.employerRate ?? saved?.pensionEmployerRate ?? null,
+            createdAt: saved?.createdAt ?? ({} as ManualInsurancePremiumRates['createdAt']),
+            updatedAt: saved?.updatedAt ?? ({} as ManualInsurancePremiumRates['updatedAt']),
+        };
+    });
+
+    showManualRateInputSection = computed(() => {
+        const resolved = this.resolvedPremiumRates();
+        if (!resolved) return false;
+        return (
+            resolved.needsManualHealthRate
+            || resolved.needsManualCareRate
+            || resolved.needsManualPensionRate
+        );
+    });
+
+    /** 保存済み手動料率のみで解決（ページ表示時の未設定判定用） */
+    private resolvedPremiumRatesFromSaved = computed(() => {
+        const liabilityYearMonth = this.premiumLiabilityYearMonth();
+        const employee = this.employee();
+        if (!liabilityYearMonth || !employee) return null;
+        return resolveInsurancePremiumRates({
+            liabilityYearMonth,
+            office: this.office(),
+            employee,
+            manualRates: this.manualRates(),
+        });
+    });
+
+    manualRatesUnsetNotice = computed((): string | null => {
+        const liabilityYearMonth = this.premiumLiabilityYearMonth();
+        const resolved = this.resolvedPremiumRatesFromSaved();
+        if (!liabilityYearMonth || !resolved) return null;
+
+        const needsManual =
+            resolved.needsManualHealthRate
+            || resolved.needsManualCareRate
+            || resolved.needsManualPensionRate;
+        if (!needsManual || manualRatesMissingMessage(resolved) === null) return null;
+
+        return `${healthInsuranceFiscalYear(liabilityYearMonth)}年度の料率が設定されていないため、手動で入力してください。`;
+    });
+
+    manualRatesUnsetModalDismissedFor = signal<string | null>(null);
+
+    showManualRatesUnsetModal = computed((): boolean => {
+        if (this.isLoading() || this.isLoadingMonth()) return false;
+        if (this.pageMode() !== 'premium') return false;
+        if (!this.manualRatesUnsetNotice()) return false;
+        const liabilityYearMonth = this.premiumLiabilityYearMonth();
+        if (!liabilityYearMonth) return false;
+        return this.manualRatesUnsetModalDismissedFor() !== liabilityYearMonth;
+    });
+
     isNextMonthCollection = computed(
         () => this.insurancePremiumCollectionTiming() === 'next_month',
     );
@@ -296,9 +452,8 @@ export class InsurancePremiumDetailPageComponent {
         const employee = this.employee();
         const ym = this.targetYearMonth();
         if (!employee || !ym) return false;
-        const retireYm = navigableYearMonthMax(employee);
-        if (!retireYm) return true;
-        return ym < retireYm;
+        const maxYm = viewableYearMonthMax(employee, this.currentYearMonth());
+        return ym < maxYm;
     });
 
     /** 保険料タブ：選択月＝給与から控除する月 */
@@ -1036,13 +1191,18 @@ export class InsurancePremiumDetailPageComponent {
         this.isLoading.set(true);
         this.errorMessage.set('');
         this.employeeId.set(this.route.snapshot.params['employeeId'] ?? '');
+        this.pageMode.set(this.readPageModeFromRoute());
 
         const yearMonth = this.route.snapshot.queryParams['ym'] as string | undefined;
         const initialYearMonth =
             yearMonth && /^\d{4}-\d{2}$/.test(yearMonth) ? yearMonth : this.currentYearMonth();
         this.setTargetYearMonth(initialYearMonth);
-        const tab = this.route.snapshot.queryParams['tab'] as string | undefined;
-        this.activeTab.set(this.resolveInitialTab(tab));
+
+        if (this.redirectLegacyTabIfNeeded()) {
+            this.isLoading.set(false);
+            return;
+        }
+
         this.resetBonusForm();
 
         try {
@@ -1057,8 +1217,11 @@ export class InsurancePremiumDetailPageComponent {
                     this.setTargetYearMonth(clamped);
                 }
                 await Promise.all([this.loadEmployeeRewards(), this.loadSocialInsuranceStatus()]);
-                await this.loadStandardReward();
-                await this.loadMonthBonuses();
+                await Promise.all([
+                    this.loadStandardReward(),
+                    this.loadManualRates(),
+                    this.loadMonthBonuses(),
+                ]);
                 await Promise.all([this.loadOffice(), this.loadCompany()]);
                 await Promise.all([
                     this.loadRegularDecisionProcedure(),
@@ -1147,24 +1310,30 @@ export class InsurancePremiumDetailPageComponent {
 
     async onTargetYearMonthChange(yearMonth: string) {
         if (!yearMonth || !/^\d{4}-\d{2}$/.test(yearMonth)) return;
-        if (yearMonth === this.targetYearMonth()) return;
 
-        this.setTargetYearMonth(yearMonth);
+        const employee = this.employee();
+        const effectiveYearMonth = employee
+            ? clampViewableYearMonth(employee, yearMonth, this.currentYearMonth())
+            : yearMonth;
+        if (effectiveYearMonth === this.targetYearMonth()) return;
+
+        this.setTargetYearMonth(effectiveYearMonth);
         this.standardReward.set(null);
         this.prefilledFromYearMonth.set(null);
         this.resetRewardFieldsKeepMonth();
         this.message.set('');
         this.errorMessage.set('');
+        this.manualRateMessage.set('');
+        this.manualRateErrorMessage.set('');
 
         void this.router.navigate([], {
             relativeTo: this.route,
-            queryParams: { ym: yearMonth },
+            queryParams: { ym: effectiveYearMonth },
             queryParamsHandling: 'merge',
             replaceUrl: true,
         });
 
         this.resetBonusForm();
-        this.isBonusFormVisible.set(false);
         this.bonusMessage.set('');
         this.bonusErrorMessage.set('');
 
@@ -1172,6 +1341,7 @@ export class InsurancePremiumDetailPageComponent {
         try {
             await Promise.all([
                 this.loadStandardReward(),
+                this.loadManualRates(),
                 this.loadMonthBonuses(),
                 this.loadRegularDecisionProcedure(),
                 this.loadRevisionProcedure(),
@@ -1254,6 +1424,12 @@ export class InsurancePremiumDetailPageComponent {
         await this.onTargetYearMonthChange(nextMonth);
     }
 
+    async goToOldestUnregisteredMonth(): Promise<void> {
+        const oldest = this.oldestUnregisteredYearMonth();
+        if (!oldest || oldest === this.targetYearMonth()) return;
+        await this.onTargetYearMonthChange(oldest);
+    }
+
     latestRegisteredReward(): StandardMonthlyReward | null {
         const ym = this.targetYearMonth();
         if (!ym) return null;
@@ -1321,20 +1497,48 @@ export class InsurancePremiumDetailPageComponent {
         this.bumpFormRewardRevision();
     }
 
-    setActiveTab(tab: PremiumDetailTab): void {
-        if (this.activeTab() === tab) return;
-        this.activeTab.set(tab);
-        void this.router.navigate([], {
-            relativeTo: this.route,
-            queryParams: { tab },
-            queryParamsHandling: 'merge',
-            replaceUrl: true,
-        });
+    rewardDetailLink(): string[] {
+        const employeeId = this.employeeId();
+        return employeeId ? ['/rewards', employeeId] : ['/rewards'];
     }
 
-    private resolveInitialTab(tab: string | undefined): PremiumDetailTab {
-        if (tab === 'premium') return 'premium';
-        return 'input';
+    premiumDetailLink(): string[] {
+        const employeeId = this.employeeId();
+        return employeeId ? ['/premium', employeeId] : ['/premium'];
+    }
+
+    crossPageQueryParams(): { ym?: string } {
+        const ym = this.targetYearMonth();
+        return ym ? { ym } : {};
+    }
+
+    private readPageModeFromRoute(): PremiumPageMode {
+        return this.route.snapshot.data['premiumPageMode'] === 'premium' ? 'premium' : 'input';
+    }
+
+    private redirectLegacyTabIfNeeded(): boolean {
+        const tab = this.route.snapshot.queryParams['tab'] as string | undefined;
+        const employeeId = this.employeeId();
+        if (!employeeId || !tab) return false;
+
+        const ym = this.targetYearMonth();
+        const queryParams = ym ? { ym } : {};
+
+        if (tab === 'input' && this.pageMode() === 'premium') {
+            void this.router.navigate(['/rewards', employeeId], {
+                queryParams,
+                replaceUrl: true,
+            });
+            return true;
+        }
+        if (tab === 'premium' && this.pageMode() === 'input') {
+            void this.router.navigate(['/premium', employeeId], {
+                queryParams,
+                replaceUrl: true,
+            });
+            return true;
+        }
+        return false;
     }
 
     private setTargetYearMonth(yearMonth: string) {
@@ -1694,7 +1898,6 @@ export class InsurancePremiumDetailPageComponent {
             await this.loadMonthBonuses();
             await this.loadBonusPaymentProcedure();
             this.resetBonusForm();
-            this.isBonusFormVisible.set(false);
 
             const liabilityMonths = new Set<string>();
             if (confirmReward) {
@@ -1827,6 +2030,7 @@ export class InsurancePremiumDetailPageComponent {
             pensionInsuranceStartDate: this.pensionInsuranceStartDate(),
             pensionInsuranceEndDate: this.pensionInsuranceEndDate(),
             office: this.office(),
+            manualRates: this.manualRates(),
         });
         if (!calculated) return;
 
@@ -1847,22 +2051,22 @@ export class InsurancePremiumDetailPageComponent {
 
     // 健康保険料率（本人負担）
     healthInsuranceRate = computed((): number | null => {
-        return this.healthInsuranceRateRow()?.employeeRate ?? null;
+        return this.resolvedPremiumRates()?.healthEmployeeRate ?? null;
     });
 
     // 健康保険料率（会社負担）
     healthInsuranceEmployerRate = computed((): number | null => {
-        return this.healthInsuranceRateRow()?.employerRate ?? null;
+        return this.resolvedPremiumRates()?.healthEmployerRate ?? null;
     });
 
     // 介護保険料率（本人負担）
     careInsuranceRate = computed((): number | null => {
-        return this.careInsuranceRateRow()?.employeeRate ?? null;
+        return this.resolvedPremiumRates()?.careEmployeeRate ?? null;
     });
 
     // 介護保険料率（会社負担）
     careInsuranceEmployerRate = computed((): number | null => {
-        return this.careInsuranceRateRow()?.employerRate ?? null;
+        return this.resolvedPremiumRates()?.careEmployerRate ?? null;
     });
 
     /** この月に適用される健康保険の標準報酬月額（保存済み報酬のみ） */
@@ -1917,28 +2121,99 @@ export class InsurancePremiumDetailPageComponent {
     });
 
     healthPremiumAmountDisplay = computed((): InsurancePremiumAmountDisplay => {
-        return this.resolvePremiumAmountDisplay(
+        const resolved = this.resolvedPremiumRates();
+        return this.premiumAmountDisplayWithManualRateHint(
             this.healthInsuranceJoinStatus(),
             this.isHealthPremiumMonth(),
             this.healthInsurancePremium(),
+            resolved?.needsManualHealthRate ?? false,
+            resolved?.healthEmployeeRate ?? null,
+            '健康保険',
         );
     });
 
     pensionPremiumAmountDisplay = computed((): InsurancePremiumAmountDisplay => {
-        return this.resolvePremiumAmountDisplay(
+        const resolved = this.resolvedPremiumRates();
+        return this.premiumAmountDisplayWithManualRateHint(
             this.pensionInsuranceJoinStatus(),
             this.isPensionPremiumMonth(),
             this.pensionInsurancePremium(),
+            resolved?.needsManualPensionRate ?? false,
+            resolved?.pensionEmployeeRate ?? null,
+            '厚生年金',
         );
     });
 
     carePremiumAmountDisplay = computed((): InsurancePremiumAmountDisplay => {
-        return this.resolvePremiumAmountDisplay(
+        const resolved = this.resolvedPremiumRates();
+        return this.premiumAmountDisplayWithManualRateHint(
             this.careInsuranceLiabilityJoinStatus(),
             this.isCarePremiumMonth(),
             this.careInsurancePremium(),
+            resolved?.needsManualCareRate ?? false,
+            resolved?.careEmployeeRate ?? null,
+            '介護保険',
         );
     });
+
+    private premiumAmountDisplayWithManualRateHint(
+        joinStatus: insuranceJoinStatus,
+        isPremiumMonth: boolean,
+        premium: number | null,
+        needsManualRate: boolean,
+        rate: number | null,
+        label: string,
+    ): InsurancePremiumAmountDisplay {
+        if (
+            needsManualRate
+            && isPremiumMonth
+            && joinStatus === 'active'
+            && rate === null
+        ) {
+            return {
+                kind: 'undetermined',
+                message: `${label}の料率データがありません。手動で入力してください。`,
+            };
+        }
+        return this.resolvePremiumAmountDisplay(joinStatus, isPremiumMonth, premium);
+    }
+
+    hasUndeterminedPremiumDueToMissingManualRates = computed((): boolean => {
+        if (!this.liabilityMonthHasConfirmedReward() || this.isPremiumEnrollmentUndetermined()) {
+            return false;
+        }
+        const resolved = this.resolvedPremiumRates();
+        if (!resolved) return false;
+        return (
+            this.isInsurancePremiumBlockedByMissingManualRate(
+                resolved.needsManualHealthRate,
+                this.healthInsuranceJoinStatus(),
+                this.isHealthPremiumMonth(),
+                resolved.healthEmployeeRate,
+            )
+            || this.isInsurancePremiumBlockedByMissingManualRate(
+                resolved.needsManualPensionRate,
+                this.pensionInsuranceJoinStatus(),
+                this.isPensionPremiumMonth(),
+                resolved.pensionEmployeeRate,
+            )
+            || this.isInsurancePremiumBlockedByMissingManualRate(
+                resolved.needsManualCareRate,
+                this.careInsuranceLiabilityJoinStatus(),
+                this.isCarePremiumMonth(),
+                resolved.careEmployeeRate,
+            )
+        );
+    });
+
+    private isInsurancePremiumBlockedByMissingManualRate(
+        needsManualRate: boolean,
+        joinStatus: insuranceJoinStatus,
+        isPremiumMonth: boolean,
+        rate: number | null,
+    ): boolean {
+        return needsManualRate && joinStatus === 'active' && isPremiumMonth && rate === null;
+    }
 
     private resolvePremiumAmountDisplay(
         joinStatus: insuranceJoinStatus,
@@ -1974,18 +2249,27 @@ export class InsurancePremiumDetailPageComponent {
     });
 
     // 厚生年金料率
-    pensionInsuranceRate = 0.0915;
+    pensionInsuranceRate = computed((): number | null => {
+        return this.resolvedPremiumRates()?.pensionEmployeeRate ?? null;
+    });
+
+    pensionInsuranceEmployerRate = computed((): number | null => {
+        return this.resolvedPremiumRates()?.pensionEmployerRate ?? null;
+    });
 
     // 厚生年金料（本人負担）
     pensionInsurancePremium = computed((): number | null => {
         if (!this.isPensionPremiumMonth()) return null;
-        return this.calculatePremium(this.applicableHealthStandardAmount(), this.pensionInsuranceRate);
+        return this.calculatePremium(this.applicableHealthStandardAmount(), this.pensionInsuranceRate());
     });
 
     // 厚生年金料（会社負担）
     pensionInsuranceEmployerPremium = computed((): number | null => {
         if (!this.isPensionPremiumMonth()) return null;
-        return this.calculatePremium(this.applicableHealthStandardAmount(), this.pensionInsuranceRate);
+        return this.calculatePremium(
+            this.applicableHealthStandardAmount(),
+            this.pensionInsuranceEmployerRate(),
+        );
     });
 
     // 介護保険料（本人負担）
@@ -2005,6 +2289,7 @@ export class InsurancePremiumDetailPageComponent {
 
     // 社会保険料の合計（本人負担）
     socialInsurancePremium = computed((): number | null => {
+        if (this.hasUndeterminedPremiumDueToMissingManualRates()) return null;
         const healthPremium = this.healthInsurancePremium() ?? 0;
         const pensionPremium = this.pensionInsurancePremium() ?? 0;
         const carePremium = this.careInsurancePremium() ?? 0;
@@ -2013,6 +2298,7 @@ export class InsurancePremiumDetailPageComponent {
 
     // 社会保険料の合計（会社負担）
     socialInsuranceEmployerPremium = computed((): number | null => {
+        if (this.hasUndeterminedPremiumDueToMissingManualRates()) return null;
         const healthPremium = this.healthInsuranceEmployerPremium() ?? 0;
         const pensionPremium = this.pensionInsuranceEmployerPremium() ?? 0;
         const carePremium = this.careInsuranceEmployerPremium() ?? 0;
@@ -2110,13 +2396,19 @@ export class InsurancePremiumDetailPageComponent {
                 .filter((bonus) => bonus.targetYearMonth === targetYearMonth)
                 .sort((a, b) => a.paymentDate.localeCompare(b.paymentDate));
             this.monthBonuses.set(filtered);
-            this.isBonusFormVisible.set(filtered.length === 0 && this.isBonusEditable());
         } catch (error) {
             console.error('賞与の取得に失敗しました', error);
             this.bonusErrorMessage.set('賞与の取得に失敗しました');
         } finally {
             this.isLoadingBonus.set(false);
+            this.syncBonusFormVisibility();
         }
+    }
+
+    private syncBonusFormVisibility(): void {
+        this.isBonusFormVisible.set(
+            this.monthBonuses().length === 0 && this.isTargetMonth(),
+        );
     }
 
     isBonusEditable = computed(() => {
@@ -2389,9 +2681,10 @@ export class InsurancePremiumDetailPageComponent {
 
     // 社会保険料の合計（本人負担）
     socialInsuranceTotalPremium = computed((): number | null => {
-        const monthly = this.socialInsurancePremium() ?? 0;
-        const bonus = this.bonusSocialInsuranceEmployeePremium() ?? 0;
-        return monthly + bonus;
+        const monthly = this.socialInsurancePremium();
+        if (monthly === null) return null;
+        const bonus = this.bonusSocialInsuranceEmployeePremium();
+        return monthly + (bonus ?? 0);
     });
 
     insuranceRatePercentLabel(rate: number | null): string | null {
@@ -2399,36 +2692,122 @@ export class InsurancePremiumDetailPageComponent {
         return Number((rate * 100).toFixed(3)).toString();
     }
 
-    private healthInsuranceFiscalYear(targetYearMonth: string): string {
-        const [y, m] = targetYearMonth.split('-').map(Number);
-        return m < 3 ? String(y - 1) : String(y);
+    updateManualRateFormField<K extends keyof ManualInsurancePremiumRateForm>(
+        field: K,
+        value: ManualInsurancePremiumRateForm[K],
+    ): void {
+        this.manualRateForm.update((form) => ({ ...form, [field]: value }));
+        this.manualRateMessage.set('');
+        this.manualRateErrorMessage.set('');
     }
 
-    private healthInsuranceRateRow() {
-        const targetYearMonth = this.premiumLiabilityYearMonth();
-        if (!targetYearMonth) return null;
-
-        const fiscalYear = this.healthInsuranceFiscalYear(targetYearMonth);
-        const fileName = `kyokai-health-insurance-rates-${fiscalYear}-03.ts`;
-        const rates =
-            KYOKAI_HEALTH_INSURANCE_RATE_FILES.find((file) => file.fileName === fileName)?.rates ?? [];
-
-        return findHealthInsuranceRate({
-            rates,
-            targetYearMonth,
-            providerType: this.office()?.healthInsuranceType ?? 'kyokai',
-            prefecture: resolveOfficePrefecture(this.office(), this.employee()?.prefecture),
-        });
+    dismissManualRatesUnsetModal(): void {
+        const liabilityYearMonth = this.premiumLiabilityYearMonth();
+        if (liabilityYearMonth) {
+            this.manualRatesUnsetModalDismissedFor.set(liabilityYearMonth);
+        }
     }
 
-    private careInsuranceRateRow() {
-        const targetYearMonth = this.premiumLiabilityYearMonth();
-        if (!targetYearMonth) return null;
+    async loadManualRates(): Promise<void> {
+        const employee = this.employee();
+        const liabilityYearMonth = this.premiumLiabilityYearMonth();
+        if (!employee || !liabilityYearMonth) {
+            this.manualRates.set(null);
+            this.manualRateForm.set({ ...EMPTY_MANUAL_INSURANCE_PREMIUM_RATE_FORM });
+            return;
+        }
 
-        return findCareInsuranceRate(targetYearMonth);
+        try {
+            const saved = await this.manualRateService.getByEmployeeAndLiabilityMonth(
+                employee.id,
+                liabilityYearMonth,
+            );
+            this.manualRates.set(saved);
+            this.manualRateForm.set(this.buildManualRateForm(saved));
+        } catch (error) {
+            console.error('手動料率の取得に失敗しました', error);
+            this.manualRates.set(null);
+            this.manualRateForm.set({ ...EMPTY_MANUAL_INSURANCE_PREMIUM_RATE_FORM });
+            this.manualRateErrorMessage.set('手動料率の取得に失敗しました');
+        }
     }
 
-    // 保険料を計算
+    async saveManualRates(): Promise<void> {
+        if (this.isSavingManualRates()) return;
+
+        const employee = this.employee();
+        const liabilityYearMonth = this.premiumLiabilityYearMonth();
+        const resolved = this.resolvedPremiumRates();
+        if (!employee || !liabilityYearMonth || !resolved) return;
+
+        const form = this.manualRateForm();
+        const validationError = this.validateManualRateForm(resolved, form);
+        if (validationError) {
+            this.manualRateErrorMessage.set(validationError);
+            return;
+        }
+
+        const health = manualRatePairFromPercent(form.healthRatePercent);
+        const care = manualRatePairFromPercent(form.careRatePercent);
+        const pension = manualRatePairFromPercent(form.pensionRatePercent);
+
+        this.isSavingManualRates.set(true);
+        this.manualRateErrorMessage.set('');
+        this.manualRateMessage.set('');
+
+        try {
+            const saved = await this.manualRateService.save({
+                companyId: employee.companyId,
+                employeeId: employee.id,
+                liabilityYearMonth,
+                healthEmployeeRate: resolved.needsManualHealthRate ? health.employeeRate : null,
+                healthEmployerRate: resolved.needsManualHealthRate ? health.employerRate : null,
+                careEmployeeRate: resolved.needsManualCareRate ? care.employeeRate : null,
+                careEmployerRate: resolved.needsManualCareRate ? care.employerRate : null,
+                pensionEmployeeRate: resolved.needsManualPensionRate ? pension.employeeRate : null,
+                pensionEmployerRate: resolved.needsManualPensionRate ? pension.employerRate : null,
+            });
+            this.manualRates.set(saved);
+            this.manualRateForm.set(this.buildManualRateForm(saved));
+            this.manualRateMessage.set(`${this.premiumLiabilityYearMonthLabel()}分の料率を保存しました`);
+
+            const payYearMonth = this.targetYearMonth();
+            if (payYearMonth) {
+                await this.persistPremiumResultForPayMonth(payYearMonth);
+            }
+        } catch (error) {
+            console.error('手動料率の保存に失敗しました', error);
+            this.manualRateErrorMessage.set('手動料率の保存に失敗しました');
+        } finally {
+            this.isSavingManualRates.set(false);
+        }
+    }
+
+    private buildManualRateForm(saved: ManualInsurancePremiumRates | null): ManualInsurancePremiumRateForm {
+        if (!saved) return { ...EMPTY_MANUAL_INSURANCE_PREMIUM_RATE_FORM };
+        return {
+            healthRatePercent: savedRateToPercentInput(saved.healthEmployeeRate, saved.healthEmployerRate),
+            careRatePercent: savedRateToPercentInput(saved.careEmployeeRate, saved.careEmployerRate),
+            pensionRatePercent: savedRateToPercentInput(saved.pensionEmployeeRate, saved.pensionEmployerRate),
+        };
+    }
+
+    private validateManualRateForm(
+        resolved: NonNullable<ReturnType<typeof this.resolvedPremiumRates>>,
+        form: ManualInsurancePremiumRateForm,
+    ): string | null {
+        if (resolved.needsManualHealthRate && percentInputToDecimalRate(form.healthRatePercent) === null) {
+            return '健康保険の料率を入力してください';
+        }
+        if (resolved.needsManualCareRate && percentInputToDecimalRate(form.careRatePercent) === null) {
+            return '介護保険の料率を入力してください';
+        }
+        if (resolved.needsManualPensionRate && percentInputToDecimalRate(form.pensionRatePercent) === null) {
+            return '厚生年金の料率を入力してください';
+        }
+        return null;
+    }
+
     private calculateBonusInsurancePremiumBreakdown(employer: boolean): {
         health: number | null;
         pension: number | null;
@@ -2463,7 +2842,10 @@ export class InsurancePremiumDetailPageComponent {
                   )
                 : null,
             pension: this.isPensionPremiumMonth()
-                ? this.calculatePremium(amounts.pension, this.pensionInsuranceRate)
+                ? this.calculatePremium(
+                      amounts.pension,
+                      employer ? this.pensionInsuranceEmployerRate() : this.pensionInsuranceRate(),
+                  )
                 : null,
             care: this.isCarePremiumMonth()
                 ? this.calculatePremium(

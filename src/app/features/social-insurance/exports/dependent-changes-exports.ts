@@ -4,7 +4,7 @@ import { Dependent, Employee } from '../../employee/models/employee.models';
 import { resolveInsuredPersonNumberForExport } from '../../employee/utils/insured-person-number.util';
 import { Procedure } from '../models/procedures.model';
 import {
-    dependentAddReasonLabel,
+    dependentAddReasonDisplayText,
     dependentChangeTypeLabel,
     dependentDeleteReasonLabel,
     dependentRelationshipLabel,
@@ -57,7 +57,10 @@ export function createDependentChangeCsvRow(params: {
 
     const changeReason =
         changeType === 'add'
-            ? dependentAddReasonLabel(procedure.dependentAddReason)
+            ? dependentAddReasonDisplayText(
+                procedure.dependentAddReason,
+                procedure.dependentAddReasonNote,
+            )
             : changeType === 'delete'
               ? dependentDeleteReasonLabel(procedure.dependentDeleteReason)
               : '—';

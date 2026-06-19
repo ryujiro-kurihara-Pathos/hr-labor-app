@@ -15,6 +15,7 @@ import { Company } from '../../company/models/company.model';
 import { SocialInsuranceStatus } from '../models/social-insurance-status.model';
 import { SocialInsuranceProcedureService } from '../services/social-insurance-procedure.service';
 import { ProcedureActionBarComponent } from '../components/procedure-action-bar.component';
+import { ProcedureDetailHeaderComponent } from '../components/procedure-detail-header.component';
 import { EmployeeService } from '../../employee/services/employee.service';
 import { splitOfficeSymbol } from '../../company/utils/office-format.util';
 import {
@@ -23,15 +24,21 @@ import {
     procedureStatusLabel,
     todayDateString,
 } from '../utils/procedure-display.util';
-import { resolveDependentChangeOccurredAndDueDate, procedureDueDateFromOccurredDate } from '../utils/procedure-due-date.util';
+import { resolveDependentChangeOccurredAndDueDate } from '../utils/procedure-due-date.util';
 import {
+    buildDependentProcedureDraftUpdate,
     dependentAddReasonLabel,
+    dependentAddReasonDisplayText,
+    dependentChangeEventDateLabel,
+    dependentChangeEventDateValue,
     dependentChangeTypeLabel,
     dependentDeleteReasonLabel,
     dependentDisplayName,
+    DependentProcedureFormState,
     dependentRelationshipLabel,
     dependentToFormFields,
     extractDependentProcedureData,
+    generateMyNumber,
     hasSavedDependentData,
 } from '../utils/dependent-procedure-data.util';
 import {
@@ -42,31 +49,27 @@ import {
     resolveDependentOccurredDateBounds,
     resolveInsuredPeriodBounds,
 } from '../utils/procedure-date-range.util';
+import {
+    DEPENDENT_ANNUAL_INCOME_RULE_LINES,
+    dependentAddIncomeBlockReason,
+    resolveDependentIncomeReferenceDate,
+} from '../utils/dependent-income-eligibility.util';
+import { FieldHelpTooltipComponent } from '../../../shared/components/field-help-tooltip.component';
 
 type ChangeType = 'add' | 'change' | 'delete';
 
-type DependentFormState = {
-    occurredDate: string;
-    dependentId: string;
-    lastName: string;
-    firstName: string;
-    birthDate: string;
-    gender: 'male' | 'female' | '';
-    relationship: Dependent['relationship'] | '';
-    myNumber: string;
-    address: string;
-    occupation: string;
-    income: number | '';
-    dependencyStartDate: string;
-    addReason: DependentAddReason | '';
-    dependencyEndDate: string;
-    deleteReason: DependentDeleteReason | '';
-};
+type DependentFormState = DependentProcedureFormState;
 
 @Component({
     selector: 'app-dependent-procedure',
     standalone: true,
-    imports: [FormsModule, DecimalPipe, ProcedureActionBarComponent],
+    imports: [
+        FormsModule,
+        DecimalPipe,
+        ProcedureActionBarComponent,
+        ProcedureDetailHeaderComponent,
+        FieldHelpTooltipComponent,
+    ],
     templateUrl: './dependent-procedure.component.html',
 })
 export class DependentProcedureComponent {
@@ -87,6 +90,7 @@ export class DependentProcedureComponent {
     form = signal<DependentFormState>(this.emptyForm());
     baselineForm = signal<DependentFormState | null>(null);
     isSaving = signal(false);
+    isSavingDraft = signal(false);
     saveMessage = signal('');
     saveErrorMessage = signal('');
 
@@ -96,8 +100,12 @@ export class DependentProcedureComponent {
     readonly dependentChangeTypeLabel = dependentChangeTypeLabel;
     readonly dependentRelationshipLabel = dependentRelationshipLabel;
     readonly dependentAddReasonLabel = dependentAddReasonLabel;
+    readonly dependentAddReasonDisplayText = dependentAddReasonDisplayText;
     readonly dependentDeleteReasonLabel = dependentDeleteReasonLabel;
     readonly dependentDisplayName = dependentDisplayName;
+    readonly dependentChangeEventDateLabel = dependentChangeEventDateLabel;
+    readonly dependentChangeEventDateValue = dependentChangeEventDateValue;
+    readonly incomeRuleAnnotationLines = [...DEPENDENT_ANNUAL_INCOME_RULE_LINES];
 
     readonly addReasonOptions = Object.entries(DEPENDENT_ADD_REASON_LABELS) as [DependentAddReason, string][];
     readonly deleteReasonOptions = Object.entries(DEPENDENT_DELETE_REASON_LABELS) as [
@@ -126,9 +134,25 @@ export class DependentProcedureComponent {
         }),
     );
 
-    occurredDateBounds = computed(() =>
+    changeDateBounds = computed(() =>
         resolveDependentOccurredDateBounds({
             changeType: this.changeType(),
+            bounds: this.insuredPeriodBounds(),
+            dependent: this.selectedDependent(),
+        }),
+    );
+
+    startDateBounds = computed(() =>
+        resolveDependentOccurredDateBounds({
+            changeType: 'add',
+            bounds: this.insuredPeriodBounds(),
+            dependent: null,
+        }),
+    );
+
+    endDateBounds = computed(() =>
+        resolveDependentOccurredDateBounds({
+            changeType: 'delete',
             bounds: this.insuredPeriodBounds(),
             dependent: this.selectedDependent(),
         }),
@@ -154,6 +178,13 @@ export class DependentProcedureComponent {
         );
         if (!validation.ok) return validation;
 
+        if (changeType === 'add') {
+            const blockReason = this.addIncomeBlockReason();
+            if (blockReason) {
+                return { ok: false as const, message: blockReason };
+            }
+        }
+
         if (changeType === 'change' && !this.hasDependentInfoChanges()) {
             return { ok: false as const, message: '変更がありません' };
         }
@@ -163,11 +194,40 @@ export class DependentProcedureComponent {
 
     canSubmit = computed(() => this.submitValidation().ok);
 
+    canSaveDraft = computed(() => {
+        if (!this.changeType() || this.isCompleted()) return false;
+        if (this.changeType() === 'add' && this.addIncomeBlockReason()) return false;
+        return true;
+    });
+
+    addIncomeBlockReason = computed(() => {
+        if (this.changeType() !== 'add') return null;
+        const form = this.form();
+        return dependentAddIncomeBlockReason({
+            annualIncome: form.income === '' ? null : Number(form.income),
+            birthDate: form.birthDate,
+            referenceDate: resolveDependentIncomeReferenceDate({
+                changeType: 'add',
+                dependencyStartDate: form.dependencyStartDate,
+                changeDate: form.changeDate,
+                dependencyEndDate: form.dependencyEndDate,
+                fallbackDate: todayDateString(),
+            }),
+            isDisabled: form.isDisabled,
+        });
+    });
+
     previewDueDate = computed(() => {
-        const occurredDate = this.form().occurredDate.trim();
-        if (!occurredDate) return null;
-        const dueDate = procedureDueDateFromOccurredDate(occurredDate);
-        return dueDate || null;
+        const changeType = this.changeType();
+        if (!changeType) return null;
+        const form = this.form();
+        const dates = resolveDependentChangeOccurredAndDueDate({
+            changeType,
+            changeDate: form.changeDate,
+            dependencyStartDate: form.dependencyStartDate,
+            dependencyEndDate: form.dependencyEndDate,
+        });
+        return dates?.dueDate ?? null;
     });
 
     exportProcedure = computed((): Procedure => {
@@ -191,8 +251,10 @@ export class DependentProcedureComponent {
             dependentAddress: form.address,
             dependentOccupation: form.occupation,
             dependentIncome: form.income === '' ? null : Number(form.income),
+            dependentIsDisabled: form.isDisabled,
             dependencyStartDate: type === 'delete' ? '' : form.dependencyStartDate,
             dependentAddReason: type === 'add' ? form.addReason : '',
+            dependentAddReasonNote: type === 'add' && form.addReason === 'other' ? form.addReasonNote : '',
             dependencyEndDate: type === 'delete' ? form.dependencyEndDate : '',
             dependentDeleteReason: type === 'delete' ? form.deleteReason : '',
         };
@@ -216,6 +278,7 @@ export class DependentProcedureComponent {
                 address: item.dependentAddress,
                 occupation: item.dependentOccupation,
                 income: item.dependentIncome,
+                isDisabled: item.dependentIsDisabled,
             };
         }
 
@@ -237,6 +300,7 @@ export class DependentProcedureComponent {
             address: form.address,
             occupation: form.occupation,
             income: form.income === '' ? null : Number(form.income),
+            isDisabled: form.isDisabled,
         };
     });
 
@@ -250,11 +314,18 @@ export class DependentProcedureComponent {
             this.initializedProcedureId = item.id;
             this.changeType.set(item.dependentChanges);
             if (item.dependentChanges) {
-                this.form.set(this.formFromProcedure(item));
+                const form = this.formFromProcedure(item);
+                if (
+                    (item.dependentChanges === 'add' || item.dependentChanges === 'change')
+                    && !form.myNumber.trim()
+                ) {
+                    form.myNumber = generateMyNumber();
+                }
+                this.form.set(form);
             } else {
                 this.form.set({
                     ...this.emptyForm(),
-                    occurredDate: item.occurredDate ?? '',
+                    changeDate: item.dependentChanges === 'change' ? item.occurredDate ?? '' : '',
                 });
             }
             this.baselineForm.set(null);
@@ -277,17 +348,21 @@ export class DependentProcedureComponent {
     selectChangeType(type: ChangeType): void {
         if (this.isCompleted()) return;
         this.changeType.set(type);
-        this.form.set(this.emptyForm());
+        const form = this.emptyForm();
+        if (type === 'add') {
+            form.myNumber = generateMyNumber();
+        }
+        this.form.set(form);
         this.baselineForm.set(null);
         this.saveMessage.set('');
         this.saveErrorMessage.set('');
     }
 
     onDependentSelected(dependentId: string): void {
-        const occurredDate = this.form().occurredDate;
+        const changeDate = this.form().changeDate;
 
         if (!dependentId) {
-            this.form.set({ ...this.emptyForm(), occurredDate });
+            this.form.set({ ...this.emptyForm(), changeDate });
             this.baselineForm.set(null);
             return;
         }
@@ -302,12 +377,46 @@ export class DependentProcedureComponent {
         this.baselineForm.set(baseline);
         this.form.set({
             ...baseline,
-            occurredDate,
+            changeDate,
         });
     }
 
+    async saveDraftProcedure(): Promise<void> {
+        if (this.isCompleted() || this.isSaving() || this.isSavingDraft()) return;
+
+        const type = this.changeType();
+        if (!type) {
+            this.saveErrorMessage.set('異動の別を選択してください');
+            return;
+        }
+
+        const addBlockReason = this.addIncomeBlockReason();
+        if (addBlockReason) {
+            this.saveErrorMessage.set(addBlockReason);
+            return;
+        }
+
+        const item = this.procedure();
+        const form = this.form();
+        this.isSavingDraft.set(true);
+        this.saveErrorMessage.set('');
+        this.saveMessage.set('');
+
+        try {
+            const updated = buildDependentProcedureDraftUpdate(item, type, form);
+            await this.procedureService.updateProcedure(updated);
+            this.procedureUpdated.emit(updated);
+            this.saveMessage.set('下書きを保存しました');
+        } catch (error) {
+            console.error('扶養変更届の下書き保存に失敗しました', error);
+            this.saveErrorMessage.set('下書きの保存に失敗しました');
+        } finally {
+            this.isSavingDraft.set(false);
+        }
+    }
+
     async saveProcedure(): Promise<void> {
-        if (this.isCompleted() || this.isSaving()) return;
+        if (this.isCompleted() || this.isSaving() || this.isSavingDraft()) return;
 
         const validation = this.submitValidation();
         if (!validation.ok) return;
@@ -349,7 +458,10 @@ export class DependentProcedureComponent {
                     address: form.address,
                     occupation: form.occupation,
                     income: form.income === '' ? null : Number(form.income),
-                    memo: form.addReason ? dependentAddReasonLabel(form.addReason) : '',
+                    isDisabled: form.isDisabled,
+                    memo: form.addReason
+                        ? dependentAddReasonDisplayText(form.addReason, form.addReasonNote)
+                        : '',
                 });
                 dependentId = created.id;
             } else if (type === 'change') {
@@ -364,6 +476,7 @@ export class DependentProcedureComponent {
                     address: form.address,
                     occupation: form.occupation,
                     income: form.income === '' ? null : Number(form.income),
+                    isDisabled: form.isDisabled,
                 });
             } else {
                 await this.employeeService.endDependent(
@@ -377,7 +490,7 @@ export class DependentProcedureComponent {
             const submittedDate = todayDateString();
             const procedureDates = resolveDependentChangeOccurredAndDueDate({
                 changeType: type,
-                occurredDate: form.occurredDate,
+                changeDate: form.changeDate,
                 dependencyStartDate: form.dependencyStartDate,
                 dependencyEndDate: form.dependencyEndDate,
             });
@@ -399,8 +512,10 @@ export class DependentProcedureComponent {
                 dependentAddress: form.address,
                 dependentOccupation: form.occupation,
                 dependentIncome: form.income === '' ? null : Number(form.income),
+                dependentIsDisabled: form.isDisabled,
                 dependencyStartDate: type === 'delete' ? '' : form.dependencyStartDate,
                 dependentAddReason: type === 'add' ? form.addReason : '',
+            dependentAddReasonNote: type === 'add' && form.addReason === 'other' ? form.addReasonNote : '',
                 dependencyEndDate: type === 'delete' ? form.dependencyEndDate : '',
                 dependentDeleteReason: type === 'delete' ? form.deleteReason : '',
             };
@@ -420,18 +535,15 @@ export class DependentProcedureComponent {
     updateForm<K extends keyof DependentFormState>(key: K, value: DependentFormState[K]): void {
         this.form.update((current) => {
             const next = { ...current, [key]: value };
-            if (key === 'dependencyStartDate' && value && !current.occurredDate) {
-                next.occurredDate = String(value);
-            }
-            if (key === 'dependencyEndDate' && value && !current.occurredDate) {
-                next.occurredDate = String(value);
+            if (key === 'addReason' && value !== 'other') {
+                next.addReasonNote = '';
             }
             return next;
         });
 
         if (
             !this.isCompleted()
-            && (key === 'occurredDate' || key === 'dependencyStartDate' || key === 'dependencyEndDate')
+            && (key === 'changeDate' || key === 'dependencyStartDate' || key === 'dependencyEndDate')
         ) {
             void this.syncProcedureDatesIfNeeded();
         }
@@ -445,7 +557,7 @@ export class DependentProcedureComponent {
         const form = this.form();
         const procedureDates = resolveDependentChangeOccurredAndDueDate({
             changeType: type,
-            occurredDate: form.occurredDate,
+            changeDate: form.changeDate,
             dependencyStartDate: form.dependencyStartDate,
             dependencyEndDate: form.dependencyEndDate,
         });
@@ -513,13 +625,14 @@ export class DependentProcedureComponent {
             address: form.address.trim(),
             occupation: form.occupation.trim(),
             income: form.income === '' ? null : Number(form.income),
+            isDisabled: form.isDisabled,
             dependencyStartDate: form.dependencyStartDate,
         };
     }
 
     private emptyForm(): DependentFormState {
         return {
-            occurredDate: '',
+            changeDate: '',
             dependentId: '',
             lastName: '',
             firstName: '',
@@ -530,8 +643,10 @@ export class DependentProcedureComponent {
             address: '',
             occupation: '',
             income: '',
+            isDisabled: false,
             dependencyStartDate: '',
             addReason: '',
+            addReasonNote: '',
             dependencyEndDate: '',
             deleteReason: '',
         };
@@ -539,7 +654,7 @@ export class DependentProcedureComponent {
 
     private formFromProcedure(procedure: Procedure): DependentFormState {
         return {
-            occurredDate: procedure.occurredDate,
+            changeDate: procedure.dependentChanges === 'change' ? procedure.occurredDate : '',
             dependentId: procedure.dependentId ?? '',
             lastName: procedure.dependentLastName,
             firstName: procedure.dependentFirstName,
@@ -550,8 +665,10 @@ export class DependentProcedureComponent {
             address: procedure.dependentAddress,
             occupation: procedure.dependentOccupation,
             income: procedure.dependentIncome ?? '',
+            isDisabled: procedure.dependentIsDisabled,
             dependencyStartDate: procedure.dependencyStartDate,
             addReason: procedure.dependentAddReason,
+            addReasonNote: procedure.dependentAddReasonNote,
             dependencyEndDate: procedure.dependencyEndDate,
             deleteReason: procedure.dependentDeleteReason,
         };
@@ -559,7 +676,7 @@ export class DependentProcedureComponent {
 
     private toSubmitForm(form: DependentFormState): DependentProcedureSubmitForm {
         return {
-            occurredDate: form.occurredDate,
+            changeDate: form.changeDate,
             dependentId: form.dependentId,
             lastName: form.lastName,
             firstName: form.firstName,
@@ -568,6 +685,7 @@ export class DependentProcedureComponent {
             relationship: form.relationship,
             dependencyStartDate: form.dependencyStartDate,
             addReason: form.addReason,
+            addReasonNote: form.addReasonNote,
             dependencyEndDate: form.dependencyEndDate,
             deleteReason: form.deleteReason,
         };

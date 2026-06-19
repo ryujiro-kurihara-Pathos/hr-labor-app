@@ -38,10 +38,14 @@ export class ProcedureActionBarComponent {
     procedureForExport = input<Procedure | null>(null);
     exportContext = input<ProcedureCsvExportContext>({});
     isSubmitting = input(false);
+    isSavingDraft = input(false);
+    showDraftSave = input(false);
+    canSaveDraft = input(true);
     submitValidation = input<ProcedureSubmitValidationResult>({ ok: true });
     actionErrorMessage = input('');
 
     submitClick = output<void>();
+    draftClick = output<void>();
 
     exportMessage = signal('');
     deleteErrorMessage = signal('');
@@ -83,8 +87,22 @@ export class ProcedureActionBarComponent {
         this.exportMessage.set('CSVを出力しました');
     }
 
+    onDraftSave(): void {
+        if (
+            this.isCompleted()
+            || this.isDeleting()
+            || this.isSubmitting()
+            || this.isSavingDraft()
+            || !this.canSaveDraft()
+        ) {
+            return;
+        }
+
+        this.draftClick.emit();
+    }
+
     async onSubmit(): Promise<void> {
-        if (this.isCompleted() || this.isDeleting() || this.isSubmitting()) {
+        if (this.isCompleted() || this.isDeleting() || this.isSubmitting() || this.isSavingDraft()) {
             return;
         }
 

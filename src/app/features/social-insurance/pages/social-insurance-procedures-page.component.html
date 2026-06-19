@@ -83,7 +83,7 @@
                         <div class="procedure-body">
                             <div class="procedure-top">
                                 <div class="procedure-titles">
-                                    <p class="procedure-type">{{ procedureTypeLabel(procedure.procedureType) }}</p>
+                                    <p class="procedure-type">{{ meta.shortLabel }}</p>
                                     <p class="procedure-subject">{{ subjectName(procedure) }}</p>
                                     <p class="procedure-subtitle">{{ procedureSubtitle(procedure) }}</p>
                                 </div>
@@ -91,7 +91,6 @@
                                     <span
                                         class="status-badge"
                                         [class.not-started]="procedure.status === 'notStarted'"
-                                        [class.in-progress]="procedure.status === 'inProgress'"
                                         [class.completed]="procedure.status === 'completed'"
                                     >
                                         {{ procedureStatusLabel(procedure.status) }}
@@ -103,6 +102,10 @@
                             </div>
 
                             <dl class="procedure-meta">
+                                <div class="meta-item">
+                                    <dt>届出名称</dt>
+                                    <dd>{{ procedureTypeLabel(procedure.procedureType) }}</dd>
+                                </div>
                                 <div class="meta-item">
                                     <dt>対応期限</dt>
                                     <dd [class.overdue-text]="isOverdue(procedure)">{{ dueDateLabel(procedure) }}</dd>
@@ -320,25 +323,30 @@
         padding: 14px 16px;
         background: #fff;
         border: 1px solid #e5e7eb;
+        border-left: 4px solid #cbd5e1;
         border-radius: 12px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
         text-decoration: none;
         color: inherit;
-        transition: border-color 0.15s, box-shadow 0.15s;
+        transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
     }
 
     .procedure-card:hover {
         border-color: #93c5fd;
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+        border-left-color: #2563eb;
+        box-shadow: 0 6px 16px rgba(59, 130, 246, 0.1);
+        transform: translateY(-1px);
     }
 
     .procedure-card.overdue {
         border-color: #fecaca;
+        border-left-color: #ef4444;
         background: #fffbfb;
     }
 
     .procedure-card.completed {
-        opacity: 0.88;
+        border-left-color: #86efac;
+        opacity: 0.92;
     }
 
     .type-icon {
@@ -399,8 +407,9 @@
 
     .procedure-badges {
         display: flex;
-        flex-direction: column;
-        align-items: flex-end;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
         gap: 6px;
         flex-shrink: 0;
     }
@@ -417,11 +426,6 @@
     .status-badge.not-started {
         background: #f3f4f6;
         color: #4b5563;
-    }
-
-    .status-badge.in-progress {
-        background: #fef3c7;
-        color: #92400e;
     }
 
     .status-badge.completed {

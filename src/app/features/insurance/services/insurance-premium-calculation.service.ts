@@ -4,26 +4,23 @@ import { Employee } from '../../employee/models/employee.models';
 import { Office } from '../../company/models/office.model';
 import { InsurancePremiumCollectionTiming } from '../../company/models/company.model';
 import { resolvePremiumLiabilityYearMonth } from '../../company/utils/company-payroll-settings.util';
-import { resolveOfficePrefecture } from '../../company/utils/office-prefecture.util';
 import { BonusReward } from '../../bonus/models/bonus-reward.model';
 import { isBonusConfirmed } from '../../bonus/utils/bonus-status.util';
-import { KYOKAI_HEALTH_INSURANCE_RATE_FILES } from '../../insurance-rate/data/insurance-rates';
-import { findCareInsuranceRate, findHealthInsuranceRate } from '../../insurance-rate/utils/insurance-rate-lookup.util';
 import { isCareInsurancePremiumTargetMonth } from '../../social-insurance/utils/care-insurance-period.util';
 import {
     isHealthInsurancePremiumTargetMonth,
     isPensionInsurancePremiumTargetMonth,
 } from '../../social-insurance/utils/age-premium-period.util';
+import { ManualInsurancePremiumRates } from '../models/manual-insurance-premium-rate.model';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 import { StandardRemunerationDeterminationService } from './standard-remuneration-determination.service';
 import { bonusesForStandardBonusPremium } from '../utils/effective-monthly-reward.util';
 import { resolveBonusPremiumableStandardAmounts } from '../utils/bonus-standard-amount-cap.util';
+import { resolveInsurancePremiumRates } from '../utils/insurance-premium-rate-resolution.util';
 import { roundInsurancePremium } from '../utils/insurance-premium-rounding.util';
 import { isRewardConfirmed, savedRewardsForPremiumCalculation } from '../utils/reward-status.util';
 import { addMonthsToYearMonth } from '../utils/reward-target-month.util';
 import { getQualificationDate } from '../utils/standard-remuneration-determination.util';
-
-const PENSION_RATE = 0.0915;
 
 export type CalculatedInsurancePremium = {
     standardMonthlyAmount: number | null;
@@ -58,6 +55,7 @@ export type InsurancePremiumCalculationParams = {
     pensionInsuranceStartDate: string | null;
     pensionInsuranceEndDate: string | null;
     office: Office | null;
+    manualRates?: ManualInsurancePremiumRates | null;
 };
 
 @Injectable({
@@ -89,6 +87,7 @@ export class InsurancePremiumCalculationService {
             pensionInsuranceStartDate,
             pensionInsuranceEndDate,
             office,
+            manualRates = null,
         } = params;
 
         const liabilityYearMonth = resolvePremiumLiabilityYearMonth(payYearMonth, collectionTiming);
@@ -109,8 +108,12 @@ export class InsurancePremiumCalculationService {
 
         const standardMonthlyAmount = effective.calculation.health.standardMonthlyAmount;
         const qualificationDate = getQualificationDate(employee, healthInsuranceStartDate);
-        const healthRateRow = this.findHealthRateRow(liabilityYearMonth, office, employee);
-        const careRateRow = findCareInsuranceRate(liabilityYearMonth);
+        const rates = resolveInsurancePremiumRates({
+            liabilityYearMonth,
+            office,
+            employee,
+            manualRates,
+        });
 
         const isHealthMonth = isHealthInsurancePremiumTargetMonth(
             liabilityYearMonth,
@@ -134,22 +137,22 @@ export class InsurancePremiumCalculationService {
         );
 
         const healthInsuranceEmployeePremium = isHealthMonth
-            ? this.premium(standardMonthlyAmount, healthRateRow?.employeeRate ?? null)
+            ? this.premium(standardMonthlyAmount, rates.healthEmployeeRate)
             : 0;
         const healthInsuranceEmployerPremium = isHealthMonth
-            ? this.premium(standardMonthlyAmount, healthRateRow?.employerRate ?? null)
+            ? this.premium(standardMonthlyAmount, rates.healthEmployerRate)
             : 0;
         const pensionInsuranceEmployeePremium = isPensionMonth
-            ? this.premium(standardMonthlyAmount, PENSION_RATE)
+            ? this.premium(standardMonthlyAmount, rates.pensionEmployeeRate)
             : 0;
         const pensionInsuranceEmployerPremium = isPensionMonth
-            ? this.premium(standardMonthlyAmount, PENSION_RATE)
+            ? this.premium(standardMonthlyAmount, rates.pensionEmployerRate)
             : 0;
         const careInsuranceEmployeePremium = isCareMonth
-            ? this.premium(standardMonthlyAmount, careRateRow?.employeeRate ?? null)
+            ? this.premium(standardMonthlyAmount, rates.careEmployeeRate)
             : 0;
         const careInsuranceEmployerPremium = isCareMonth
-            ? this.premium(standardMonthlyAmount, careRateRow?.employerRate ?? null)
+            ? this.premium(standardMonthlyAmount, rates.careEmployerRate)
             : 0;
 
         const monthlyEmployeePremiumTotal =
@@ -179,22 +182,22 @@ export class InsurancePremiumCalculationService {
             });
 
             bonusHealthInsuranceEmployeePremium = isHealthMonth
-                ? this.premium(premiumableAmounts.healthAndCare, healthRateRow?.employeeRate ?? null)
+                ? this.premium(premiumableAmounts.healthAndCare, rates.healthEmployeeRate)
                 : 0;
             bonusHealthInsuranceEmployerPremium = isHealthMonth
-                ? this.premium(premiumableAmounts.healthAndCare, healthRateRow?.employerRate ?? null)
+                ? this.premium(premiumableAmounts.healthAndCare, rates.healthEmployerRate)
                 : 0;
             bonusPensionInsuranceEmployeePremium = isPensionMonth
-                ? this.premium(premiumableAmounts.pension, PENSION_RATE)
+                ? this.premium(premiumableAmounts.pension, rates.pensionEmployeeRate)
                 : 0;
             bonusPensionInsuranceEmployerPremium = isPensionMonth
-                ? this.premium(premiumableAmounts.pension, PENSION_RATE)
+                ? this.premium(premiumableAmounts.pension, rates.pensionEmployerRate)
                 : 0;
             bonusCareInsuranceEmployeePremium = isCareMonth
-                ? this.premium(premiumableAmounts.healthAndCare, careRateRow?.employeeRate ?? null)
+                ? this.premium(premiumableAmounts.healthAndCare, rates.careEmployeeRate)
                 : 0;
             bonusCareInsuranceEmployerPremium = isCareMonth
-                ? this.premium(premiumableAmounts.healthAndCare, careRateRow?.employerRate ?? null)
+                ? this.premium(premiumableAmounts.healthAndCare, rates.careEmployerRate)
                 : 0;
         }
 
@@ -233,28 +236,5 @@ export class InsurancePremiumCalculationService {
     private premium(amount: number, rate: number | null): number {
         if (rate === null) return 0;
         return roundInsurancePremium(amount * rate);
-    }
-
-    private findHealthRateRow(
-        liabilityYearMonth: string,
-        office: Office | null,
-        employee: Employee,
-    ) {
-        const fiscalYear = this.healthInsuranceFiscalYear(liabilityYearMonth);
-        const fileName = `kyokai-health-insurance-rates-${fiscalYear}-03.ts`;
-        const rates =
-            KYOKAI_HEALTH_INSURANCE_RATE_FILES.find((file) => file.fileName === fileName)?.rates ?? [];
-
-        return findHealthInsuranceRate({
-            rates,
-            targetYearMonth: liabilityYearMonth,
-            providerType: office?.healthInsuranceType ?? 'kyokai',
-            prefecture: resolveOfficePrefecture(office, employee.prefecture),
-        });
-    }
-
-    private healthInsuranceFiscalYear(targetYearMonth: string): string {
-        const [y, m] = targetYearMonth.split('-').map(Number);
-        return m < 3 ? String(y - 1) : String(y);
     }
 }
