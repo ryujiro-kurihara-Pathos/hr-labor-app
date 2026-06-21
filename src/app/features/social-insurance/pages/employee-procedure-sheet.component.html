@@ -128,8 +128,8 @@
                             @for (yearMonth of missingMonthlyRewardMonths(); track yearMonth; let last = $last) {
                                 <a
                                     [routerLink]="['/rewards', employee().id]"
-                                    [queryParams]="{ ym: yearMonth }"
-                                >{{ monthLabel(yearMonth) }}</a>@if (!last) {、}
+                                    [queryParams]="rewardInputPayMonthQuery(yearMonth)"
+                                >{{ rewardInputPayMonthLabel(yearMonth) }}</a>@if (!last) {、}
                             }
                             の報酬月額が未入力です）
                         </p>
@@ -149,7 +149,7 @@
             @case ('revision') {
                 <div class="meta-row">
                     <dt>改定年月</dt>
-                    <dd>{{ yearMonthLabel(item.targetYearMonth) }}</dd>
+                    <dd>{{ revisionApplyFromLabel() }}</dd>
                 </div>
                 <div class="meta-row">
                     <dt>改定前報酬月額</dt>

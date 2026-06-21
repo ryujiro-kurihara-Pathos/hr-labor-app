@@ -2,9 +2,12 @@ import { Timestamp } from 'firebase/firestore';
 
 import { Employee } from '../../employee/models/employee.models';
 import {
+    addMonthsToYearMonth,
     yearMonthFromDateString,
     yearMonthFromTimestamp,
 } from './reward-target-month.util';
+
+export type PayrollPaymentMonthOffset = 0 | 1;
 
 export type HealthInsuranceStartDateByEmployeeId = Record<string, string | null | undefined>;
 
@@ -59,8 +62,32 @@ export function getRegularDecisionProcedureBaseYear(targetYearMonth: string): nu
     return Number(targetYearMonth.slice(0, 4));
 }
 
+/** 定時決定の支払月（4〜6月に支払われた給与＝算定基礎届の列） */
 export function getAprJunYearMonths(baseYear: number): string[] {
     return [`${baseYear}-04`, `${baseYear}-05`, `${baseYear}-06`];
+}
+
+export function getRegularDeterminationPaymentMonths(baseYear: number): string[] {
+    return getAprJunYearMonths(baseYear);
+}
+
+/**
+ * 定時決定で参照する報酬レコードの targetYearMonth（支給年月）。
+ * 4〜6月に支払われた給与分。
+ */
+export function getRegularDeterminationRewardMonths(
+    baseYear: number,
+    _payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+): string[] {
+    return getRegularDeterminationPaymentMonths(baseYear);
+}
+
+/** 支払月に対応する報酬レコードの targetYearMonth（支給年月） */
+export function mapRegularPaymentMonthToRewardMonth(
+    paymentYearMonth: string,
+    _payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+): string {
+    return paymentYearMonth;
 }
 
 export function getDeterminationType(
@@ -89,29 +116,36 @@ export function isRegularDecisionProcedureRequiredForBaseYear(
     return !(qualMonth > 6 || (qualMonth === 6 && qualDay >= 1));
 }
 
-/** 定時決定の算定基礎対象となる4〜6月（在籍期間内のみ） */
+/** 定時決定の算定対象となる報酬月（在籍期間内のみ） */
 export function getRegularBaseMonths(
     employee: Employee,
     baseYear: number,
     qualificationDate: string,
+    payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
 ): string[] {
     const joinYm = yearMonthFromDateString(qualificationDate);
     const retireYm = yearMonthFromTimestamp(employee.retiredDate);
 
-    return getAprJunYearMonths(baseYear).filter((ym) => {
+    return getRegularDeterminationRewardMonths(baseYear, payrollPaymentMonthOffset).filter((ym) => {
         if (joinYm && ym < joinYm) return false;
         if (retireYm && ym > retireYm) return false;
         return true;
     });
 }
 
-/** 定時決定の平均算定に使う4〜6月（支払基礎日数17日以上） */
+/** 定時決定の平均算定に使う報酬月（支払基礎日数17日以上） */
 export function getRegularCalculationMonths(
     employee: Employee,
     baseYear: number,
     qualificationDate: string,
+    payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
 ): string[] {
-    return getRegularBaseMonths(employee, baseYear, qualificationDate).filter(
+    return getRegularBaseMonths(
+        employee,
+        baseYear,
+        qualificationDate,
+        payrollPaymentMonthOffset,
+    ).filter(
         (ym) =>
             getPaymentBaseDays(ym, qualificationDate, employee.retiredDate) >=
             REGULAR_DETERMINATION_MIN_PAYMENT_BASE_DAYS,
@@ -207,8 +241,10 @@ export function collectRewardMonthsToFetch(
     const months = new Set<string>([targetYearMonth]);
 
     const baseYear = getRegularDeterminationBaseYear(targetYearMonth);
-    for (const ym of getAprJunYearMonths(baseYear)) {
-        months.add(ym);
+    for (const offset of [0, 1] as const) {
+        for (const ym of getRegularDeterminationRewardMonths(baseYear, offset)) {
+            months.add(ym);
+        }
     }
 
     for (const employee of employees) {

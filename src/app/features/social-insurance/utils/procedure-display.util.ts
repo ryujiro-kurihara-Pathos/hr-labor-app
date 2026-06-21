@@ -69,6 +69,13 @@ export function isProcedureOverdue(
     );
 }
 
+/** 被扶養者異動届（扶養変更届）のみ、未提出なら削除可能 */
+export function canDeleteProcedure(
+    procedure: Pick<Procedure, 'procedureType' | 'status'>,
+): boolean {
+    return procedure.procedureType === 'dependentChange' && procedure.status !== 'completed';
+}
+
 export function resolveProcedureSubjectName(
     procedure: Pick<Procedure, 'employeeId' | 'employeeLastName' | 'employeeFirstName' | 'targetYearMonth' | 'procedureType'>,
     employeeNameById: Record<string, string> = {},

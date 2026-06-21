@@ -8,7 +8,7 @@ import { Procedure } from '../models/procedures.model';
 import { downloadCsv } from '../../../shared/components/utils/csv.utils';
 import { ConfirmService } from '../../../shared/services/confirm.service';
 import { SocialInsuranceProcedureService } from '../services/social-insurance-procedure.service';
-import { dateLabel } from '../utils/procedure-display.util';
+import { dateLabel, canDeleteProcedure } from '../utils/procedure-display.util';
 import {
     buildProcedureCsvExport,
     canExportProcedureCsv,
@@ -59,7 +59,7 @@ export class ProcedureActionBarComponent {
 
     canExportCsv = computed(() => canExportProcedureCsv(this.procedure().procedureType));
 
-    canDelete = computed(() => !this.isCompleted());
+    canDelete = computed(() => canDeleteProcedure(this.procedure()));
 
     submittedDateLabel(): string {
         const item = this.procedure();

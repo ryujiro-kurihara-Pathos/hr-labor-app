@@ -2,6 +2,10 @@ import { BonusReward } from '../../bonus/models/bonus-reward.model';
 import { GradeLookupResult } from '../models/standard-monthly-reward-table.model';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 import { effectiveMonthlyRewardTotal } from './effective-monthly-reward.util';
+import { formatPayYearMonthLabelFromWorkMonth } from './reward-pay-month.util';
+import {
+    PayrollPaymentMonthOffset,
+} from './standard-remuneration-determination.util';
 import { addMonthsToYearMonth } from './reward-target-month.util';
 
 /** 随時改定成立に必要な等級差（健康保険・厚生年金それぞれ） */
@@ -27,6 +31,25 @@ export function getRevisionCalculationMonths(originMonth: string): string[] {
 
 export function getRevisionApplyFromMonth(originMonth: string): string {
     return addMonthsToYearMonth(originMonth, 3);
+}
+
+/** 改定適用開始月（支給年月）のラベル */
+export function formatRevisionApplyFromPayMonthLabel(
+    applyFromPayMonth: string,
+    _payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+): string {
+    return formatPayYearMonthLabelFromWorkMonth(applyFromPayMonth);
+}
+
+/** 起算月から改定適用開始の支給年月ラベルを取得 */
+export function formatRevisionApplyFromLabelFromOrigin(
+    originMonth: string,
+    payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+): string {
+    return formatRevisionApplyFromPayMonthLabel(
+        getRevisionApplyFromMonth(originMonth),
+        payrollPaymentMonthOffset,
+    );
 }
 
 export function monthlyRewardTotal(reward: StandardMonthlyReward): number {

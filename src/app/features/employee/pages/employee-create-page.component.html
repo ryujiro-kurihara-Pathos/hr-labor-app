@@ -52,24 +52,62 @@
                             </select>
                         </div>
                         <div class="form-field">
-                            <label for="expected-monthly-salary">
-                                見込み給与（月額）
-                                <span class="required">必須</span>
-                            </label>
-                            <input
-                                id="expected-monthly-salary"
-                                type="number"
-                                name="expectedMonthlySalary"
-                                min="1"
-                                step="1"
-                                [(ngModel)]="expectedMonthlySalary"
-                                placeholder="280000"
-                                required
-                            />
-                            <p class="field-note">
-                                入社月の報酬入力と資格取得届の報酬月額に反映します（下書きとして登録されます）。
-                            </p>
+                            @if (isPartTimeEmployment()) {
+                                <label for="expected-monthly-salary">
+                                    見込み給与（月額）
+                                    <span class="required">必須</span>
+                                </label>
+                                <input
+                                    id="expected-monthly-salary"
+                                    type="number"
+                                    name="expectedMonthlySalary"
+                                    min="1"
+                                    step="1"
+                                    [(ngModel)]="expectedMonthlySalary"
+                                    placeholder="88000"
+                                    required
+                                />
+                                <p class="field-note">初回の給与条件と入社月の報酬入力に反映します。</p>
+                            }
                         </div>
+                        @if (!isPartTimeEmployment()) {
+                            <div class="salary-condition-form-panel form-field-wide">
+                                <div class="salary-condition-form-header">
+                                    <span class="field-group-label">給与条件（初回） <span class="required">必須</span></span>
+                                    <p class="field-note">入社月から適用する固定的賃金です。月次報酬入力に自動反映されます。</p>
+                                </div>
+                                <div class="salary-condition-form-grid">
+                                    <div class="form-field">
+                                        <label for="salary-basic">基本給</label>
+                                        <input id="salary-basic" type="number" min="0" step="1" [(ngModel)]="salaryConditionForm.basicSalary" name="salaryBasic" placeholder="250000" />
+                                    </div>
+                                    <div class="form-field">
+                                        <label for="salary-commuting">通勤手当</label>
+                                        <input id="salary-commuting" type="number" min="0" step="1" [(ngModel)]="salaryConditionForm.commutingAllowance" name="salaryCommuting" />
+                                    </div>
+                                    <div class="form-field">
+                                        <label for="salary-position">役職手当</label>
+                                        <input id="salary-position" type="number" min="0" step="1" [(ngModel)]="salaryConditionForm.positionAllowance" name="salaryPosition" />
+                                    </div>
+                                    <div class="form-field">
+                                        <label for="salary-housing">住宅手当</label>
+                                        <input id="salary-housing" type="number" min="0" step="1" [(ngModel)]="salaryConditionForm.housingAllowance" name="salaryHousing" />
+                                    </div>
+                                    <div class="form-field">
+                                        <label for="salary-overtime">見込み残業代</label>
+                                        <input id="salary-overtime" type="number" min="0" step="1" [(ngModel)]="salaryConditionForm.fixedOvertimePay" name="salaryOvertime" />
+                                    </div>
+                                    <div class="form-field">
+                                        <label for="salary-other-fixed">その他固定手当</label>
+                                        <input id="salary-other-fixed" type="number" min="0" step="1" [(ngModel)]="salaryConditionForm.otherFixedAllowance" name="salaryOtherFixed" />
+                                    </div>
+                                </div>
+                                <div class="salary-total-field">
+                                    <span class="salary-total-label">固定的賃金合計</span>
+                                    <strong class="salary-total-value">{{ salaryConditionTotal() | number }}円</strong>
+                                </div>
+                            </div>
+                        }
                         <div class="form-field">
                             <label for="department">部署</label>
                             <input id="department" type="text" name="department" [(ngModel)]="employee.department" placeholder="営業部" />
@@ -547,6 +585,61 @@
         color: #b45309;
     }
 
+    .field-group-label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 6px;
+    }
+
+    .salary-condition-form-panel {
+        grid-column: 1 / -1;
+        padding: 16px;
+        border-radius: 12px;
+        background: #f8fafc;
+        border: 1px solid #dbeafe;
+    }
+
+    .salary-condition-form-header {
+        margin-bottom: 14px;
+    }
+
+    .salary-condition-form-header .field-note {
+        margin-top: 4px;
+    }
+
+    .salary-condition-form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px 16px;
+    }
+
+    .salary-condition-form-grid .form-field {
+        margin: 0;
+    }
+
+    .salary-total-field {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 14px;
+        padding: 12px 14px;
+        border-radius: 10px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+    }
+
+    .salary-total-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #64748b;
+    }
+
+    .salary-total-value {
+        font-size: 18px;
+        color: #0f172a;
+    }
+
     .field-error {
         margin: 0;
         font-size: 12px;
@@ -661,6 +754,10 @@
         }
 
         .form-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .salary-condition-form-grid {
             grid-template-columns: 1fr;
         }
     }

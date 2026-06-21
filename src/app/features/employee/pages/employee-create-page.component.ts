@@ -1,4 +1,5 @@
 import { Component, signal, inject } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
@@ -29,7 +30,14 @@ import { normalizeAuthEmail } from '../../auth/utils/email-link-auth.util';
 import { PostalCodeLookupService } from '../../../shared/services/postal-code-lookup.service';
 import { applyPostalLookupResult } from '../../../shared/utils/postal-code-lookup.util';
 import { StandardMonthlyRewardService } from '../../insurance/services/standard-monthly-reward.service';
-import { buildJoinMonthExpectedRewardInput } from '../../insurance/utils/join-month-expected-reward.util';
+import { SalaryConditionService } from '../../insurance/services/salary-condition.service';
+import {
+    buildInitialSalaryConditionInput,
+    buildJoinMonthRewardFromSalaryCondition,
+    isSalaryConditionFormValid,
+} from '../../insurance/utils/join-month-expected-reward.util';
+import { SalaryConditionFormValue } from '../../insurance/models/salary-condition.model';
+import { fixedWageTotalFromForm } from '../../insurance/utils/salary-condition.util';
 import { katakanaValidationMessage, isKatakanaOnly } from '../utils/katakana.util';
 
 const PREFECTURES = [
@@ -43,7 +51,7 @@ const PREFECTURES = [
 @Component({
     selector: 'app-employee-create-page',
     standalone: true,
-    imports: [FormsModule, RouterLink],
+    imports: [FormsModule, RouterLink, DecimalPipe],
     templateUrl: './employee-create-page.component.html',
 })
 export class EmployeeCreatePageComponent {
@@ -58,6 +66,7 @@ export class EmployeeCreatePageComponent {
     private readonly employeeInviteService = inject(EmployeeInviteService);
     private readonly postalCodeLookupService = inject(PostalCodeLookupService);
     private readonly rewardService = inject(StandardMonthlyRewardService);
+    private readonly salaryConditionService = inject(SalaryConditionService);
 
     isLoading = signal(false);
     isLoadingEmployee = signal(false);
@@ -70,6 +79,17 @@ export class EmployeeCreatePageComponent {
     offices = signal<Office[]>([]);
     employee: EmployeeInput = createEmptyEmployeeInput();
     expectedMonthlySalary: number | '' = '';
+    salaryConditionForm: SalaryConditionFormValue = {
+        effectiveStartMonth: '',
+        basicSalary: '',
+        commutingAllowance: 0,
+        positionAllowance: 0,
+        housingAllowance: 0,
+        fixedOvertimePay: 0,
+        otherFixedAllowance: 0,
+        note: '',
+        changeReason: '初回登録',
+    };
     weeklyScheduledWorkHours: number | '' = '';
     monthlyScheduledWorkDays: number | '' = '';
     prescribedWage: number | '' = '';
@@ -139,8 +159,7 @@ export class EmployeeCreatePageComponent {
             || this.isFormEmpty(this.employee.joinedDate)
             || this.isFormEmpty(this.employee.officeId)
             || this.employee.employmentType === null
-            || this.expectedMonthlySalary === ''
-            || Number(this.expectedMonthlySalary) <= 0
+            || !this.isSalaryInputValid()
             || lastNameKanaMessage
             || firstNameKanaMessage
         ) {
@@ -186,15 +205,40 @@ export class EmployeeCreatePageComponent {
             await this.socialInsuranceStatusService.createSocialInsuranceStatus(syncedSocialInsuranceInput);
 
             const expectedSalary = Number(this.expectedMonthlySalary);
-            const joinMonthRewardInput = buildJoinMonthExpectedRewardInput({
-                companyId: employee.companyId,
-                employeeId: employee.id,
-                joinedDate: employee.joinedDate,
-                employmentType: employee.employmentType,
-                expectedMonthlySalary: expectedSalary,
-            });
-            if (joinMonthRewardInput) {
-                await this.rewardService.saveDraft(joinMonthRewardInput);
+            const salaryConditionInput = this.isPartTimeEmployment()
+                ? buildInitialSalaryConditionInput({
+                    companyId: employee.companyId,
+                    employeeId: employee.id,
+                    joinedDate: employee.joinedDate,
+                    form: {
+                        ...this.salaryConditionForm,
+                        basicSalary: expectedSalary,
+                        commutingAllowance: 0,
+                        positionAllowance: 0,
+                        housingAllowance: 0,
+                        fixedOvertimePay: 0,
+                        otherFixedAllowance: 0,
+                    },
+                })
+                : buildInitialSalaryConditionInput({
+                    companyId: employee.companyId,
+                    employeeId: employee.id,
+                    joinedDate: employee.joinedDate,
+                    form: this.salaryConditionForm,
+                });
+
+            if (salaryConditionInput) {
+                await this.salaryConditionService.save(salaryConditionInput);
+                const joinMonthRewardInput = buildJoinMonthRewardFromSalaryCondition({
+                    companyId: employee.companyId,
+                    employeeId: employee.id,
+                    joinedDate: employee.joinedDate,
+                    employmentType: employee.employmentType,
+                    condition: salaryConditionInput,
+                });
+                if (joinMonthRewardInput) {
+                    await this.rewardService.saveDraft(joinMonthRewardInput);
+                }
             }
 
             await this.procedureService.syncQualificationProcedureForEmployee({
@@ -239,6 +283,17 @@ export class EmployeeCreatePageComponent {
 
     isPartTimeEmployment(): boolean {
         return isPartTimeEmployment(this.employee.employmentType);
+    }
+
+    isSalaryInputValid(): boolean {
+        if (this.isPartTimeEmployment()) {
+            return this.expectedMonthlySalary !== '' && Number(this.expectedMonthlySalary) > 0;
+        }
+        return isSalaryConditionFormValid(this.salaryConditionForm);
+    }
+
+    salaryConditionTotal(): number {
+        return fixedWageTotalFromForm(this.salaryConditionForm);
     }
 
     selectedOffice(): Office | undefined {

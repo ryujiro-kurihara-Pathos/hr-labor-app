@@ -10,12 +10,23 @@ import { EmployeeService } from '../../employee/services/employee.service';
 import { Office } from '../../company/models/office.model';
 import { Company, InsurancePremiumCollectionTiming } from '../../company/models/company.model';
 import { CompanyService } from '../../company/services/company.service';
-import { formatPayrollDeductionNote, formatPremiumCollectionSummary, resolvePremiumLiabilityYearMonth } from '../../company/utils/company-payroll-settings.util';
+import {
+    formatPayrollDeductionNote,
+    formatPremiumCollectionSummary,
+    formatZeroPremiumBeforeEmploymentReason,
+    resolvePremiumLiabilityYearMonth,
+    resolvePremiumStandardDeterminationYearMonth,
+} from '../../company/utils/company-payroll-settings.util';
 import { OfficeService } from '../../company/services/office.service';
 import { resolveOfficePrefecture } from '../../company/utils/office-prefecture.util';
 import { SocialInsuranceStatus } from '../../social-insurance/models/social-insurance-status.model';
 import { SocialInsuranceStatusService } from '../../social-insurance/services/social-insurance-status.service';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
+import {
+    findLatestConfirmedPayYearMonth,
+    isRewardConfirmedForPayMonth,
+    rewardLookupKeysForPayMonth,
+} from '../utils/reward-pay-month.util';
 import { StandardMonthlyRewardService } from '../services/standard-monthly-reward.service';
 import { StandardRemunerationDeterminationService } from '../services/standard-remuneration-determination.service';
 import { EffectiveStandardRemuneration } from '../models/standard-remuneration-determination.model';
@@ -24,13 +35,13 @@ import { BonusRewardService } from '../../bonus/services/bonus-reward.service';
 import { isBonusConfirmed } from '../../bonus/utils/bonus-status.util';
 import {
     addMonthsToYearMonth,
-    clampViewableYearMonth,
+    clampPremiumViewableYearMonth,
+    isPremiumViewableYearMonth,
     isRewardTargetMonth,
-    isViewableYearMonth,
-    listViewableYearMonths,
-    viewableYearMonthMax,
+    listPremiumViewableYearMonths,
+    premiumViewableYearMonthMax,
+    premiumViewableYearMonthReason,
     viewableYearMonthMin,
-    viewableYearMonthReason,
     yearMonthFromDateString,
 } from '../utils/reward-target-month.util';
 import {
@@ -157,6 +168,16 @@ export class MyInsurancePremiumPageComponent implements OnInit {
         return ym ? formatYearMonthLabel(ym) : '';
     });
 
+    latestConfirmedWorkYearMonth = computed((): string | null => {
+        const rewardsByYearMonth = Object.fromEntries(
+            this.allRewards().map((item) => [item.targetYearMonth, item]),
+        );
+        return findLatestConfirmedPayYearMonth(
+            rewardsByYearMonth,
+            this.company()?.payrollPaymentMonthOffset ?? 1,
+        );
+    });
+
     resolvedQualificationDate = computed((): string | null => {
         const employee = this.employee();
         const status = this.insuranceStatus();
@@ -175,7 +196,14 @@ export class MyInsurancePremiumPageComponent implements OnInit {
 
     viewableMaxYearMonth = computed(() => {
         const employee = this.employee();
-        return employee ? viewableYearMonthMax(employee, this.currentYearMonth()) : null;
+        return employee
+            ? premiumViewableYearMonthMax(
+                employee,
+                this.currentYearMonth(),
+                this.insurancePremiumCollectionTiming(),
+                this.latestConfirmedWorkYearMonth(),
+            )
+            : null;
     });
 
     viewablePeriodLabel = computed(() => {
@@ -188,7 +216,17 @@ export class MyInsurancePremiumPageComponent implements OnInit {
     isViewableMonth = computed(() => {
         const employee = this.employee();
         const ym = this.targetYearMonth();
-        return Boolean(employee && ym && isViewableYearMonth(employee, ym, this.currentYearMonth()));
+        return Boolean(
+            employee
+            && ym
+            && isPremiumViewableYearMonth(
+                employee,
+                ym,
+                this.currentYearMonth(),
+                this.insurancePremiumCollectionTiming(),
+                this.latestConfirmedWorkYearMonth(),
+            ),
+        );
     });
 
     canGoPrevMonth = computed(() => {
@@ -207,7 +245,13 @@ export class MyInsurancePremiumPageComponent implements OnInit {
         const employee = this.employee();
         const ym = this.targetYearMonth();
         if (!employee || !ym) return null;
-        return viewableYearMonthReason(employee, ym, this.currentYearMonth());
+        return premiumViewableYearMonthReason(
+            employee,
+            ym,
+            this.currentYearMonth(),
+            this.insurancePremiumCollectionTiming(),
+            this.latestConfirmedWorkYearMonth(),
+        );
     });
 
     unconfirmedMonthsInRange = computed(() => {
@@ -217,9 +261,22 @@ export class MyInsurancePremiumPageComponent implements OnInit {
         const rewardsByYearMonth = Object.fromEntries(
             this.allRewards().map((reward) => [reward.targetYearMonth, reward]),
         );
+        const timing = this.insurancePremiumCollectionTiming();
 
-        return listViewableYearMonths(employee, this.currentYearMonth()).filter(
-            (yearMonth) => !isRewardConfirmed(rewardsByYearMonth[yearMonth]),
+        return listPremiumViewableYearMonths(
+            employee,
+            this.currentYearMonth(),
+            timing,
+            this.latestConfirmedWorkYearMonth(),
+        ).filter(
+            (payYearMonth) => {
+                const liabilityYearMonth = resolvePremiumLiabilityYearMonth(payYearMonth, timing);
+                return !isRewardConfirmedForPayMonth(
+                    rewardsByYearMonth,
+                    liabilityYearMonth,
+                    this.company()?.payrollPaymentMonthOffset ?? 1,
+                );
+            },
         );
     });
 
@@ -236,13 +293,14 @@ export class MyInsurancePremiumPageComponent implements OnInit {
     });
 
     bonusesForPremium = computed(() => {
+        const payYearMonth = this.targetYearMonth();
         const liabilityYearMonth = this.premiumLiabilityYearMonth();
-        if (!liabilityYearMonth) return [];
-        const bonusesInLiabilityMonth = this.allBonuses().filter(
-            (bonus) => bonus.targetYearMonth === liabilityYearMonth,
+        if (!payYearMonth || !liabilityYearMonth) return [];
+        const bonusesInPayMonth = this.allBonuses().filter(
+            (bonus) => bonus.targetYearMonth === payYearMonth,
         );
         return bonusesForStandardBonusPremium(
-            bonusesInLiabilityMonth,
+            bonusesInPayMonth,
             liabilityYearMonth,
             this.allBonuses(),
         );
@@ -260,8 +318,14 @@ export class MyInsurancePremiumPageComponent implements OnInit {
     liabilityMonthHasConfirmedReward = computed((): boolean => {
         const liabilityYearMonth = this.premiumLiabilityYearMonth();
         if (!liabilityYearMonth) return false;
-        const reward = this.allRewards().find((item) => item.targetYearMonth === liabilityYearMonth);
-        return isRewardConfirmed(reward ?? null);
+        const rewardsByYearMonth = Object.fromEntries(
+            this.allRewards().map((item) => [item.targetYearMonth, item]),
+        );
+        return isRewardConfirmedForPayMonth(
+            rewardsByYearMonth,
+            liabilityYearMonth,
+            this.company()?.payrollPaymentMonthOffset ?? 1,
+        );
     });
 
     healthInsuranceJoinStatus = computed((): insuranceJoinStatus => {
@@ -368,17 +432,12 @@ export class MyInsurancePremiumPageComponent implements OnInit {
         const liabilityYearMonth = this.premiumLiabilityYearMonth();
         const employee = this.employee();
         const joinYearMonth = employee ? yearMonthFromDateString(employee.joinedDate) : null;
-        if (
-            this.isNextMonthCollection()
-            && joinYearMonth
-            && liabilityYearMonth
-            && liabilityYearMonth < joinYearMonth
-        ) {
-            const nextPayLabel = formatYearMonthLabel(
-                addMonthsToYearMonth(this.targetYearMonth(), 1),
-            );
-            return `この月の給与から控除する保険料はありません。${nextPayLabel}を選ぶと、${this.targetYearMonthLabel()}の報酬に基づく保険料が表示されます。`;
-        }
+        const beforeEmploymentReason = formatZeroPremiumBeforeEmploymentReason({
+            payYearMonth: this.targetYearMonth(),
+            joinYearMonth,
+            liabilityYearMonth,
+        });
+        if (beforeEmploymentReason) return beforeEmploymentReason;
 
         const qualificationYearMonth = yearMonthFromDateString(this.resolvedQualificationDate());
         if (
@@ -398,6 +457,8 @@ export class MyInsurancePremiumPageComponent implements OnInit {
         if (enrollment) return enrollment;
 
         if (!this.liabilityMonthHasConfirmedReward()) {
+            if (this.showZeroMonthlyPremiumDueToCollectionTiming()) return null;
+
             const payLabel = this.targetYearMonthLabel();
             const basisLabel = this.premiumLiabilityYearMonthLabel();
             if (this.isNextMonthCollection() && basisLabel && basisLabel !== payLabel) {
@@ -425,13 +486,18 @@ export class MyInsurancePremiumPageComponent implements OnInit {
         const rewardsByYearMonth = confirmedRewardsByYearMonth(
             Object.fromEntries(this.allRewards().map((item) => [item.targetYearMonth, item])),
         );
+        const standardDeterminationYearMonth = resolvePremiumStandardDeterminationYearMonth(
+            liabilityYearMonth,
+            this.insurancePremiumCollectionTiming(),
+        );
 
         return this.determinationService.resolve(
             employee,
             rewardsByYearMonth,
-            liabilityYearMonth,
+            standardDeterminationYearMonth,
             this.insuranceStatus()?.healthInsuranceStartDate ?? null,
             this.allBonuses(),
+            this.company()?.payrollPaymentMonthOffset ?? 1,
         );
     });
 
@@ -656,7 +722,13 @@ export class MyInsurancePremiumPageComponent implements OnInit {
         const employee = this.employee();
         if (!employee || !yearMonth || !/^\d{4}-\d{2}$/.test(yearMonth)) return;
 
-        const clamped = clampViewableYearMonth(employee, yearMonth, this.currentYearMonth());
+        const clamped = clampPremiumViewableYearMonth(
+            employee,
+            yearMonth,
+            this.currentYearMonth(),
+            this.insurancePremiumCollectionTiming(),
+            this.latestConfirmedWorkYearMonth(),
+        );
         if (clamped === this.targetYearMonth()) return;
 
         this.targetYearMonth.set(clamped);
@@ -672,7 +744,13 @@ export class MyInsurancePremiumPageComponent implements OnInit {
         const employee = this.employee();
         if (!employee) return;
 
-        this.targetYearMonth.set(clampViewableYearMonth(employee, next, this.currentYearMonth()));
+        this.targetYearMonth.set(clampPremiumViewableYearMonth(
+            employee,
+            next,
+            this.currentYearMonth(),
+            this.insurancePremiumCollectionTiming(),
+            this.latestConfirmedWorkYearMonth(),
+        ));
         await this.loadMonthData();
     }
 
@@ -727,9 +805,6 @@ export class MyInsurancePremiumPageComponent implements OnInit {
             }
 
             this.employee.set(employee);
-            this.targetYearMonth.set(
-                clampViewableYearMonth(employee, this.targetYearMonth(), this.currentYearMonth()),
-            );
 
             const [status, office, allBonuses, company] = await Promise.all([
                 this.socialInsuranceStatusService.getInsuranceStatusByEmployeeId(employee.id),
@@ -745,6 +820,19 @@ export class MyInsurancePremiumPageComponent implements OnInit {
             if (company) {
                 this.insurancePremiumCollectionTiming.set(company.insurancePremiumCollectionTiming);
             }
+
+            const allRewards = await this.rewardService.listByEmployee(employee.id);
+            this.allRewards.set(allRewards);
+
+            this.targetYearMonth.set(
+                clampPremiumViewableYearMonth(
+                    employee,
+                    this.targetYearMonth(),
+                    this.currentYearMonth(),
+                    this.insurancePremiumCollectionTiming(),
+                    this.latestConfirmedWorkYearMonth(),
+                ),
+            );
 
             await this.loadMonthData();
         } catch (error) {
@@ -763,10 +851,21 @@ export class MyInsurancePremiumPageComponent implements OnInit {
         this.isLoadingMonth.set(true);
 
         try {
-            const [reward, allRewards] = await Promise.all([
-                this.rewardService.getByEmployeeAndMonth(employee.id, targetYearMonth),
-                this.rewardService.listByEmployee(employee.id),
-            ]);
+            const liabilityYearMonth = resolvePremiumLiabilityYearMonth(
+                targetYearMonth,
+                this.insurancePremiumCollectionTiming(),
+            );
+
+            const offset = this.company()?.payrollPaymentMonthOffset ?? 1;
+            let reward: StandardMonthlyReward | null = null;
+            if (liabilityYearMonth) {
+                for (const key of rewardLookupKeysForPayMonth(liabilityYearMonth, offset)) {
+                    reward = await this.rewardService.getByEmployeeAndMonth(employee.id, key);
+                    if (reward) break;
+                }
+            }
+
+            const allRewards = await this.rewardService.listByEmployee(employee.id);
 
             this.standardReward.set(reward);
             this.allRewards.set(allRewards);
@@ -776,22 +875,23 @@ export class MyInsurancePremiumPageComponent implements OnInit {
                 .sort((a, b) => a.paymentDate.localeCompare(b.paymentDate));
             this.monthBonuses.set(monthBonuses);
 
-            const liabilityYearMonth = resolvePremiumLiabilityYearMonth(
-                targetYearMonth,
-                this.insurancePremiumCollectionTiming(),
-            );
-
             const rewardsByYearMonth = confirmedRewardsByYearMonth(
                 Object.fromEntries(allRewards.map((item) => [item.targetYearMonth, item])),
             );
 
-            const effective = this.determinationService.resolve(
-                employee,
-                rewardsByYearMonth,
-                targetYearMonth,
-                this.insuranceStatus()?.healthInsuranceStartDate ?? null,
-                this.allBonuses(),
-            );
+            const effective = liabilityYearMonth
+                ? this.determinationService.resolve(
+                    employee,
+                    rewardsByYearMonth,
+                    resolvePremiumStandardDeterminationYearMonth(
+                        liabilityYearMonth,
+                        this.insurancePremiumCollectionTiming(),
+                    ),
+                    this.insuranceStatus()?.healthInsuranceStartDate ?? null,
+                    this.allBonuses(),
+                    this.company()?.payrollPaymentMonthOffset ?? 1,
+                )
+                : null;
             this.effectiveStandard.set(effective);
 
             const office = this.office();

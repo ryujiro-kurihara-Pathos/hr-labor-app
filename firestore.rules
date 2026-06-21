@@ -112,5 +112,9 @@ service cloud.firestore {
     match /bonusRewards/{bonusId} {
       allow read, write: if isSignedIn() && userExists();
     }
+
+    match /salaryConditions/{conditionId} {
+      allow read, write: if isSignedIn() && userExists();
+    }
   }
 }

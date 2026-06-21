@@ -126,6 +126,20 @@ export function resolvePremiumLiabilityYearMonth(
         : displayYearMonth;
 }
 
+/**
+ * 保険料算定に参照する標準報酬月額の決定月。
+ * 翌月徴収は根拠月（何月分）の先月時点の標準報酬月額を使う。
+ */
+export function resolvePremiumStandardDeterminationYearMonth(
+    liabilityYearMonth: string,
+    timing: InsurancePremiumCollectionTiming,
+): string {
+    if (timing === 'next_month') {
+        return addMonthsToYearMonth(liabilityYearMonth, -1);
+    }
+    return liabilityYearMonth;
+}
+
 /** 給与控除を行う年月（画面の選択月） */
 export function resolvePayrollDeductionYearMonth(
     displayYearMonth: string,
@@ -157,6 +171,30 @@ export function formatPremiumCollectionSummary(
         resolvePremiumLiabilityYearMonth(displayYearMonth, timing),
     );
     return `${liabilityLabel}分の保険料を、${deductionLabel}の給与から控除します（翌月徴収）。`;
+}
+
+/**
+ * 翌月徴収で根拠月が入社前のため、給与控除月に月次保険料がない場合の説明。
+ * 控除月が入社月のときは入社月向けの文言を返す。
+ */
+export function formatZeroPremiumBeforeEmploymentReason(params: {
+    payYearMonth: string;
+    joinYearMonth: string | null;
+    liabilityYearMonth: string | null;
+}): string | null {
+    const { payYearMonth, joinYearMonth, liabilityYearMonth } = params;
+    if (!joinYearMonth || !liabilityYearMonth || liabilityYearMonth >= joinYearMonth) {
+        return null;
+    }
+
+    const payLabel = formatYearMonthLabel(payYearMonth);
+    const nextPayLabel = formatYearMonthLabel(addMonthsToYearMonth(payYearMonth, 1));
+
+    if (payYearMonth === joinYearMonth) {
+        return `${payLabel}は入社月のため、この月の給与から控除する保険料はありません。${nextPayLabel}を選ぶと、${payLabel}分の保険料が表示されます。`;
+    }
+
+    return `この月の給与から控除する保険料はありません。${nextPayLabel}を選ぶと、${payLabel}の報酬に基づく保険料が表示されます。`;
 }
 
 export function isValidPayrollDay(day: number | null): boolean {

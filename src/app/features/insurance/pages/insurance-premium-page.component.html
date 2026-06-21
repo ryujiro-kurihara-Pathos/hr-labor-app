@@ -80,7 +80,7 @@
                 <p class="section-empty">
                     この月に算出できる保険料はありません。
                     @if (unregisteredRows().length > 0) {
-                        <a routerLink="/rewards" [queryParams]="{ ym: targetYearMonth() }">報酬入力画面</a>
+                        <a routerLink="/rewards" [queryParams]="{ ym: rewardInputYearMonthForPremiumBasis() }">報酬入力画面</a>
                         で報酬を登録してください。
                     }
                 </p>

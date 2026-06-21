@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Employee } from '../../employee/models/employee.models';
 import { Office } from '../../company/models/office.model';
 import { InsurancePremiumCollectionTiming } from '../../company/models/company.model';
-import { resolvePremiumLiabilityYearMonth } from '../../company/utils/company-payroll-settings.util';
+import { resolvePremiumLiabilityYearMonth, resolvePremiumStandardDeterminationYearMonth } from '../../company/utils/company-payroll-settings.util';
 import { BonusReward } from '../../bonus/models/bonus-reward.model';
 import { isBonusConfirmed } from '../../bonus/utils/bonus-status.util';
 import { isCareInsurancePremiumTargetMonth } from '../../social-insurance/utils/care-insurance-period.util';
@@ -12,15 +12,17 @@ import {
     isPensionInsurancePremiumTargetMonth,
 } from '../../social-insurance/utils/age-premium-period.util';
 import { ManualInsurancePremiumRates } from '../models/manual-insurance-premium-rate.model';
+import { SalaryCondition } from '../models/salary-condition.model';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 import { StandardRemunerationDeterminationService } from './standard-remuneration-determination.service';
 import { bonusesForStandardBonusPremium } from '../utils/effective-monthly-reward.util';
 import { resolveBonusPremiumableStandardAmounts } from '../utils/bonus-standard-amount-cap.util';
 import { resolveInsurancePremiumRates } from '../utils/insurance-premium-rate-resolution.util';
 import { roundInsurancePremium } from '../utils/insurance-premium-rounding.util';
+import { lookupRewardByPayMonth } from '../utils/reward-pay-month.util';
 import { isRewardConfirmed, savedRewardsForPremiumCalculation } from '../utils/reward-status.util';
 import { addMonthsToYearMonth } from '../utils/reward-target-month.util';
-import { getQualificationDate } from '../utils/standard-remuneration-determination.util';
+import { getQualificationDate, PayrollPaymentMonthOffset } from '../utils/standard-remuneration-determination.util';
 
 export type CalculatedInsurancePremium = {
     standardMonthlyAmount: number | null;
@@ -56,6 +58,8 @@ export type InsurancePremiumCalculationParams = {
     pensionInsuranceEndDate: string | null;
     office: Office | null;
     manualRates?: ManualInsurancePremiumRates | null;
+    payrollPaymentMonthOffset?: PayrollPaymentMonthOffset;
+    salaryConditions?: SalaryCondition[];
 };
 
 @Injectable({
@@ -88,21 +92,33 @@ export class InsurancePremiumCalculationService {
             pensionInsuranceEndDate,
             office,
             manualRates = null,
+            payrollPaymentMonthOffset = 1,
+            salaryConditions = [],
         } = params;
 
         const liabilityYearMonth = resolvePremiumLiabilityYearMonth(payYearMonth, collectionTiming);
         if (!liabilityYearMonth) return null;
 
-        const liabilityReward = rewardsByYearMonth[liabilityYearMonth];
+        const liabilityReward = lookupRewardByPayMonth(
+            rewardsByYearMonth,
+            liabilityYearMonth,
+            payrollPaymentMonthOffset,
+        );
         if (!isRewardConfirmed(liabilityReward)) return null;
 
         const savedRewards = savedRewardsForPremiumCalculation(rewardsByYearMonth);
+        const standardDeterminationYearMonth = resolvePremiumStandardDeterminationYearMonth(
+            liabilityYearMonth,
+            collectionTiming,
+        );
         const effective = this.determinationService.resolve(
             employee,
             savedRewards,
-            liabilityYearMonth,
+            standardDeterminationYearMonth,
             healthInsuranceStartDate,
             bonuses,
+            payrollPaymentMonthOffset,
+            salaryConditions,
         );
         if (!effective?.isComplete || !effective.calculation?.health) return null;
 
@@ -160,9 +176,9 @@ export class InsurancePremiumCalculationService {
         const monthlyEmployerPremiumTotal =
             healthInsuranceEmployerPremium + pensionInsuranceEmployerPremium + careInsuranceEmployerPremium;
 
-        const bonusesInLiabilityMonth = bonuses.filter((bonus) => bonus.targetYearMonth === liabilityYearMonth);
+        const bonusesInPayMonth = bonuses.filter((bonus) => bonus.targetYearMonth === payYearMonth);
         const bonusTargets = bonusesForStandardBonusPremium(
-            bonusesInLiabilityMonth,
+            bonusesInPayMonth,
             liabilityYearMonth,
             bonuses,
         );

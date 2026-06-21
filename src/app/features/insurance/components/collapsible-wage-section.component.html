@@ -1,0 +1,82 @@
+<div class="wage-section" [class.fixed]="variant() === 'fixed'" [class.variable]="variant() === 'variable'">
+    <button
+        type="button"
+        class="wage-toggle"
+        (click)="toggle.emit()"
+        [attr.aria-expanded]="expanded()"
+    >
+        <span class="wage-toggle-label">{{ title() }}</span>
+        @if (hint()) {
+            <span class="wage-toggle-hint">{{ hint() }}</span>
+        }
+        <span class="wage-toggle-total">{{ totalAmount() | number }}円</span>
+        <span class="wage-toggle-icon" aria-hidden="true">{{ expanded() ? '▲' : '▼' }}</span>
+    </button>
+
+    @if (expanded()) {
+        <div class="wage-expanded-body">
+            <ng-content />
+        </div>
+    }
+</div>
+
+<style>
+    .wage-section {
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .wage-section.fixed {
+        background: #f8fafc;
+        border: 1px solid #dbeafe;
+    }
+
+    .wage-section.variable {
+        background: #fafafa;
+        border: 1px dashed #d1d5db;
+    }
+
+    .wage-toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 14px;
+        border: none;
+        background: transparent;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .wage-toggle:hover {
+        background: #f3f4f6;
+    }
+
+    .wage-toggle-label {
+        font-size: 14px;
+        font-weight: 700;
+        color: #4b5563;
+    }
+
+    .wage-toggle-hint {
+        font-size: 12px;
+        color: #9ca3af;
+    }
+
+    .wage-toggle-total {
+        margin-left: auto;
+        font-size: 14px;
+        font-weight: 700;
+        color: #4b5563;
+        white-space: nowrap;
+    }
+
+    .wage-toggle-icon {
+        font-size: 11px;
+        color: #6b7280;
+    }
+
+    .wage-expanded-body {
+        padding: 0 14px 14px;
+    }
+</style>

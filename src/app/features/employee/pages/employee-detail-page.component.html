@@ -330,6 +330,31 @@
                     </div>
                 </section>
 
+                <section id="salary-condition" class="section-card profile-section">
+                    <div class="section-card-header">
+                        <div>
+                            <h2 class="section-title">給与条件</h2>
+                            <p class="section-card-desc">現在適用中の固定的賃金</p>
+                        </div>
+                        <div class="section-card-actions">
+                            <button type="button" class="section-card-action" (click)="openSalaryConditionChangeModal()">
+                                給与条件を変更する
+                            </button>
+                            <button type="button" class="section-card-action" (click)="openSalaryConditionHistoryModal()">
+                                給与条件履歴を見る
+                            </button>
+                        </div>
+                    </div>
+                    @if (currentSalaryCondition(); as condition) {
+                        <app-salary-condition-display
+                            [condition]="condition"
+                            [showEffectiveMonth]="true"
+                        />
+                    } @else {
+                        <p class="section-note">給与条件が未登録です。報酬入力画面から登録してください。</p>
+                    }
+                </section>
+
                 <section id="dependents" class="section-card profile-section">
                     <div class="section-card-header">
                         <div>
@@ -898,71 +923,98 @@
                 />
             </section>
 
-            <section id="retire-section" class="section-card retire-section action-panel">
+            <section id="retire-section" class="section-card retire-section">
                 <div class="section-card-header">
                     <h2 class="section-title">在籍管理</h2>
-                    <p class="section-card-desc">退職処理と在籍への復帰</p>
                 </div>
+
+                <div class="info-tile-grid enrollment-grid">
+                    <div class="info-tile">
+                        <span class="info-tile-label">在籍状況</span>
+                        <span class="info-tile-value">
+                            <span
+                                class="status-badge status-badge-inline"
+                                [class.before-join]="isBeforeJoin(employee()!)"
+                                [class.retired]="isFullyRetired(employee()!)"
+                                [class.pending-retirement]="isPendingRetirement(employee()!)"
+                            >
+                                {{ employeeStatusLabel(employee()!) }}
+                            </span>
+                        </span>
+                    </div>
+                    <div class="info-tile">
+                        <span class="info-tile-label">入社日</span>
+                        <span class="info-tile-value">{{ formatInsuranceDate(employee()!.joinedDate) }}</span>
+                    </div>
+                    @if (employee()!.retiredDate) {
+                        <div class="info-tile">
+                            <span class="info-tile-label">退職日</span>
+                            <span class="info-tile-value">{{ formatRetiredDate(employee()!.retiredDate) }}</span>
+                        </div>
+                    }
+                </div>
+
                 @if (canRetireEmployee()) {
                     @if (!isRetireFormOpen()) {
-                        <p class="section-note">退職日を登録すると、在籍状況は自動で「退職予定」または「退職済」に変わります。</p>
-                        <button
-                            type="button"
-                            class="btn retire-btn"
-                            (click)="openRetireForm()"
-                            [disabled]="isRetiring()"
-                        >
-                            退職処理
-                        </button>
-                    } @else {
-                        <div class="form-field">
-                            <label for="retired-date">退職日</label>
-                            <input
-                                id="retired-date"
-                                type="date"
-                                name="retiredDateInput"
-                                [(ngModel)]="retiredDateInput"
-                            />
+                        <div class="enrollment-toolbar">
+                            <button
+                                type="button"
+                                class="btn retire-btn"
+                                (click)="openRetireForm()"
+                                [disabled]="isRetiring()"
+                            >
+                                退職処理
+                            </button>
                         </div>
-                        @if (errorMessage()) {
-                            <p class="error-message">{{ errorMessage() }}</p>
-                        }
-                        <div class="button-area">
-                            <button
-                                type="button"
-                                class="btn sub-btn"
-                                (click)="closeRetireForm()"
-                                [disabled]="isRetiring()"
-                            >
-                                キャンセル
-                            </button>
-                            <button
-                                type="button"
-                                class="btn retire-confirm-btn"
-                                (click)="retireEmployee()"
-                                [disabled]="isRetiring()"
-                            >
-                                @if (isRetiring()) {
-                                    処理中...
-                                } @else {
-                                    退職を確定
-                                }
-                            </button>
+                    } @else {
+                        <div class="enrollment-retire-form">
+                            <div class="enrollment-retire-row">
+                                <div class="form-field enrollment-date-field">
+                                    <label for="retired-date">退職日</label>
+                                    <input
+                                        id="retired-date"
+                                        type="date"
+                                        name="retiredDateInput"
+                                        [(ngModel)]="retiredDateInput"
+                                        [min]="retiredDateMin() ?? undefined"
+                                    />
+                                </div>
+                                <div class="enrollment-form-actions">
+                                    <button
+                                        type="button"
+                                        class="btn sub-btn"
+                                        (click)="closeRetireForm()"
+                                        [disabled]="isRetiring()"
+                                    >
+                                        キャンセル
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="btn retire-confirm-btn"
+                                        (click)="retireEmployee()"
+                                        [disabled]="isRetiring()"
+                                    >
+                                        @if (isRetiring()) {
+                                            処理中...
+                                        } @else {
+                                            退職を確定
+                                        }
+                                    </button>
+                                </div>
+                            </div>
+                            @if (errorMessage()) {
+                                <p class="error-message">{{ errorMessage() }}</p>
+                            }
                         </div>
                     }
                 } @else if (canReactivateEmployee()) {
-                    @if (isPastRetiredDate()) {
-                        <p class="section-note">この従業員は退職済みです。</p>
-                    } @else {
-                        <p class="section-note">この従業員は{{ formatRetiredDate(employee()!.retiredDate) }}に退職予定です。</p>
-                    }
-                    @if (errorMessage()) {
-                        <p class="error-message">{{ errorMessage() }}</p>
-                    }
-                    <div class="button-area stacked">
+                    <div class="enrollment-toolbar">
+                        @if (errorMessage()) {
+                            <p class="error-message">{{ errorMessage() }}</p>
+                        }
                         <button
                             type="button"
-                            class="btn sub-btn"
+                            class="btn reactivate-btn"
                             (click)="reactivateEmployee()"
                             [disabled]="isRetiring()"
                         >
@@ -973,8 +1025,6 @@
                             }
                         </button>
                     </div>
-                } @else {
-                    <p class="section-note">在籍中の従業員です。退職処理は上記ボタンから行えます。</p>
                 }
             </section>
             }
@@ -1010,6 +1060,25 @@
         </div>
     }
 </div>
+
+@if (showSalaryConditionModal()) {
+    <app-salary-condition-modal
+        title="給与条件を変更"
+        [initialValue]="salaryConditionModalInitial()"
+        [minEffectiveStartMonth]="salaryConditionMinEffectiveMonth()"
+        [isLoading]="isSavingSalaryCondition()"
+        [serverErrorMessage]="salaryConditionSaveError()"
+        (close)="closeSalaryConditionModal()"
+        (submit)="saveSalaryCondition($event)"
+    />
+}
+
+@if (showSalaryConditionHistoryModal()) {
+    <app-salary-condition-history-modal
+        [periods]="salaryConditionPeriods()"
+        (close)="closeSalaryConditionHistoryModal()"
+    />
+}
 
 <style>
     .employee-detail-page {
@@ -1199,6 +1268,18 @@
 
     .section-card-action:hover {
         text-decoration: underline;
+    }
+
+    .section-card-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+    }
+
+    .section-note {
+        margin: 0;
+        font-size: 14px;
+        color: #6b7280;
     }
 
     .info-tile-grid {
@@ -1634,6 +1715,59 @@
         margin-bottom: 0;
     }
 
+    .retire-section .section-card-header {
+        margin-bottom: 12px;
+    }
+
+    .enrollment-grid {
+        margin-bottom: 14px;
+    }
+
+    .status-badge-inline {
+        vertical-align: middle;
+    }
+
+    .enrollment-toolbar {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+        padding-top: 4px;
+        border-top: 1px solid #f3f4f6;
+    }
+
+    .enrollment-retire-form {
+        padding-top: 14px;
+        border-top: 1px solid #f3f4f6;
+    }
+
+    .enrollment-retire-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 12px 16px;
+    }
+
+    .enrollment-date-field {
+        flex: 1 1 180px;
+        min-width: 0;
+        margin: 0;
+    }
+
+    .enrollment-date-field input {
+        width: 100%;
+    }
+
+    .enrollment-form-actions {
+        display: flex;
+        gap: 10px;
+        flex: 0 0 auto;
+    }
+
+    .enrollment-form-actions .btn {
+        min-width: 112px;
+    }
+
     .qualification-procedure-section {
         margin-bottom: 8px;
         padding-top: 8px;
@@ -1993,20 +2127,35 @@
     }
 
     .retire-btn {
-        width: 100%;
+        min-width: 140px;
         background: #fff;
         color: #b45309;
         border: 1px solid #fcd34d;
     }
 
     .retire-btn:hover:not(:disabled) {
-        background: #fffbeb;
+        background: #fef3c7;
+    }
+
+    .reactivate-btn {
+        min-width: 140px;
+        background: #fff;
+        color: #0369a1;
+        border: 1px solid #7dd3fc;
+    }
+
+    .reactivate-btn:hover:not(:disabled) {
+        background: #e0f2fe;
     }
 
     .retire-confirm-btn {
-        flex: 1;
         background: #b45309;
         color: #fff;
+        border: none;
+    }
+
+    .retire-confirm-btn:hover:not(:disabled) {
+        background: #92400e;
     }
 
     .primary-btn {
@@ -2131,6 +2280,20 @@
         .dependent-list-actions {
             width: 100%;
             justify-content: space-between;
+        }
+
+        .enrollment-retire-row {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .enrollment-form-actions {
+            width: 100%;
+        }
+
+        .enrollment-form-actions .btn {
+            flex: 1;
+            min-width: 0;
         }
     }
 </style>

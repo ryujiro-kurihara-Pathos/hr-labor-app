@@ -40,6 +40,31 @@ import {
     judgePensionInsuranceJoinStatus,
 } from '../../social-insurance/utils/age-premium-period.util';
 import { formatYearMonthLabel } from '../../insurance/utils/standard-remuneration-determination.util';
+import { SalaryConditionService } from '../../insurance/services/salary-condition.service';
+import { StandardMonthlyRewardService } from '../../insurance/services/standard-monthly-reward.service';
+import { SalaryConditionModalComponent } from '../../insurance/components/salary-condition-modal.component';
+import { SalaryConditionHistoryModalComponent } from '../../insurance/components/salary-condition-history-modal.component';
+import { SalaryConditionDisplayComponent } from '../../insurance/components/salary-condition-display.component';
+import {
+    SalaryCondition,
+    SalaryConditionFormValue,
+    SalaryConditionPeriod,
+} from '../../insurance/models/salary-condition.model';
+import {
+    buildSalaryConditionPeriods,
+    formValueFromSalaryCondition,
+    resolveEarliestSalaryConditionMonth,
+    resolveSalaryConditionForMonth,
+    salaryConditionInputFromForm,
+    validateSalaryConditionForm,
+} from '../../insurance/utils/salary-condition.util';
+import {
+    buildSalaryConditionRewardDraftInput,
+    listRewardMonthsToSyncFromSalaryCondition,
+} from '../../insurance/utils/salary-condition-sync.util';
+import { StandardMonthlyReward } from '../../insurance/models/standard-monthly-reward.model';
+import { normalizeRewardStatus } from '../../insurance/utils/reward-status.util';
+import { inputableYearMonthMax } from '../../insurance/utils/reward-target-month.util';
 import { EmployeeInvitePanelComponent } from '../../invitations/components/employee-invite-panel.component';
 import {
     employeeDisplayStatusLabel,
@@ -76,7 +101,16 @@ type InsuranceDateDisplay = {
 @Component({
     selector: 'app-employee-detail-page',
     standalone: true,
-    imports: [FormsModule, RouterLink, DecimalPipe, PartTimeInsuranceWarningComponent, EmployeeInvitePanelComponent],
+    imports: [
+        FormsModule,
+        RouterLink,
+        DecimalPipe,
+        PartTimeInsuranceWarningComponent,
+        EmployeeInvitePanelComponent,
+        SalaryConditionModalComponent,
+        SalaryConditionHistoryModalComponent,
+        SalaryConditionDisplayComponent,
+    ],
     templateUrl: './employee-detail-page.component.html',
 })
 
@@ -89,6 +123,8 @@ export class EmployeeDetailPageComponent {
     private readonly procedureService = inject(SocialInsuranceProcedureService);
     private readonly confirmService = inject(ConfirmService);
     private readonly postalCodeLookupService = inject(PostalCodeLookupService);
+    private readonly salaryConditionService = inject(SalaryConditionService);
+    private readonly rewardService = inject(StandardMonthlyRewardService);
 
     // 従業員情報
     employee = signal<Employee | null>(null);
@@ -98,6 +134,14 @@ export class EmployeeDetailPageComponent {
     // 取得資格手続きのID
     qualificationProcedure = signal<Procedure | null>(null);
     employeeProcedures = signal<Procedure[]>([]);
+    salaryConditions = signal<SalaryCondition[]>([]);
+    employeeRewards = signal<Record<string, StandardMonthlyReward>>({});
+    showSalaryConditionModal = signal(false);
+    showSalaryConditionHistoryModal = signal(false);
+    salaryConditionModalInitial = signal<SalaryConditionFormValue | null>(null);
+    salaryConditionEditingMonth = signal<string | null>(null);
+    salaryConditionSaveError = signal('');
+    isSavingSalaryCondition = signal(false);
 
     readonly procedureTypeMeta = procedureTypeMeta;
     readonly procedureStatusLabel = procedureStatusLabel;
@@ -126,6 +170,31 @@ export class EmployeeDetailPageComponent {
     pendingProcedureCount = computed(
         () => this.employeeProceduresSorted().filter((procedure) => procedure.status !== 'completed').length,
     );
+
+    currentSalaryCondition = computed((): SalaryCondition | null => {
+        const employee = this.employee();
+        if (!employee) return null;
+        return resolveSalaryConditionForMonth(this.salaryConditions(), currentYearMonth());
+    });
+
+    salaryConditionPeriods = computed((): SalaryConditionPeriod[] =>
+        buildSalaryConditionPeriods(this.salaryConditions()),
+    );
+
+    salaryConditionMinEffectiveMonth = computed((): string | null =>
+        resolveEarliestSalaryConditionMonth({
+            joinedDate: this.employee()?.joinedDate,
+            qualificationDate: this.socialInsuranceStatus()?.healthInsuranceStartDate ?? null,
+        }),
+    );
+
+    confirmedRewardMonths = computed((): string[] =>
+        Object.values(this.employeeRewards())
+            .filter((reward) => normalizeRewardStatus(reward) === 'confirmed')
+            .map((reward) => reward.targetYearMonth),
+    );
+
+    readonly formatYearMonthLabel = formatYearMonthLabel;
 
     activeDependentCount = computed(
         () => this.dependents().filter((dependent) => dependent.status === 'active').length,
@@ -297,6 +366,7 @@ export class EmployeeDetailPageComponent {
             await this.loadLossProcedure();
             await this.loadOpenDependentChangeProcedure();
             await this.loadEmployeeProcedures();
+            await this.loadSalaryConditionData();
         } catch (error) {
             console.error('従業員の取得に失敗しました', error);
             this.errorMessage.set('従業員の取得に失敗しました');
@@ -923,6 +993,17 @@ export class EmployeeDetailPageComponent {
         return `${y}/${m}/${d}`;
     }
 
+    formatDateInputLabel(value: string): string {
+        const trimmed = value.trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+        const [y, m, d] = trimmed.split('-').map(Number);
+        return `${y}年${m}月${d}日`;
+    }
+
+    retiredDateMin(): string | null {
+        return this.employee()?.joinedDate?.trim() || null;
+    }
+
     openRetireForm(): void {
         this.retiredDateInput = this.todayDateString();
         this.errorMessage.set('');
@@ -950,6 +1031,17 @@ export class EmployeeDetailPageComponent {
             this.errorMessage.set('退職日の形式が正しくありません');
             return;
         }
+
+        const dateLabel = this.formatDateInputLabel(retiredDateInput);
+        const confirmed = await this.confirmService.confirm(
+            `${dateLabel}を退職日として登録しますか？在籍状況の更新と資格喪失届の作成が行われます。`,
+            {
+                confirmLabel: '退職を確定',
+                cancelLabel: 'キャンセル',
+                danger: true,
+            },
+        );
+        if (!confirmed) return;
 
         this.isRetiring.set(true);
         this.errorMessage.set('');
@@ -1312,4 +1404,119 @@ export class EmployeeDetailPageComponent {
         this.expectedEmploymentOver2Months = draft.expectedEmploymentOver2Months;
     }
 
+    async loadSalaryConditionData(): Promise<void> {
+        const employee = this.employee();
+        if (!employee) return;
+
+        const [conditions, rewards] = await Promise.all([
+            this.salaryConditionService.listByEmployee(employee.id),
+            this.rewardService.listByEmployee(employee.id),
+        ]);
+        this.salaryConditions.set(conditions);
+        this.employeeRewards.set(Object.fromEntries(rewards.map((reward) => [reward.targetYearMonth, reward])));
+    }
+
+    openSalaryConditionChangeModal(): void {
+        const current = this.currentSalaryCondition();
+        this.salaryConditionEditingMonth.set(null);
+        this.salaryConditionModalInitial.set({
+            effectiveStartMonth: currentYearMonth(),
+            basicSalary: current?.basicSalary ?? '',
+            commutingAllowance: current?.commutingAllowance ?? 0,
+            positionAllowance: current?.positionAllowance ?? 0,
+            housingAllowance: current?.housingAllowance ?? 0,
+            fixedOvertimePay: current?.fixedOvertimePay ?? 0,
+            otherFixedAllowance: current?.otherFixedAllowance ?? 0,
+            note: '',
+            changeReason: '',
+        });
+        this.salaryConditionSaveError.set('');
+        this.showSalaryConditionModal.set(true);
+    }
+
+    openSalaryConditionHistoryModal(): void {
+        this.showSalaryConditionHistoryModal.set(true);
+    }
+
+    closeSalaryConditionModal(): void {
+        this.showSalaryConditionModal.set(false);
+        this.salaryConditionSaveError.set('');
+    }
+
+    closeSalaryConditionHistoryModal(): void {
+        this.showSalaryConditionHistoryModal.set(false);
+    }
+
+    async saveSalaryCondition(form: SalaryConditionFormValue): Promise<void> {
+        const employee = this.employee();
+        if (!employee) return;
+
+        const validationError = validateSalaryConditionForm({
+            form,
+            employee,
+            conditions: this.salaryConditions(),
+            confirmedRewardMonths: this.confirmedRewardMonths(),
+            editingEffectiveStartMonth: this.salaryConditionEditingMonth(),
+            qualificationDate: this.socialInsuranceStatus()?.healthInsuranceStartDate ?? null,
+        });
+        if (validationError) {
+            this.salaryConditionSaveError.set(validationError);
+            return;
+        }
+
+        this.isSavingSalaryCondition.set(true);
+        this.salaryConditionSaveError.set('');
+
+        try {
+            const input = salaryConditionInputFromForm(form, {
+                companyId: employee.companyId,
+                employeeId: employee.id,
+            });
+            const saved = await this.salaryConditionService.save(input);
+            const allConditions = await this.salaryConditionService.listByEmployee(employee.id);
+            this.salaryConditions.set(allConditions);
+            await this.syncDraftRewardsAfterSalaryConditionSave(saved, allConditions);
+            this.closeSalaryConditionModal();
+        } catch (error) {
+            console.error('給与条件の保存に失敗しました', error);
+            this.salaryConditionSaveError.set('給与条件の保存に失敗しました');
+        } finally {
+            this.isSavingSalaryCondition.set(false);
+        }
+    }
+
+    private async syncDraftRewardsAfterSalaryConditionSave(
+        savedCondition: SalaryCondition,
+        allConditions: SalaryCondition[],
+    ): Promise<void> {
+        const employee = this.employee();
+        if (!employee) return;
+
+        const maxYearMonth = inputableYearMonthMax(employee, currentYearMonth());
+        const months = listRewardMonthsToSyncFromSalaryCondition({
+            employee,
+            savedCondition,
+            allConditions,
+            rewardsByYearMonth: this.employeeRewards(),
+            maxYearMonth,
+        });
+
+        for (const targetYearMonth of months) {
+            const condition = resolveSalaryConditionForMonth(allConditions, targetYearMonth);
+            if (!condition) continue;
+
+            const existing = this.employeeRewards()[targetYearMonth] ?? null;
+            const input = buildSalaryConditionRewardDraftInput({
+                employee,
+                targetYearMonth,
+                condition,
+                existing,
+                triggersRevision: savedCondition.triggersRevision
+                    && targetYearMonth === savedCondition.effectiveStartMonth,
+            });
+            await this.rewardService.saveDraft(input);
+        }
+
+        await this.loadSalaryConditionData();
+    }
 }

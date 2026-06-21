@@ -1,5 +1,6 @@
 import {
     calculateRevisionAverageMonthlyReward,
+    formatRevisionApplyFromPayMonthLabel,
     getRevisionApplyFromMonth,
     getRevisionCalculationMonths,
     hasRevisionGradeDifference,
@@ -80,6 +81,16 @@ describe('revision-determination.util', () => {
             };
 
             expect(calculateRevisionAverageMonthlyReward(rewards, '2025-08')).toBeNull();
+        });
+    });
+
+    describe('formatRevisionApplyFromPayMonthLabel', () => {
+        it('翌月払いでも支給年月ラベルをそのまま表示する', () => {
+            expect(formatRevisionApplyFromPayMonthLabel('2026-09', 1)).toBe('2026年9月');
+        });
+
+        it('当月払いでは勤務月と同じラベルになる', () => {
+            expect(formatRevisionApplyFromPayMonthLabel('2026-09', 0)).toBe('2026年9月');
         });
     });
 });

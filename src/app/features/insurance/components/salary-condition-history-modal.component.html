@@ -1,0 +1,168 @@
+<div class="modal-backdrop" (click)="onBackdropClick($event)">
+    <div class="modal-card" role="dialog" aria-labelledby="salary-condition-history-title">
+        <h1 id="salary-condition-history-title">給与条件履歴</h1>
+
+        @if (periods().length === 0) {
+            <p class="empty-note">給与条件が登録されていません。</p>
+        } @else {
+            <div class="history-list">
+                @for (period of periods(); track period.condition.id) {
+                    <article class="history-item">
+                        <header class="history-item-header">
+                            <h2>{{ period.displayLabel }}</h2>
+                            <p class="history-total">固定的賃金合計 {{ period.condition.fixedWageTotal | number }}円</p>
+                        </header>
+                        <dl class="history-breakdown">
+                            @for (key of fieldKeys; track key) {
+                                <div class="history-breakdown-row">
+                                    <dt>{{ fieldLabels[key] }}</dt>
+                                    <dd>{{ period.condition[key] | number }}円</dd>
+                                </div>
+                            }
+                        </dl>
+                        @if (period.condition.changeReason) {
+                            <p class="history-meta">変更理由：{{ period.condition.changeReason }}</p>
+                        }
+                        @if (period.condition.note) {
+                            <p class="history-meta">備考：{{ period.condition.note }}</p>
+                        }
+                    </article>
+                }
+            </div>
+        }
+
+        <div class="button-area">
+            <button type="button" class="form-btn sub-button" (click)="onClose()">閉じる</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 16px;
+        background: rgba(0, 0, 0, 0.45);
+    }
+
+    .modal-card {
+        width: 100%;
+        max-width: 720px;
+        max-height: calc(100vh - 32px);
+        overflow: auto;
+        padding: 28px 32px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    }
+
+    h1 {
+        margin: 0 0 20px;
+        font-size: 22px;
+    }
+
+    .empty-note {
+        margin: 0 0 20px;
+        color: #6b7280;
+    }
+
+    .history-list {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+
+    .history-item {
+        padding: 16px;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        background: #f9fafb;
+    }
+
+    .history-item-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .history-item-header h2 {
+        margin: 0;
+        font-size: 16px;
+    }
+
+    .history-total {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .history-breakdown {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px 16px;
+        margin: 0;
+    }
+
+    .history-breakdown-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 13px;
+    }
+
+    .history-breakdown-row dt {
+        margin: 0;
+        color: #6b7280;
+    }
+
+    .history-breakdown-row dd {
+        margin: 0;
+        font-weight: 600;
+        color: #111827;
+    }
+
+    .history-meta {
+        margin: 10px 0 0;
+        font-size: 12px;
+        color: #6b7280;
+    }
+
+    .button-area {
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .form-btn {
+        min-width: 120px;
+        height: 42px;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .sub-button {
+        background-color: #e5e7eb;
+        color: #333;
+    }
+
+    @media (max-width: 640px) {
+        .history-breakdown {
+            grid-template-columns: 1fr;
+        }
+
+        .history-item-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    }
+</style>

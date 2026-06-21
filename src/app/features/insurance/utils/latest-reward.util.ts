@@ -20,3 +20,19 @@ export function findLatestRegisteredRewardBefore(
 
     return latest;
 }
+
+/** 確定済み月次報酬のうち、最も新しい勤務月（targetYearMonth）を返す */
+export function findLatestConfirmedWorkYearMonth(
+    rewardsByYearMonth: Record<string, StandardMonthlyReward>,
+): string | null {
+    let latestYm: string | null = null;
+
+    for (const [ym, reward] of Object.entries(rewardsByYearMonth)) {
+        if (!isRewardConfirmed(reward)) continue;
+        if (!latestYm || ym > latestYm) {
+            latestYm = ym;
+        }
+    }
+
+    return latestYm;
+}

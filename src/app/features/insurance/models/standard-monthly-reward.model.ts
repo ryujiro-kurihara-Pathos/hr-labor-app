@@ -27,8 +27,8 @@ export type StandardMonthlyReward = {
     companyId: string;                               // 会社ID
     employeeId: string;                              // 従業員ID
 
-    // 対象年月
-    targetYearMonth: string;                         // 対象年月（YYYY-MM）例: '2026-04'
+    // 対象支給年月（報酬レコードのキー）
+    targetYearMonth: string;                         // 支給年月（YYYY-MM）例: '2026-04'
 
     // 固定的賃金
     basicSalary: number;                             // 基本給
@@ -73,7 +73,7 @@ export type StandardMonthlyRewardInput = Omit<
 export type RewardFormFieldValue = number | '';
 
 export type RewardForm = {
-    targetYearMonth: string;                         // 対象年月 例: '2026-04'
+    targetYearMonth: string;                         // 支給年月 例: '2026-04'
 
     basicSalary: RewardFormFieldValue;                 // 基本給
     commutingAllowance: RewardFormFieldValue;          // 通勤手当

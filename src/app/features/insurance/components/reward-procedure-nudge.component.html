@@ -1,0 +1,102 @@
+<div class="procedure-nudge" [class.overdue]="overdue()">
+    <span class="procedure-nudge-icon" [class]="tone()" aria-hidden="true">{{ icon() }}</span>
+    <p class="procedure-nudge-line">
+        <span class="procedure-nudge-label">{{ label() }}</span>
+        @if (summary()) {
+            <span class="procedure-nudge-summary" [class.overdue-text]="overdue()">{{ summary() }}</span>
+        }
+    </p>
+    <button type="button" class="procedure-nudge-btn" (click)="onAction()" [disabled]="creating()">
+        @if (creating()) {
+            作成中...
+        } @else if (exists()) {
+            開く
+        } @else {
+            作成
+        }
+    </button>
+</div>
+
+<style>
+    .procedure-nudge {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        background: #fff;
+    }
+
+    .procedure-nudge.overdue {
+        border-color: #fecaca;
+        background: #fef2f2;
+    }
+
+    .procedure-nudge-icon {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 800;
+        color: #fff;
+    }
+
+    .procedure-nudge-icon.blue { background: #2563eb; }
+    .procedure-nudge-icon.orange { background: #ea580c; }
+    .procedure-nudge-icon.amber { background: #d97706; }
+    .procedure-nudge-icon.green { background: #059669; }
+
+    .procedure-nudge-line {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        min-width: 0;
+        flex: 1;
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.4;
+    }
+
+    .procedure-nudge-label {
+        font-weight: 700;
+        color: #111827;
+        white-space: nowrap;
+    }
+
+    .procedure-nudge-summary {
+        color: #6b7280;
+    }
+
+    .procedure-nudge-summary.overdue-text {
+        color: #b91c1c;
+        font-weight: 600;
+    }
+
+    .procedure-nudge-btn {
+        flex-shrink: 0;
+        padding: 6px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: #fff;
+        font-size: 12px;
+        font-weight: 600;
+        color: #374151;
+        cursor: pointer;
+    }
+
+    .procedure-nudge-btn:hover:not(:disabled) {
+        background: #f9fafb;
+        border-color: #9ca3af;
+    }
+
+    .procedure-nudge-btn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+</style>

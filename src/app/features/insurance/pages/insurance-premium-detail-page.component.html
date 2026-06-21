@@ -64,31 +64,38 @@
                 ←
             </button>
             <div class="month-picker">
-                <label for="target-year-month" class="month-label">
-                    @if (pageMode() === 'premium') {
-                        控除する月
-                    } @else {
-                        対象年月
+                <div class="month-picker-row">
+                    <label for="target-year-month" class="month-label">
+                        @if (pageMode() === 'premium') {
+                            控除する月
+                        } @else {
+                            支給年月
+                        }
+                    </label>
+                    <input
+                        id="target-year-month"
+                        type="month"
+                        name="targetYearMonth"
+                        [ngModel]="targetYearMonth()"
+                        (ngModelChange)="onTargetYearMonthChange($event)"
+                        [disabled]="isLoadingMonth()"
+                    />
+                    <span class="month-display">{{ targetYearMonthLabel() }}</span>
+                    @if (pageMode() === 'input' && showOldestUnregisteredLink()) {
+                        <button
+                            type="button"
+                            class="oldest-month-jump"
+                            title="未入力で最も古い月（{{ oldestUnregisteredYearMonthLabel() }}）へ移動"
+                            (click)="goToOldestUnregisteredMonth()"
+                        >
+                            未入力<span class="oldest-month-jump-sep">·</span>{{ oldestUnregisteredYearMonthLabel() }}へ
+                        </button>
                     }
-                </label>
-                <input
-                    id="target-year-month"
-                    type="month"
-                    name="targetYearMonth"
-                    [ngModel]="targetYearMonth()"
-                    (ngModelChange)="onTargetYearMonthChange($event)"
-                    [disabled]="isLoadingMonth()"
-                />
-                <span class="month-display">{{ targetYearMonthLabel() }}</span>
-                @if (pageMode() === 'input' && showOldestUnregisteredLink()) {
-                    <button
-                        type="button"
-                        class="oldest-month-jump"
-                        title="未入力で最も古い月（{{ oldestUnregisteredYearMonthLabel() }}）へ移動"
-                        (click)="goToOldestUnregisteredMonth()"
-                    >
-                        未入力<span class="oldest-month-jump-sep">·</span>{{ oldestUnregisteredYearMonthLabel() }}へ
-                    </button>
+                </div>
+                @if (pageMode() === 'input' && payrollPaymentDateLabel()) {
+                    <p class="pay-period-meta">
+                        支給日: <strong>{{ payrollPaymentDateLabel() }}</strong>
+                    </p>
                 }
             </div>
             <button
@@ -119,123 +126,45 @@
         @if (showQualificationProcedureSection() || showRevisionProcedureSection() || showRegularDecisionProcedureSection()) {
             <div class="procedure-nudges">
                 @if (showQualificationProcedureSection()) {
-                    <div class="procedure-nudge">
-                        <span class="procedure-nudge-icon tone-blue" aria-hidden="true">資</span>
-                        <div class="procedure-nudge-body">
-                            <span class="procedure-nudge-label">資格取得届</span>
-                            <span class="procedure-nudge-meta">{{ qualificationMonthLabel() }}</span>
-                            @if (qualificationProcedureExists()) {
-                                <span
-                                    class="procedure-nudge-badge"
-                                    [class.not-started]="qualificationProcedureStatus() === 'notStarted'"
-                                    [class.completed]="qualificationProcedureStatus() === 'completed'"
-                                >
-                                    {{ qualificationProcedureStatusLabel(qualificationProcedureStatus()) }}
-                                </span>
-                            } @else {
-                                <span class="procedure-nudge-hint">提出が必要</span>
-                            }
-                        </div>
-                        <button
-                            type="button"
-                            class="procedure-nudge-btn"
-                            (click)="openQualificationProcedure()"
-                            [disabled]="isCreatingQualificationProcedure()"
-                        >
-                            @if (isCreatingQualificationProcedure()) {
-                                作成中...
-                            } @else if (qualificationProcedureExists()) {
-                                開く
-                            } @else {
-                                作成
-                            }
-                        </button>
-                    </div>
-                }
-
-                @if (showRevisionProcedureSection()) {
-                    @if (revisionProcedureContext(); as revisionCtx) {
-                        <div class="procedure-nudge">
-                            <span class="procedure-nudge-icon tone-orange" aria-hidden="true">改</span>
-                            <div class="procedure-nudge-body">
-                                <span class="procedure-nudge-label">月額変更届</span>
-                                <span class="procedure-nudge-meta">{{ revisionCtx.windowLabel }}</span>
-                                @if (revisionProcedureExists()) {
-                                    <span
-                                        class="procedure-nudge-badge"
-                                        [class.not-started]="revisionProcedureStatus() === 'notStarted'"
-                                        [class.completed]="revisionProcedureStatus() === 'completed'"
-                                    >
-                                        {{ revisionProcedureStatusLabel(revisionProcedureStatus()) }}
-                                    </span>
-                                } @else {
-                                    <span class="procedure-nudge-hint">提出が必要</span>
-                                }
-                            </div>
-                            <button
-                                type="button"
-                                class="procedure-nudge-btn"
-                                (click)="openRevisionProcedure()"
-                                [disabled]="isCreatingRevisionProcedure()"
-                            >
-                                @if (isCreatingRevisionProcedure()) {
-                                    作成中...
-                                } @else if (revisionProcedureExists()) {
-                                    開く
-                                } @else {
-                                    作成
-                                }
-                            </button>
-                        </div>
-                    }
-                }
-
-                @if (showRegularDecisionProcedureSection()) {
-                    <div class="procedure-nudge">
-                        <span class="procedure-nudge-icon tone-amber" aria-hidden="true">算</span>
-                        <div class="procedure-nudge-body">
-                            <span class="procedure-nudge-label">算定基礎届</span>
-                            <span class="procedure-nudge-meta">{{ regularDecisionYearLabel() }}年4〜6月</span>
-                            @if (regularDecisionProcedureExists()) {
-                                <span
-                                    class="procedure-nudge-badge"
-                                    [class.not-started]="regularDecisionProcedureStatus() === 'notStarted'"
-                                    [class.completed]="regularDecisionProcedureStatus() === 'completed'"
-                                >
-                                    {{ regularDecisionProcedureStatusLabel(regularDecisionProcedureStatus()) }}
-                                </span>
-                            } @else {
-                                <span class="procedure-nudge-hint">提出が必要</span>
-                            }
-                        </div>
-                        <button
-                            type="button"
-                            class="procedure-nudge-btn"
-                            (click)="openRegularDecisionProcedure()"
-                            [disabled]="isCreatingRegularDecisionProcedure()"
-                        >
-                            @if (isCreatingRegularDecisionProcedure()) {
-                                作成中...
-                            } @else if (regularDecisionProcedureExists()) {
-                                開く
-                            } @else {
-                                作成
-                            }
-                        </button>
-                    </div>
-                }
-            </div>
+                    <app-reward-procedure-nudge
+                        icon="資"
+                        tone="blue"
+                        label="資格取得届"
+                        [summary]="qualificationProcedureNudgeSummary()"
+                        [overdue]="isQualificationProcedureOverdue()"
+                        [exists]="qualificationProcedureExists()"
+                        [creating]="isCreatingQualificationProcedure()"
+                        (action)="openQualificationProcedure()"
+                    />
         }
 
-        @if (canCopyFromLatestRegistered()) {
-            <button
-                type="button"
-                class="btn sub-btn copy-prev-btn"
-                (click)="copyFromLatestRegistered()"
-                [disabled]="isSaving() || !isTargetMonth()"
-            >
-                直近の登録済み（{{ latestRegisteredYearMonthLabel() }}）をコピー
-            </button>
+        @if (showRevisionProcedureSection()) {
+                    @for (ctx of revisionProcedureContexts(); track ctx.applyFromMonth) {
+                        <app-reward-procedure-nudge
+                            icon="改"
+                            tone="orange"
+                            label="月額変更届"
+                            [summary]="ctx.applyFromLabel + '（算定 ' + ctx.windowLabel + '）'"
+                            [exists]="revisionProcedureExistsFor(ctx.applyFromMonth)"
+                            [creating]="isCreatingRevisionProcedureFor(ctx.applyFromMonth)"
+                            (action)="openRevisionProcedure(ctx.applyFromMonth)"
+                        />
+            }
+        }
+
+        @if (showRegularDecisionProcedureSection()) {
+                    <app-reward-procedure-nudge
+                        icon="算"
+                        tone="amber"
+                        label="算定基礎届"
+                        [summary]="regularDecisionProcedureNudgeSummary()"
+                        [overdue]="isRegularDecisionProcedureOverdue()"
+                        [exists]="regularDecisionProcedureExists()"
+                        [creating]="isCreatingRegularDecisionProcedure()"
+                        (action)="openRegularDecisionProcedure()"
+                    />
+                }
+                </div>
         }
 
         <div class="input-columns">
@@ -243,15 +172,11 @@
                 <span class="card-type-badge monthly">月次報酬</span>
                 <h2 class="section-title">報酬入力</h2>
 
-                @if (!isTargetMonth()) {
-                    <p class="period-excluded-note">{{ targetMonthReason() }}</p>
+                @if (!isSalaryInputTargetMonth()) {
+                    <p class="period-excluded-note">{{ salaryInputExcludedReason() }}</p>
                 }
 
                 @if (isPartTimeEmployee()) {
-                    <p class="wage-section-note">
-                        パート・アルバイト向けの入力です。報酬月額は月額報酬＋通勤手当＋その他手当の合計です（日割りしません）。
-                    </p>
-
                     <div class="reward-fields part-time-reward-fields">
                         @if (isJoinMonthPartTimePayLocked()) {
                             <p class="join-month-fixed-wage-note">
@@ -295,20 +220,37 @@
                         </div>
                     </div>
                 } @else {
-                @if (isJoinMonthFixedWageLocked()) {
-                    <div class="wage-section fixed-wage-section fixed-wage-readonly">
-                        <p class="join-month-fixed-wage-note">
-                            固定的賃金は <strong>{{ joinMonthFixedWageTotal() | number }}円</strong> です
-                        </p>
-                        <p class="join-month-fixed-wage-subnote">入社月のため、見込み報酬を反映しています。</p>
-                    </div>
-                } @else {
-                <div class="wage-section fixed-wage-section">
-                    <div class="wage-section-header">
-                        <h3 class="wage-section-title">固定的賃金</h3>
-                        <app-field-help-tooltip ariaLabel="固定的賃金について">
-                            毎月一定額が支給される項目。前月と異なる値は黄色で表示されます。
-                        </app-field-help-tooltip>
+                <div class="reward-wage-sections">
+                <app-collapsible-wage-section
+                    title="固定的賃金"
+                    hint="基本給・通勤手当など"
+                    [totalAmount]="fixedWageTotalDisplay()"
+                    [expanded]="showFixedWageFields()"
+                    variant="fixed"
+                    (toggle)="toggleFixedWageFields()"
+                >
+                    @if (isFixedWageReadOnly()) {
+                        @if (activeSalaryConditionForMonth(); as condition) {
+                            <app-salary-condition-display
+                                [condition]="condition"
+                                [showActions]="true"
+                                [compact]="true"
+                                (changeClick)="openSalaryConditionChangeModal()"
+                                (historyClick)="openSalaryConditionHistoryModal()"
+                            />
+                        } @else {
+                            <p class="join-month-fixed-wage-note">
+                                固定的賃金は <strong>{{ joinMonthFixedWageTotal() | number }}円</strong> です
+                            </p>
+                            @if (isJoinMonthFixedWageLocked()) {
+                                <p class="join-month-fixed-wage-subnote">入社月のため、見込み報酬を反映しています。</p>
+                            }
+                        }
+                    } @else {
+                        <div class="wage-section-header wage-expanded-header">
+                            <app-field-help-tooltip ariaLabel="固定的賃金について">
+                                毎月一定額が支給される項目。前月と異なる値は黄色で表示されます。
+                            </app-field-help-tooltip>
                         @if (hasFixedWageChangesInForm()) {
                             <span class="wage-change-hint">前月から変更あり</span>
                         }
@@ -430,23 +372,18 @@
                             }
                         </div>
                     </div>
-                </div>
-                }
+                    }
+                </app-collapsible-wage-section>
 
-                <div class="wage-section variable-wage-section">
-                    <button
-                        type="button"
-                        class="variable-wage-toggle"
-                        (click)="toggleVariableWageFields()"
-                        [attr.aria-expanded]="showVariableWageFields()"
-                    >
-                        <span class="variable-wage-toggle-label">変動的賃金</span>
-                        <span class="variable-wage-toggle-hint">残業代・インセンティブなど</span>
-                        <span class="variable-wage-toggle-icon" aria-hidden="true">{{ showVariableWageFields() ? '▲' : '▼' }}</span>
-                    </button>
-
-                    @if (showVariableWageFields()) {
-                    <div class="reward-fields variable-wage-fields">
+                <app-collapsible-wage-section
+                    title="変動的賃金"
+                    hint="残業代・インセンティブなど"
+                    [totalAmount]="variableWageTotalDisplay()"
+                    [expanded]="showVariableWageFields()"
+                    variant="variable"
+                    (toggle)="toggleVariableWageFields()"
+                >
+                    <div class="reward-fields">
                         <div class="form-field">
                             <label for="overtime-pay">残業代</label>
                             <input
@@ -503,36 +440,36 @@
                             />
                         </div>
                     </div>
-                    }
+                </app-collapsible-wage-section>
                 </div>
                 }
 
                 @if (isRewardEditable()) {
                     <div class="save-actions">
-                        <button
-                            type="button"
+                <button
+                    type="button"
                             class="btn sub-btn save-btn"
                             (click)="saveDraftStandardMonthlyReward()"
-                            [disabled]="isSaving() || isLoadingMonth() || !isTargetMonth()"
-                        >
-                            @if (isSaving()) {
-                                保存中...
-                            } @else {
+                    [disabled]="isSaving() || isLoadingMonth() || !isTargetMonth()"
+                >
+                    @if (isSaving()) {
+                        保存中...
+                    } @else {
                                 保存
-                            }
-                        </button>
-                    </div>
+                    }
+                </button>
+                </div>
                 } @else if (monthRewardStatus() === 'confirmed') {
                     <p class="reward-locked-note">確定済みのため変更できません。</p>
-                } @else if (!isTargetMonth()) {
+                } @else if (!isSalaryInputTargetMonth()) {
                     <p class="reward-locked-note">在籍期間外のため入力できません。</p>
                 }
             </section>
 
-            <section class="card bonus-card">
+        <section class="card bonus-card">
             <span class="card-type-badge bonus">賞与</span>
             <div class="section-title-row">
-                <h2 class="section-title">賞与入力（{{ targetYearMonthLabel() }}）</h2>
+            <h2 class="section-title">賞与入力（{{ targetYearMonthLabel() }}）</h2>
                 @if (!treatBonusAsMonthlyRemuneration()) {
                     <app-field-help-tooltip
                         title="標準賞与額の上限"
@@ -657,11 +594,11 @@
                             />
                         </div>
                     </div>
-
+    
                     @if (getPreviewStandardBonusAmount(); as standardAmount) {
                         <p class="bonus-preview">標準賞与額（見込み）：{{ standardAmount | number }}円</p>
                     }
-
+    
                     @if (!isBonusFormEditable()) {
                         <p class="reward-locked-note">確定済みのため変更できません。</p>
                     } @else {
@@ -721,7 +658,7 @@
         >
             <div class="reward-summary-head">
                 <h2 class="section-title">{{ targetYearMonthLabel() }}</h2>
-                <span
+                                <span
                     class="registration-badge"
                     [class.loading]="monthRewardStatus() === 'loading'"
                     [class.confirmed]="monthRewardStatus() === 'confirmed'"
@@ -730,8 +667,8 @@
                     [class.excluded]="monthRewardStatus() === 'excluded'"
                 >
                     {{ monthRewardStatusLabel() }}
-                </span>
-            </div>
+                                </span>
+                            </div>
 
             @if (monthRewardStatusDescription()) {
                 <p class="month-status-description">{{ monthRewardStatusDescription() }}</p>
@@ -745,34 +682,43 @@
                     } @else if (isPartTimeEmployee()) {
                         {{ getPartTimeMonthlyRewardTotal() | number }}<span class="reward-monthly-total-unit">円</span>
                         <span class="reward-monthly-total-note">（入力中）</span>
-                    } @else {
+                        } @else {
                         —
                     }
                 </span>
                 @if (includedBonusInMonth() > 0) {
                     <p class="included-bonus-note">
                         うち賞与算入 {{ includedBonusInMonth() | number }}円
-                    </p>
+                            </p>
+                        }
+                @if (effectiveStandard(); as effective) {
+                    <div class="reward-monthly-total-meta">
+                        <span class="reward-meta-item">
+                            <span class="reward-meta-label">決定区分</span>
+                            {{ effective.determinationLabel }}
+                        </span>
+                        @if (effective.isComplete && effective.calculation) {
+                            <span class="reward-meta-item reward-standard-amounts">
+                                <span class="reward-meta-label">標準報酬月額</span>
+                                <span class="reward-standard-amount-line">
+                                    健康保険 {{ effective.calculation.health?.standardMonthlyAmount | number }}円
+                                </span>
+                                <span class="reward-standard-amount-line">
+                                    厚生年金 {{ effective.calculation.pension?.standardMonthlyAmount | number }}円
+                                </span>
+                            </span>
+                            @if (effective.determinationType === 'revision' && displayRevisionApplyFromLabel(); as applyFromLabel) {
+                                <span class="reward-meta-item">
+                                    <span class="reward-meta-label">改定年月</span>
+                                    {{ applyFromLabel }}
+                                </span>
+                            }
+                        } @else if (effective.description) {
+                            <span class="reward-meta-item muted">{{ effective.description }}</span>
+                        }
+                    </div>
                 }
             </div>
-
-            @if (effectiveStandard(); as effective) {
-                <div class="reward-summary-meta">
-                    <p class="status-line">決定区分：{{ effective.determinationLabel }}</p>
-                    @if (effective.isComplete && effective.calculation) {
-                        <p class="status-line">
-                            標準報酬月額　健 {{ effective.calculation.health?.standardMonthlyAmount | number }}円 /
-                            年 {{ effective.calculation.pension?.standardMonthlyAmount | number }}円
-                        </p>
-                    } @else {
-                        <p class="status-line muted">{{ effective.description }}</p>
-                    }
-                </div>
-            }
-
-            @if (revisionPreview(); as preview) {
-                <p class="status-line revision-result">{{ preview.description }}</p>
-            }
 
             @if (monthRewardStatus() === 'unregistered' && isInputRequiredMonth()) {
                 <p class="month-status-action">報酬を入力して保存してください。</p>
@@ -784,58 +730,36 @@
             @if (canConfirmMonth()) {
                 <div class="confirm-month-panel">
                     <p class="confirm-month-warning">確定後は報酬・賞与を変更できません</p>
-                    <button
-                        type="button"
+                        <button
+                            type="button"
                         class="btn primary-btn confirm-month-btn"
                         (click)="confirmMonthCompensation()"
                         [disabled]="isConfirmingMonth() || isSaving() || isSavingBonus() || isLoadingMonth() || isLoadingBonus()"
                     >
                         @if (isConfirmingMonth()) {
                             確定中...
-                        } @else {
+                            } @else {
                             {{ confirmMonthButtonLabel() }}
-                        }
-                    </button>
-                </div>
+                            }
+                        </button>
+                    </div>
             }
 
             @if (showBonusPaymentProcedureSection()) {
                 <div class="procedure-nudges procedure-nudges-inline">
-                    <div class="procedure-nudge">
-                        <span class="procedure-nudge-icon tone-green" aria-hidden="true">賞</span>
-                        <div class="procedure-nudge-body">
-                            <span class="procedure-nudge-label">賞与支払届</span>
-                            <span class="procedure-nudge-meta">{{ targetYearMonthLabel() }}</span>
-                            @if (bonusPaymentProcedureExists()) {
-                                <span
-                                    class="procedure-nudge-badge"
-                                    [class.not-started]="bonusPaymentProcedureStatus() === 'notStarted'"
-                                    [class.completed]="bonusPaymentProcedureStatus() === 'completed'"
-                                >
-                                    {{ bonusPaymentProcedureStatusLabel(bonusPaymentProcedureStatus()) }}
-                                </span>
-                            } @else {
-                                <span class="procedure-nudge-hint">提出が必要</span>
-                            }
-                        </div>
-                        <button
-                            type="button"
-                            class="procedure-nudge-btn"
-                            (click)="openBonusPaymentProcedure()"
-                            [disabled]="isCreatingBonusPaymentProcedure()"
-                        >
-                            @if (isCreatingBonusPaymentProcedure()) {
-                                作成中...
-                            } @else if (bonusPaymentProcedureExists()) {
-                                開く
-                            } @else {
-                                作成
-                            }
-                        </button>
-                    </div>
+                    <app-reward-procedure-nudge
+                        icon="賞"
+                        tone="green"
+                        label="賞与支払届"
+                        [summary]="bonusPaymentProcedureNudgeSummary()"
+                        [overdue]="isBonusPaymentProcedureOverdue()"
+                        [exists]="bonusPaymentProcedureExists()"
+                        [creating]="isCreatingBonusPaymentProcedure()"
+                        (action)="openBonusPaymentProcedure()"
+                    />
                 </div>
             }
-        </section>
+                </section>
         }
 
         @if (pageMode() === 'premium') {
@@ -938,8 +862,8 @@
                             >
                                 {{ manualRateMessage() || manualRateErrorMessage() }}
                             </p>
-                        }
-                    </section>
+            }
+        </section>
                 }
 
                 @if (!canShowPremiumSummary()) {
@@ -1005,13 +929,13 @@
                             <div class="premium-display-card-header">
                                 <span class="premium-display-icon">健</span>
                                 <h2 class="premium-display-card-title">健康保険料</h2>
-                            </div>
+                </div>
                             <p class="premium-display-amount">
                                 @if (premiumDisplayAmountValue(healthPremiumAmountDisplay()); as amount) {
                                     {{ amount | number }}<span class="premium-display-unit">円</span>
                                 } @else if (premiumDisplayShowsZero(healthPremiumAmountDisplay())) {
                                     0<span class="premium-display-unit">円</span>
-                                } @else {
+                } @else {
                                     —<span class="premium-display-unit">円</span>
                                 }
                             </p>
@@ -1310,6 +1234,12 @@
                                 <p class="premium-detail-note">{{ effective.description }}</p>
                             }
                             <dl class="premium-detail-dl">
+                                @if (effective.determinationType === 'revision' && premiumRevisionApplyFromLabel(); as applyFromLabel) {
+                                    <div class="premium-detail-row">
+                                        <dt>改定年月</dt>
+                                        <dd>{{ applyFromLabel }}</dd>
+                                    </div>
+                                }
                                 <div class="premium-detail-row">
                                     <dt>算定対象月</dt>
                                     <dd>{{ premiumEffectiveCalculationMonthsLabel() }}</dd>
@@ -1354,147 +1284,147 @@
                         <h2 class="section-title">負担額の内訳</h2>
                         <div class="premium-total-table-wrap">
                             <table class="premium-total-table">
-                                <thead>
-                                    <tr>
+                        <thead>
+                            <tr>
                                         <th>区分</th>
                                         <th class="num">本人負担</th>
                                         <th class="num">会社負担</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
+                            </tr>
+                        </thead>
+                        <tbody>
                                     <tr class="premium-total-group">
                                         <th colspan="3">健康保険料</th>
                                     </tr>
                                     <tr class="premium-total-sub">
                                         <td>月次報酬</td>
-                                        <td class="num">
-                                            @if (healthInsurancePremium(); as premium) {
-                                                {{ premium | number }}円
-                                            } @else {
-                                                —
-                                            }
-                                        </td>
-                                        <td class="num">
-                                            @if (healthInsuranceEmployerPremium(); as premium) {
-                                                {{ premium | number }}円
-                                            } @else {
-                                                —
-                                            }
-                                        </td>
-                                    </tr>
+                                <td class="num">
+                                    @if (healthInsurancePremium(); as premium) {
+                                        {{ premium | number }}円
+                                    } @else {
+                                        —
+                                    }
+                                </td>
+                                <td class="num">
+                                    @if (healthInsuranceEmployerPremium(); as premium) {
+                                        {{ premium | number }}円
+                                    } @else {
+                                        —
+                                    }
+                                </td>
+                            </tr>
                                     <tr class="premium-total-sub">
                                         <td>賞与</td>
-                                        <td class="num">
+                                <td class="num">
                                             @if (bonusHealthInsurancePremium(); as premium) {
-                                                {{ premium | number }}円
-                                            } @else {
-                                                —
-                                            }
-                                        </td>
-                                        <td class="num">
+                                        {{ premium | number }}円
+                                    } @else {
+                                        —
+                                    }
+                                </td>
+                                <td class="num">
                                             @if (bonusHealthInsuranceEmployerPremium(); as premium) {
-                                                {{ premium | number }}円
-                                            } @else {
-                                                —
-                                            }
-                                        </td>
-                                    </tr>
+                                        {{ premium | number }}円
+                                    } @else {
+                                        —
+                                    }
+                                </td>
+                            </tr>
                                     <tr class="premium-total-group">
                                         <th colspan="3">厚生年金保険料</th>
                                     </tr>
                                     <tr class="premium-total-sub">
                                         <td>月次報酬</td>
-                                        <td class="num">
+                                <td class="num">
                                             @if (pensionInsurancePremium(); as premium) {
-                                                {{ premium | number }}円
-                                            } @else {
-                                                —
-                                            }
-                                        </td>
-                                        <td class="num">
+                                        {{ premium | number }}円
+                                    } @else {
+                                        —
+                                    }
+                                </td>
+                                <td class="num">
                                             @if (pensionInsuranceEmployerPremium(); as premium) {
-                                                {{ premium | number }}円
-                                            } @else {
-                                                —
-                                            }
-                                        </td>
-                                    </tr>
+                                        {{ premium | number }}円
+                                    } @else {
+                                        —
+                                    }
+                                </td>
+                            </tr>
                                     <tr class="premium-total-sub">
                                         <td>賞与</td>
-                                        <td class="num">
+                                            <td class="num">
                                             @if (bonusPensionInsurancePremium(); as premium) {
-                                                {{ premium | number }}円
-                                            } @else {
-                                                —
-                                            }
-                                        </td>
-                                        <td class="num">
+                                                    {{ premium | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </td>
+                                            <td class="num">
                                             @if (bonusPensionInsuranceEmployerPremium(); as premium) {
-                                                {{ premium | number }}円
-                                            } @else {
-                                                —
-                                            }
-                                        </td>
-                                    </tr>
+                                                    {{ premium | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </td>
+                                        </tr>
                                     <tr class="premium-total-group">
                                         <th colspan="3">介護保険料</th>
                                     </tr>
                                     <tr class="premium-total-sub">
                                         <td>月次報酬</td>
-                                        <td class="num">
+                                            <td class="num">
                                             @if (careInsurancePremium(); as premium) {
-                                                {{ premium | number }}円
-                                            } @else {
-                                                —
-                                            }
-                                        </td>
-                                        <td class="num">
+                                                    {{ premium | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </td>
+                                            <td class="num">
                                             @if (careInsuranceEmployerPremium(); as premium) {
-                                                {{ premium | number }}円
-                                            } @else {
-                                                —
-                                            }
-                                        </td>
-                                    </tr>
+                                                    {{ premium | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </td>
+                                        </tr>
                                     <tr class="premium-total-sub">
                                         <td>賞与</td>
-                                        <td class="num">
+                                            <td class="num">
                                             @if (bonusCareInsurancePremium(); as premium) {
-                                                {{ premium | number }}円
-                                            } @else {
-                                                —
-                                            }
-                                        </td>
-                                        <td class="num">
+                                                    {{ premium | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </td>
+                                            <td class="num">
                                             @if (bonusCareInsuranceEmployerPremium(); as premium) {
-                                                {{ premium | number }}円
-                                            } @else {
-                                                —
-                                            }
-                                        </td>
-                                    </tr>
-                                </tbody>
-                                <tfoot>
-                                    <tr>
+                                                    {{ premium | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
                                         <th>合計</th>
-                                        <th class="num">
+                                            <th class="num">
                                             @if (socialInsuranceTotalPremium() !== null) {
                                                 {{ socialInsuranceTotalPremium() | number }}円
-                                            } @else {
-                                                —
-                                            }
-                                        </th>
-                                        <th class="num">
+                                                } @else {
+                                                    —
+                                                }
+                                            </th>
+                                            <th class="num">
                                             @if (totalEmployerPremium() !== null) {
                                                 {{ totalEmployerPremium() | number }}円
-                                            } @else {
-                                                —
-                                            }
-                                        </th>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
+                                                } @else {
+                                                    —
+                                                }
+                                            </th>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
                     </section>
 
                     @if (employee(); as emp) {
@@ -1506,8 +1436,8 @@
                         </p>
                     }
                 }
-            </div>
-        }
+                        </div>
+                    }
     }
 
     @if (showManualRatesUnsetModal()) {
@@ -1580,8 +1510,8 @@
                                 <span class="manual-rate-suffix">%</span>
                             </span>
                         </label>
-                    }
-                </div>
+                }
+            </div>
 
                 @if (manualRateErrorMessage()) {
                     <p class="manual-rate-modal-feedback error">{{ manualRateErrorMessage() }}</p>
@@ -1599,9 +1529,28 @@
                     >
                         {{ isSavingManualRates() ? '保存中…' : '保存' }}
                     </button>
-                </div>
+            </div>
             </div>
         </div>
+    }
+
+    @if (showSalaryConditionModal()) {
+        <app-salary-condition-modal
+            [title]="salaryConditionEditingMonth() ? '給与条件を編集' : '給与条件を変更'"
+            [initialValue]="salaryConditionModalInitial()"
+            [minEffectiveStartMonth]="salaryConditionMinEffectiveMonth()"
+            [isLoading]="isSavingSalaryCondition()"
+            [serverErrorMessage]="salaryConditionSaveError()"
+            (close)="closeSalaryConditionModal()"
+            (submit)="saveSalaryCondition($event)"
+        />
+    }
+
+    @if (showSalaryConditionHistoryModal()) {
+        <app-salary-condition-history-modal
+            [periods]="salaryConditionPeriods()"
+            (close)="closeSalaryConditionHistoryModal()"
+        />
     }
 </div>
 
@@ -1750,106 +1699,6 @@
         margin-bottom: 0;
     }
 
-    .procedure-nudge {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 10px 12px;
-        border: 1px solid #e5e7eb;
-        border-radius: 10px;
-        background: #fff;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-    }
-
-    .procedure-nudge-icon {
-        flex-shrink: 0;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 32px;
-        height: 32px;
-        border-radius: 9px;
-        font-size: 13px;
-        font-weight: 800;
-        color: #fff;
-    }
-
-    .procedure-nudge-icon.tone-amber { background: #d97706; }
-    .procedure-nudge-icon.tone-orange { background: #ea580c; }
-    .procedure-nudge-icon.tone-green { background: #059669; }
-    .procedure-nudge-icon.tone-blue { background: #2563eb; }
-
-    .procedure-nudge-body {
-        display: flex;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 6px 8px;
-        min-width: 0;
-        flex: 1;
-    }
-
-    .procedure-nudge-label {
-        font-size: 13px;
-        font-weight: 700;
-        color: #111827;
-    }
-
-    .procedure-nudge-meta {
-        font-size: 12px;
-        color: #6b7280;
-    }
-
-    .procedure-nudge-hint {
-        font-size: 11px;
-        font-weight: 600;
-        color: #b45309;
-    }
-
-    .procedure-nudge-badge {
-        display: inline-flex;
-        align-items: center;
-        padding: 2px 7px;
-        border-radius: 999px;
-        font-size: 11px;
-        font-weight: 700;
-    }
-
-    .procedure-nudge-badge.not-started {
-        background: #f3f4f6;
-        color: #4b5563;
-    }
-
-    .procedure-nudge-badge.completed {
-        background: #dcfce7;
-        color: #166534;
-    }
-
-    .procedure-nudge-btn {
-        flex-shrink: 0;
-        height: 30px;
-        padding: 0 12px;
-        border: 1px solid #d1d5db;
-        border-radius: 7px;
-        background: #fff;
-        color: #374151;
-        font-size: 12px;
-        font-weight: 600;
-        cursor: pointer;
-        white-space: nowrap;
-        transition: border-color 0.15s, color 0.15s, background 0.15s;
-    }
-
-    .procedure-nudge-btn:hover:not(:disabled) {
-        border-color: #93c5fd;
-        color: #2563eb;
-        background: #f8fafc;
-    }
-
-    .procedure-nudge-btn:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-    }
-
     .month-toolbar {
         display: flex;
         align-items: center;
@@ -1910,7 +1759,15 @@
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        gap: 10px 16px;
+        gap: 10px 12px;
+    }
+
+    .month-picker-row {
+        display: inline-flex;
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: 10px 12px;
+        min-width: 0;
     }
 
     .month-label {
@@ -1929,6 +1786,19 @@
         font-size: 16px;
         font-weight: 600;
         color: #111827;
+    }
+
+    .pay-period-meta {
+        flex-basis: 100%;
+        margin: 0;
+        font-size: 13px;
+        color: #64748b;
+        white-space: nowrap;
+    }
+
+    .pay-period-meta strong {
+        color: #334155;
+        font-weight: 600;
     }
 
     .month-loading {
@@ -2769,8 +2639,43 @@
         color: #64748b;
     }
 
-    .reward-summary-meta {
-        margin-bottom: 12px;
+    .reward-monthly-total-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px solid #e2e8f0;
+        font-size: 13px;
+        color: #334155;
+        text-align: left;
+    }
+
+    .reward-meta-item {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 8px;
+        align-items: baseline;
+    }
+
+    .reward-meta-item.muted {
+        color: #64748b;
+    }
+
+    .reward-meta-label {
+        flex-shrink: 0;
+        font-weight: 600;
+        color: #64748b;
+    }
+
+    .reward-standard-amounts {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .reward-standard-amount-line {
+        padding-left: 0;
     }
 
     .reward-summary-panel .confirm-month-panel {
@@ -3219,8 +3124,14 @@
         border-radius: 10px;
     }
 
-    .fixed-wage-readonly {
-        margin-bottom: 14px;
+    .reward-wage-sections {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .wage-expanded-header {
+        margin-bottom: 12px;
     }
 
     .join-month-fixed-wage-note {
@@ -3241,51 +3152,6 @@
         font-size: 12px;
         color: #6b7280;
         line-height: 1.4;
-    }
-
-    .variable-wage-section {
-        padding: 0;
-        background: #fafafa;
-        border: 1px dashed #d1d5db;
-        border-radius: 10px;
-        overflow: hidden;
-    }
-
-    .variable-wage-toggle {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        width: 100%;
-        padding: 14px;
-        border: none;
-        background: transparent;
-        text-align: left;
-        cursor: pointer;
-    }
-
-    .variable-wage-toggle:hover {
-        background: #f3f4f6;
-    }
-
-    .variable-wage-toggle-label {
-        font-size: 14px;
-        font-weight: 700;
-        color: #4b5563;
-    }
-
-    .variable-wage-toggle-hint {
-        font-size: 12px;
-        color: #9ca3af;
-    }
-
-    .variable-wage-toggle-icon {
-        margin-left: auto;
-        font-size: 11px;
-        color: #6b7280;
-    }
-
-    .variable-wage-fields {
-        padding: 0 14px 14px;
     }
 
     .wage-section-header {
@@ -3702,15 +3568,6 @@
     .status-line.muted,
     .premium-note.muted {
         color: #6b7280;
-    }
-
-    .status-line.revision-result {
-        margin-top: 6px;
-        padding: 8px 10px;
-        border-radius: 6px;
-        background: rgba(255, 255, 255, 0.8);
-        border: 1px solid #e5e7eb;
-        color: #1f2937;
     }
 
     .month-status-action {

@@ -22,8 +22,9 @@ import { SocialInsuranceStatusService } from '../../social-insurance/services/so
 import { InsurancePremiumCalculationService, CalculatedInsurancePremium } from '../services/insurance-premium-calculation.service';
 import { ManualInsurancePremiumRateService } from '../services/manual-insurance-premium-rate.service';
 import { ManualInsurancePremiumRates } from '../models/manual-insurance-premium-rate.model';
-import { resolvePremiumLiabilityYearMonth } from '../../company/utils/company-payroll-settings.util';
-import { addMonthsToYearMonth, isRewardTargetMonth } from '../utils/reward-target-month.util';
+import { resolvePremiumLiabilityYearMonth, resolvePremiumStandardDeterminationYearMonth } from '../../company/utils/company-payroll-settings.util';
+import { addMonthsToYearMonth, isPremiumViewableYearMonth } from '../utils/reward-target-month.util';
+import { lookupRewardByPayMonth, findLatestConfirmedPayYearMonth } from '../utils/reward-pay-month.util';
 import { isRewardConfirmed } from '../utils/reward-status.util';
 import { exportInsurancePremiumCsv } from '../utils/insurance-premium-csv-export.util';
 
@@ -69,10 +70,20 @@ export class InsurancePremiumPageComponent {
     socialInsuranceByEmployeeId = signal<Record<string, SocialInsuranceStatus | null>>({});
     manualRatesByEmployeeId = signal<Record<string, ManualInsurancePremiumRates>>({});
     insurancePremiumCollectionTiming = signal<InsurancePremiumCollectionTiming>('next_month');
+    payrollPaymentMonthOffset = signal<0 | 1>(1);
 
     targetYearMonth = signal(this.currentYearMonth());
 
     targetYearMonthLabel = computed(() => this.formatYearMonth(this.targetYearMonth()));
+
+    /** 保険料算出に必要な報酬の支給年月（翌月徴収時は控除月の前月） */
+    rewardInputYearMonthForPremiumBasis = computed((): string => {
+        const displayYearMonth = this.targetYearMonth();
+        return resolvePremiumLiabilityYearMonth(
+            displayYearMonth,
+            this.insurancePremiumCollectionTiming(),
+        ) ?? displayYearMonth;
+    });
 
     registeredRows = computed(() =>
         this.buildRows().filter((row) => row.isTargetMonth && row.isRegistered),
@@ -138,6 +149,7 @@ export class InsurancePremiumPageComponent {
             this.insurancePremiumCollectionTiming.set(
                 company?.insurancePremiumCollectionTiming ?? 'next_month',
             );
+            this.payrollPaymentMonthOffset.set(company?.payrollPaymentMonthOffset ?? 1);
 
             const officeMap: Record<string, Office> = {};
             const nameMap: Record<string, string> = {};
@@ -223,17 +235,27 @@ export class InsurancePremiumPageComponent {
         const payYearMonth = this.targetYearMonth();
         const collectionTiming = this.insurancePremiumCollectionTiming();
         const manualRatesByEmployee = this.manualRatesByEmployeeId();
+        const offset = this.payrollPaymentMonthOffset();
         return this.employees().map((employee) => {
             const employeeRewards = byEmployee[employee.id] ?? {};
-            const reward = employeeRewards[payYearMonth] ?? null;
-            const isTargetMonth = isRewardTargetMonth(employee, payYearMonth);
+            const liabilityYearMonth = resolvePremiumLiabilityYearMonth(payYearMonth, collectionTiming) ?? payYearMonth;
+            const reward = lookupRewardByPayMonth(employeeRewards, liabilityYearMonth, offset);
+            const latestConfirmedWorkYearMonth = findLatestConfirmedPayYearMonth(employeeRewards, offset);
+            const isTargetMonth = isPremiumViewableYearMonth(
+                employee,
+                payYearMonth,
+                this.currentYearMonth(),
+                collectionTiming,
+                latestConfirmedWorkYearMonth,
+            );
             const socialInsurance = socialInsuranceByEmployee[employee.id] ?? null;
             const effective = this.determinationService.resolve(
                 employee,
                 employeeRewards,
-                payYearMonth,
+                resolvePremiumStandardDeterminationYearMonth(liabilityYearMonth, collectionTiming),
                 socialInsurance?.healthInsuranceStartDate ?? null,
                 bonusesByEmployee[employee.id] ?? [],
+                offset,
             );
             const calculatedPremium = isTargetMonth
                 ? this.premiumCalculationService.calculateForPayMonth({

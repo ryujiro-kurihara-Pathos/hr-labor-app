@@ -22,24 +22,33 @@ import {
 } from '../utils/procedure-due-date.util';
 import { StandardMonthlyRewardService } from '../../insurance/services/standard-monthly-reward.service';
 import {
-    getAprJunYearMonths,
     getFirstRegularDeterminationYearMonth,
     getPaymentBaseDays,
     getQualificationDate,
     getRegularBaseMonths,
     getRegularCalculationMonths,
     getRegularDecisionProcedureBaseYear,
+    getRegularDeterminationPaymentMonths,
+    getRegularDeterminationRewardMonths,
 } from '../../insurance/utils/standard-remuneration-determination.util';
 import { StandardMonthlyRewardCalculatorService } from '../../insurance/services/standard-monthly-reward-calculator.service';
 import { StandardRemunerationDeterminationService } from '../../insurance/services/standard-remuneration-determination.service';
 import { RouterLink } from '@angular/router';
 import { addMonthsToYearMonth, yearMonthFromDateString } from '../../insurance/utils/reward-target-month.util';
+import {
+    formatPayYearMonthLabelFromWorkMonth,
+    resolvePayMonthFromWorkMonth,
+    resolvePayMonthQueryFromWorkMonth,
+} from '../../insurance/utils/reward-pay-month.util';
 import { effectiveMonthlyRewardTotal } from '../../insurance/utils/effective-monthly-reward.util';
 import {
     evaluateRevisionAtOrigin,
     pickWinningDeterminationCandidate,
 } from '../../insurance/utils/determination-precedence.util';
-import { calculateRevisionAverageMonthlyReward } from '../../insurance/utils/revision-determination.util';
+import {
+    calculateRevisionAverageMonthlyReward,
+    formatRevisionApplyFromPayMonthLabel,
+} from '../../insurance/utils/revision-determination.util';
 import {
     FIXED_WAGE_FIELD_LABELS,
     FixedWageFieldKey,
@@ -194,7 +203,11 @@ export class EmployeeProcedureSheetComponent {
             if (revised === null || !targetYearMonth) return {};
 
             const calculation = this.calculator.calculate(revised);
-            const fixedWageChangeMonth = addMonthsToYearMonth(targetYearMonth, -3);
+            const offset = this.company().payrollPaymentMonthOffset ?? 1;
+            const fixedWageChangeMonth = resolvePayMonthFromWorkMonth(
+                addMonthsToYearMonth(targetYearMonth, -3),
+                offset,
+            );
 
             return {
                 revision: {
@@ -203,7 +216,7 @@ export class EmployeeProcedureSheetComponent {
                     previousStandardAmount: previous ?? 0,
                     revisedStandardAmount:
                         calculation.health?.standardMonthlyAmount ?? revised,
-                    effectiveFrom: targetYearMonth,
+                    effectiveFrom: resolvePayMonthFromWorkMonth(targetYearMonth, offset),
                     months: [],
                 },
             };
@@ -331,10 +344,32 @@ export class EmployeeProcedureSheetComponent {
         return `${y}年${m}月`;
     }
 
+    /** 月額変更届：改定年月（支給月表示） */
+    revisionApplyFromLabel(): string {
+        const applyFromWorkMonth = this.procedure().targetYearMonth;
+        if (!applyFromWorkMonth) return '—';
+        return formatRevisionApplyFromPayMonthLabel(
+            applyFromWorkMonth,
+            this.company().payrollPaymentMonthOffset ?? 1,
+        );
+    }
+
     /** リンク表示用（例: 2026-04 → 4月） */
     monthLabel(yearMonth: string): string {
         const month = Number(yearMonth.slice(5, 7));
         return `${month}月`;
+    }
+
+    /** 未入力報酬リンク：勤務月キー → 支給年月ラベル */
+    rewardInputPayMonthLabel(workYearMonth: string): string {
+        const offset = this.company().payrollPaymentMonthOffset ?? 1;
+        return formatPayYearMonthLabelFromWorkMonth(workYearMonth, offset);
+    }
+
+    /** 未入力報酬リンク：勤務月キー → 支給年月 query param */
+    rewardInputPayMonthQuery(workYearMonth: string): { ym: string } {
+        const offset = this.company().payrollPaymentMonthOffset ?? 1;
+        return { ym: resolvePayMonthQueryFromWorkMonth(workYearMonth, offset) };
     }
 
     formatDays(value: number | null | undefined): string {
@@ -406,6 +441,7 @@ export class EmployeeProcedureSheetComponent {
                 rewardsByYearMonth,
                 (monthlyReward) => this.calculator.calculate(monthlyReward),
                 bonuses,
+                this.company().payrollPaymentMonthOffset ?? 1,
             );
 
             const originReward = rewardsByYearMonth[originMonth] ?? null;
@@ -539,43 +575,41 @@ export class EmployeeProcedureSheetComponent {
 
 
             const baseYear = getRegularDecisionProcedureBaseYear(targetYearMonth);
-
-            const baseMonths = getRegularBaseMonths(employee, baseYear, qualificationDate);
-
-            const calculationMonths = getRegularCalculationMonths(employee, baseYear, qualificationDate);
-
+            const payrollPaymentMonthOffset = this.company().payrollPaymentMonthOffset ?? 1;
+            const baseMonths = getRegularBaseMonths(
+                employee,
+                baseYear,
+                qualificationDate,
+                payrollPaymentMonthOffset,
+            );
+            const calculationMonths = getRegularCalculationMonths(
+                employee,
+                baseYear,
+                qualificationDate,
+                payrollPaymentMonthOffset,
+            );
+            const paymentMonths = getRegularDeterminationPaymentMonths(baseYear);
+            const rewardMonths = getRegularDeterminationRewardMonths(
+                baseYear,
+                payrollPaymentMonthOffset,
+            );
             const baseMonthSet = new Set(baseMonths);
 
-
-
             const missingMonths = baseMonths.filter((ym) => !rewardsByYearMonth[ym]);
-
             this.missingMonthlyRewardMonths.set(missingMonths);
 
-
-
             this.regularDecisionMonths.set(
-
-                getAprJunYearMonths(baseYear).map((yearMonth) =>
-
+                paymentMonths.map((paymentYm, index) =>
                     this.buildMonthBreakdown(
-
-                        yearMonth,
-
+                        paymentYm,
+                        rewardMonths[index]!,
                         employee,
-
                         qualificationDate,
-
-                        rewardsByYearMonth[yearMonth] ?? null,
-
+                        rewardsByYearMonth[rewardMonths[index]!] ?? null,
                         bonuses,
-
-                        baseMonthSet.has(yearMonth),
-
+                        baseMonthSet.has(rewardMonths[index]!),
                     ),
-
                 ),
-
             );
 
 
@@ -602,6 +636,8 @@ export class EmployeeProcedureSheetComponent {
 
                 bonuses,
 
+                payrollPaymentMonthOffset,
+
             );
 
             this.previousRevisionMonth.set(previousWinner?.effectiveFrom ?? null);
@@ -619,6 +655,8 @@ export class EmployeeProcedureSheetComponent {
                 healthInsuranceStartDate,
 
                 bonuses,
+
+                payrollPaymentMonthOffset,
 
             );
 
@@ -708,7 +746,9 @@ export class EmployeeProcedureSheetComponent {
 
     private buildMonthBreakdown(
 
-        yearMonth: string,
+        displayYearMonth: string,
+
+        rewardYearMonth: string,
 
         employee: Employee,
 
@@ -726,7 +766,7 @@ export class EmployeeProcedureSheetComponent {
 
             return {
 
-                yearMonth,
+                yearMonth: displayYearMonth,
 
                 paymentBaseDays: null,
 
@@ -744,7 +784,7 @@ export class EmployeeProcedureSheetComponent {
 
         const paymentBaseDays = getPaymentBaseDays(
 
-            yearMonth,
+            rewardYearMonth,
 
             qualificationDate,
 
@@ -758,7 +798,7 @@ export class EmployeeProcedureSheetComponent {
 
             return {
 
-                yearMonth,
+                yearMonth: displayYearMonth,
 
                 paymentBaseDays,
 
@@ -774,13 +814,13 @@ export class EmployeeProcedureSheetComponent {
 
 
 
-        const totalAmount = effectiveMonthlyRewardTotal(reward, yearMonth, bonuses);
+        const totalAmount = effectiveMonthlyRewardTotal(reward, rewardYearMonth, bonuses);
 
 
 
         return {
 
-            yearMonth,
+            yearMonth: displayYearMonth,
 
             paymentBaseDays,
 

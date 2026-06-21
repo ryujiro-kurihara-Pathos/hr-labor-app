@@ -1,0 +1,198 @@
+<div class="modal-backdrop" (click)="onBackdropClick($event)">
+    <div class="modal-card" role="dialog" aria-labelledby="salary-condition-modal-title">
+        <h1 id="salary-condition-modal-title">{{ title() }}</h1>
+
+        <div class="form-field">
+            <label for="effective-start-month">適用開始月</label>
+            <input
+                id="effective-start-month"
+                type="month"
+                name="effectiveStartMonth"
+                [(ngModel)]="form.effectiveStartMonth"
+                [attr.min]="minEffectiveStartMonth() ?? undefined"
+            />
+        </div>
+
+        <div class="form-grid">
+            <div class="form-field">
+                <label for="basic-salary">基本給</label>
+                <input id="basic-salary" type="number" min="0" step="1" [(ngModel)]="form.basicSalary" />
+            </div>
+            <div class="form-field">
+                <label for="commuting-allowance">通勤手当</label>
+                <input id="commuting-allowance" type="number" min="0" step="1" [(ngModel)]="form.commutingAllowance" />
+            </div>
+            <div class="form-field">
+                <label for="position-allowance">役職手当</label>
+                <input id="position-allowance" type="number" min="0" step="1" [(ngModel)]="form.positionAllowance" />
+            </div>
+            <div class="form-field">
+                <label for="housing-allowance">住宅手当</label>
+                <input id="housing-allowance" type="number" min="0" step="1" [(ngModel)]="form.housingAllowance" />
+            </div>
+            <div class="form-field">
+                <label for="fixed-overtime-pay">見込み残業代</label>
+                <input id="fixed-overtime-pay" type="number" min="0" step="1" [(ngModel)]="form.fixedOvertimePay" />
+            </div>
+            <div class="form-field">
+                <label for="other-fixed-allowance">その他固定手当</label>
+                <input id="other-fixed-allowance" type="number" min="0" step="1" [(ngModel)]="form.otherFixedAllowance" />
+            </div>
+        </div>
+
+        <div class="fixed-total-row">
+            <span class="fixed-total-label">固定的賃金合計</span>
+            <strong class="fixed-total-value">{{ fixedWageTotal() | number }}円</strong>
+        </div>
+
+        <div class="form-field">
+            <label for="change-reason">変更理由</label>
+            <input id="change-reason" type="text" [(ngModel)]="form.changeReason" placeholder="例：昇給" />
+        </div>
+
+        <div class="form-field">
+            <label for="note">備考</label>
+            <textarea id="note" rows="2" [(ngModel)]="form.note"></textarea>
+        </div>
+
+        @if (displayErrorMessage()) {
+            <p class="error-message" role="alert">{{ displayErrorMessage() }}</p>
+        }
+
+        <div class="button-area">
+            <button type="button" class="form-btn sub-button" (click)="onCancel()" [disabled]="isLoading()">
+                キャンセル
+            </button>
+            <button type="button" class="form-btn" (click)="onSubmit()" [disabled]="isLoading()">
+                @if (isLoading()) {
+                    保存中...
+                } @else {
+                    保存する
+                }
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 16px;
+        background: rgba(0, 0, 0, 0.45);
+    }
+
+    .modal-card {
+        width: 100%;
+        max-width: 640px;
+        max-height: calc(100vh - 32px);
+        overflow: auto;
+        padding: 28px 32px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    }
+
+    h1 {
+        margin: 0 0 20px;
+        font-size: 22px;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px 16px;
+    }
+
+    .form-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 12px;
+    }
+
+    label {
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    input,
+    textarea {
+        padding: 10px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 14px;
+        font-family: inherit;
+    }
+
+    input[type='number'],
+    input[type='month'] {
+        height: 40px;
+    }
+
+    .fixed-total-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 4px 0 16px;
+        padding: 12px 14px;
+        border-radius: 10px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+    }
+
+    .fixed-total-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #64748b;
+    }
+
+    .fixed-total-value {
+        font-size: 18px;
+        color: #0f172a;
+    }
+
+    .error-message {
+        margin: 0 0 12px;
+        color: #dc2626;
+        font-size: 14px;
+    }
+
+    .button-area {
+        display: flex;
+        gap: 12px;
+        margin-top: 8px;
+    }
+
+    .form-btn {
+        flex: 1;
+        height: 42px;
+        border: none;
+        border-radius: 8px;
+        background-color: #2563eb;
+        color: #fff;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .form-btn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    .sub-button {
+        background-color: #e5e7eb;
+        color: #333;
+    }
+
+    @media (max-width: 640px) {
+        .form-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>

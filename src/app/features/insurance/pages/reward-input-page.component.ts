@@ -8,6 +8,7 @@ import { EmployeeService } from '../../employee/services/employee.service';
 import { AuthService } from '../../auth/services/auth.service';
 import { UserService } from '../../users/services/user.service';
 import { OfficeService } from '../../company/services/office.service';
+import { CompanyService } from '../../company/services/company.service';
 import { SocialInsuranceStatus } from '../../social-insurance/models/social-insurance-status.model';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 import { EffectiveStandardRemuneration } from '../models/standard-remuneration-determination.model';
@@ -16,8 +17,12 @@ import { BonusRewardService } from '../../bonus/services/bonus-reward.service';
 import { StandardMonthlyRewardService } from '../services/standard-monthly-reward.service';
 import { StandardRemunerationDeterminationService } from '../services/standard-remuneration-determination.service';
 import { SocialInsuranceStatusService } from '../../social-insurance/services/social-insurance-status.service';
-import { addMonthsToYearMonth, isRewardTargetMonth } from '../utils/reward-target-month.util';
+import { addMonthsToYearMonth } from '../utils/reward-target-month.util';
 import { isRewardConfirmed } from '../utils/reward-status.util';
+import {
+    isSalaryPayMonthTarget,
+    lookupRewardByPayMonth,
+} from '../utils/reward-pay-month.util';
 
 export type RewardInputListRow = {
     employee: Employee;
@@ -36,6 +41,7 @@ export type RewardInputListRow = {
 export class RewardInputPageComponent {
     private readonly employeeService = inject(EmployeeService);
     private readonly officeService = inject(OfficeService);
+    private readonly companyService = inject(CompanyService);
     private readonly authService = inject(AuthService);
     private readonly userService = inject(UserService);
     private readonly rewardService = inject(StandardMonthlyRewardService);
@@ -51,7 +57,9 @@ export class RewardInputPageComponent {
     rewardsByEmployeeId = signal<Record<string, Record<string, StandardMonthlyReward>>>({});
     bonusesByEmployeeId = signal<Record<string, BonusReward[]>>({});
     socialInsuranceByEmployeeId = signal<Record<string, SocialInsuranceStatus | null>>({});
+    payrollPaymentMonthOffset = signal<0 | 1>(1);
 
+    /** 支給年月 */
     targetYearMonth = signal(this.currentYearMonth());
 
     targetYearMonthLabel = computed(() => this.formatYearMonth(this.targetYearMonth()));
@@ -107,11 +115,13 @@ export class RewardInputPageComponent {
             const appUser = await this.userService.getUserByUid(authUser.uid);
             if (!appUser) return;
 
-            const [employees, offices] = await Promise.all([
+            const [employees, offices, company] = await Promise.all([
                 this.employeeService.getEmployeesByCompanyId(appUser.companyId),
                 this.officeService.getOfficesByCompanyId(appUser.companyId),
+                this.companyService.getCompanyById(appUser.companyId),
             ]);
             this.employees.set(employees);
+            this.payrollPaymentMonthOffset.set(company?.payrollPaymentMonthOffset ?? 1);
 
             const nameMap: Record<string, string> = {};
             for (const office of offices) {
@@ -178,10 +188,11 @@ export class RewardInputPageComponent {
         const bonusesByEmployee = this.bonusesByEmployeeId();
         const socialInsuranceByEmployee = this.socialInsuranceByEmployeeId();
         const payYearMonth = this.targetYearMonth();
+        const offset = this.payrollPaymentMonthOffset();
         return this.employees().map((employee) => {
             const employeeRewards = byEmployee[employee.id] ?? {};
-            const reward = employeeRewards[payYearMonth] ?? null;
-            const isTargetMonth = isRewardTargetMonth(employee, payYearMonth);
+            const reward = lookupRewardByPayMonth(employeeRewards, payYearMonth, offset);
+            const isTargetMonth = isSalaryPayMonthTarget(employee, payYearMonth, offset);
             const socialInsurance = socialInsuranceByEmployee[employee.id] ?? null;
             const effective = this.determinationService.resolve(
                 employee,
@@ -189,6 +200,7 @@ export class RewardInputPageComponent {
                 payYearMonth,
                 socialInsurance?.healthInsuranceStartDate ?? null,
                 bonusesByEmployee[employee.id] ?? [],
+                offset,
             );
             return {
                 employee,

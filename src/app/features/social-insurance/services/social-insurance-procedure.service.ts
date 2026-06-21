@@ -52,7 +52,7 @@ import { EmployeeService } from '../../employee/services/employee.service';
 import { insuranceJoinStatus } from '../models/social-insurance-status.model';
 import { dateStringFromTimestamp } from '../utils/insurance-premium-period.util';
 import { resolveLossProcedureOccurredAndDueDate } from '../utils/procedure-due-date.util';
-import { resolveLossDate, todayDateString } from '../utils/procedure-display.util';
+import { canDeleteProcedure, resolveLossDate, todayDateString } from '../utils/procedure-display.util';
 import { SocialInsuranceStatusService } from './social-insurance-status.service';
 
 
@@ -524,13 +524,16 @@ export class SocialInsuranceProcedureService {
         return this.toProcedure(snapshot.docs[0].id, snapshot.docs[0].data() as Record<string, unknown>);
     }
 
-    /** 未提出の手続きを削除 */
+    /** 被扶養者異動届（未提出のみ）を削除 */
     async deleteProcedure(procedureId: string): Promise<void> {
         const existing = await this.getProcedureById(procedureId);
         if (!existing) {
             throw new Error('手続きが見つかりませんでした');
         }
-        if (existing.status === 'completed') {
+        if (!canDeleteProcedure(existing)) {
+            if (existing.procedureType !== 'dependentChange') {
+                throw new Error('この手続きは削除できません');
+            }
             throw new Error('提出済みの手続きは削除できません');
         }
 

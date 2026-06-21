@@ -1,6 +1,73 @@
 import { EmploymentType } from '../../employee/models/employee.models';
+import { SalaryConditionFormValue, SalaryConditionInput } from '../models/salary-condition.model';
 import { StandardMonthlyRewardInput } from '../models/standard-monthly-reward.model';
+import { fixedWageTotalFromForm } from './salary-condition.util';
 import { yearMonthFromDateString } from './reward-target-month.util';
+
+export function buildInitialSalaryConditionInput(params: {
+    companyId: string;
+    employeeId: string;
+    joinedDate: string;
+    form: SalaryConditionFormValue;
+}): SalaryConditionInput | null {
+    const effectiveStartMonth = yearMonthFromDateString(params.joinedDate);
+    if (!effectiveStartMonth) return null;
+
+    return {
+        companyId: params.companyId,
+        employeeId: params.employeeId,
+        effectiveStartMonth,
+        basicSalary: toNumber(params.form.basicSalary),
+        commutingAllowance: toNumber(params.form.commutingAllowance),
+        positionAllowance: toNumber(params.form.positionAllowance),
+        housingAllowance: toNumber(params.form.housingAllowance),
+        fixedOvertimePay: toNumber(params.form.fixedOvertimePay),
+        otherFixedAllowance: toNumber(params.form.otherFixedAllowance),
+        note: params.form.note.trim(),
+        changeReason: params.form.changeReason.trim(),
+    };
+}
+
+export function buildJoinMonthRewardFromSalaryCondition(params: {
+    companyId: string;
+    employeeId: string;
+    joinedDate: string;
+    employmentType: EmploymentType;
+    condition: SalaryConditionInput;
+}): StandardMonthlyRewardInput | null {
+    const targetYearMonth = yearMonthFromDateString(params.joinedDate);
+    if (!targetYearMonth) return null;
+
+    const fixed = {
+        basicSalary: params.condition.basicSalary,
+        commutingAllowance: params.condition.commutingAllowance,
+        positionAllowance: params.condition.positionAllowance,
+        housingAllowance: params.condition.housingAllowance,
+        fixedOvertimePay: params.condition.fixedOvertimePay,
+        otherFixedAllowance: params.condition.otherFixedAllowance,
+    };
+
+    const monthlyRewardAmount = params.employmentType === 'part-time'
+        ? fixed.basicSalary + fixed.commutingAllowance + fixed.otherFixedAllowance
+        : undefined;
+
+    return {
+        companyId: params.companyId,
+        employeeId: params.employeeId,
+        targetYearMonth,
+        ...fixed,
+        overtimePay: 0,
+        holidayPay: 0,
+        nightPay: 0,
+        commissionPay: 0,
+        otherVariablePay: 0,
+        healthInsuranceGrade: 0,
+        healthInsuranceStandardMonthlyAmount: 0,
+        pensionInsuranceGrade: 0,
+        pensionInsuranceStandardMonthlyAmount: 0,
+        ...(monthlyRewardAmount !== undefined ? { monthlyRewardAmount } : {}),
+    };
+}
 
 export function buildJoinMonthExpectedRewardInput(params: {
     companyId: string;
@@ -12,27 +79,34 @@ export function buildJoinMonthExpectedRewardInput(params: {
     const targetYearMonth = yearMonthFromDateString(params.joinedDate);
     if (!targetYearMonth || params.expectedMonthlySalary <= 0) return null;
 
-    return {
+    return buildJoinMonthRewardFromSalaryCondition({
         companyId: params.companyId,
         employeeId: params.employeeId,
-        targetYearMonth,
-        basicSalary: params.expectedMonthlySalary,
-        commutingAllowance: 0,
-        positionAllowance: 0,
-        housingAllowance: 0,
-        fixedOvertimePay: 0,
-        otherFixedAllowance: 0,
-        overtimePay: 0,
-        holidayPay: 0,
-        nightPay: 0,
-        commissionPay: 0,
-        otherVariablePay: 0,
-        healthInsuranceGrade: 0,
-        healthInsuranceStandardMonthlyAmount: 0,
-        pensionInsuranceGrade: 0,
-        pensionInsuranceStandardMonthlyAmount: 0,
-        ...(params.employmentType === 'part-time'
-            ? { monthlyRewardAmount: params.expectedMonthlySalary }
-            : {}),
-    };
+        joinedDate: params.joinedDate,
+        employmentType: params.employmentType,
+        condition: {
+            companyId: params.companyId,
+            employeeId: params.employeeId,
+            effectiveStartMonth: targetYearMonth,
+            basicSalary: params.expectedMonthlySalary,
+            commutingAllowance: 0,
+            positionAllowance: 0,
+            housingAllowance: 0,
+            fixedOvertimePay: 0,
+            otherFixedAllowance: 0,
+            note: '',
+            changeReason: '',
+        },
+    });
 }
+
+function toNumber(value: number | ''): number {
+    if (value === '') return 0;
+    return Number.isFinite(value) ? value : 0;
+}
+
+export function isSalaryConditionFormValid(form: SalaryConditionFormValue): boolean {
+    if (form.basicSalary === '') return false;
+    return fixedWageTotalFromForm(form) > 0;
+}
+

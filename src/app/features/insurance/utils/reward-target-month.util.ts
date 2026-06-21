@@ -1,5 +1,6 @@
 import { Timestamp } from 'firebase/firestore';
 
+import { InsurancePremiumCollectionTiming } from '../../company/models/company.model';
 import { Employee } from '../../employee/models/employee.models';
 import {
     resolveInsuredPeriodBounds,
@@ -114,16 +115,85 @@ export function inputableYearMonthMax(employee: Employee, referenceYearMonth: st
     return forwardLimit;
 }
 
-/** 入社月〜入力上限まで閲覧・ナビ可能 */
+/** 報酬入力の上限（後方互換の別名） */
 export function viewableYearMonthMax(employee: Employee, referenceYearMonth: string): string {
     return inputableYearMonthMax(employee, referenceYearMonth);
 }
 
-/** 月ナビの上限（viewableYearMonthMax と同じ） */
+/**
+ * 保険料閲覧の上限。
+ * 当月徴収は報酬入力と同じ。翌月徴収はさらに1か月先まで（控除月＝根拠月+1のため）。
+ * 確定済み報酬がある場合は、その翌月控除分まで閲覧可能にする。
+ */
+export function premiumViewableYearMonthMax(
+    employee: Employee,
+    referenceYearMonth: string,
+    timing: InsurancePremiumCollectionTiming,
+    latestConfirmedWorkYearMonth: string | null = null,
+): string {
+    const calendarMax = premiumViewableYearMonthMaxFromCalendar(
+        employee,
+        referenceYearMonth,
+        timing,
+    );
+    if (!latestConfirmedWorkYearMonth) return calendarMax;
+
+    const rewardMax = premiumDeductYearMonthForWorkMonth(
+        latestConfirmedWorkYearMonth,
+        timing,
+    );
+    return rewardMax > calendarMax ? rewardMax : calendarMax;
+}
+
+/** 勤務月に対応する保険料の給与控除月 */
+export function premiumDeductYearMonthForWorkMonth(
+    workYearMonth: string,
+    timing: InsurancePremiumCollectionTiming,
+): string {
+    return timing === 'next_month'
+        ? addMonthsToYearMonth(workYearMonth, 1)
+        : workYearMonth;
+}
+
+function premiumViewableYearMonthMaxFromCalendar(
+    employee: Employee,
+    referenceYearMonth: string,
+    timing: InsurancePremiumCollectionTiming,
+): string {
+    if (timing === 'same_month') {
+        return inputableYearMonthMax(employee, referenceYearMonth);
+    }
+
+    const inputMax = inputableYearMonthMax(employee, referenceYearMonth);
+    let premiumMax = addMonthsToYearMonth(inputMax, 1);
+
+    const retireYm = yearMonthFromTimestamp(employee.retiredDate);
+    if (retireYm) {
+        const retirePremiumCap = addMonthsToYearMonth(retireYm, 1);
+        if (premiumMax > retirePremiumCap) premiumMax = retirePremiumCap;
+    }
+
+    return premiumMax;
+}
+
+export type YearMonthNavigationScope = 'reward_input' | 'premium_view';
+
+/** 月ナビの上限（報酬入力 or 保険料閲覧） */
 export function navigableYearMonthMax(
     employee: Employee,
     referenceYearMonth: string = currentYearMonth(),
+    scope: YearMonthNavigationScope = 'reward_input',
+    timing: InsurancePremiumCollectionTiming = 'same_month',
+    latestConfirmedWorkYearMonth: string | null = null,
 ): string {
+    if (scope === 'premium_view') {
+        return premiumViewableYearMonthMax(
+            employee,
+            referenceYearMonth,
+            timing,
+            latestConfirmedWorkYearMonth,
+        );
+    }
     return inputableYearMonthMax(employee, referenceYearMonth);
 }
 
@@ -131,7 +201,7 @@ export function viewableYearMonthMin(employee: Employee): string | null {
     return yearMonthFromDateString(employee.joinedDate);
 }
 
-/** 入社月〜入力上限の範囲内か */
+/** 報酬入力の範囲内か */
 export function isViewableYearMonth(
     employee: Employee,
     targetYearMonth: string,
@@ -140,17 +210,80 @@ export function isViewableYearMonth(
     return isRewardTargetMonth(employee, targetYearMonth, referenceYearMonth);
 }
 
+/** 保険料閲覧の範囲内か */
+export function isPremiumViewableYearMonth(
+    employee: Employee,
+    targetYearMonth: string,
+    referenceYearMonth: string,
+    timing: InsurancePremiumCollectionTiming,
+    latestConfirmedWorkYearMonth: string | null = null,
+): boolean {
+    if (!YEAR_MONTH_PATTERN.test(targetYearMonth)) return false;
+
+    const joinYm = yearMonthFromDateString(employee.joinedDate);
+    if (joinYm && targetYearMonth < joinYm) return false;
+
+    if (
+        targetYearMonth
+        > premiumViewableYearMonthMax(
+            employee,
+            referenceYearMonth,
+            timing,
+            latestConfirmedWorkYearMonth,
+        )
+    ) {
+        return false;
+    }
+
+    return true;
+}
+
 export function clampViewableYearMonth(
     employee: Employee,
     targetYearMonth: string,
     currentYearMonth: string,
 ): string {
+    return clampNavigableYearMonth(employee, targetYearMonth, currentYearMonth, {
+        scope: 'reward_input',
+    });
+}
+
+export function clampNavigableYearMonth(
+    employee: Employee,
+    targetYearMonth: string,
+    referenceYearMonth: string,
+    options: {
+        scope: YearMonthNavigationScope;
+        timing?: InsurancePremiumCollectionTiming;
+        latestConfirmedWorkYearMonth?: string | null;
+    },
+): string {
     const minYm = viewableYearMonthMin(employee);
-    const maxYm = viewableYearMonthMax(employee, currentYearMonth);
+    const maxYm = navigableYearMonthMax(
+        employee,
+        referenceYearMonth,
+        options.scope,
+        options.timing ?? 'same_month',
+        options.latestConfirmedWorkYearMonth ?? null,
+    );
     let ym = targetYearMonth;
     if (minYm && ym < minYm) ym = minYm;
     if (ym > maxYm) ym = maxYm;
     return ym;
+}
+
+export function clampPremiumViewableYearMonth(
+    employee: Employee,
+    targetYearMonth: string,
+    referenceYearMonth: string,
+    timing: InsurancePremiumCollectionTiming,
+    latestConfirmedWorkYearMonth: string | null = null,
+): string {
+    return clampNavigableYearMonth(employee, targetYearMonth, referenceYearMonth, {
+        scope: 'premium_view',
+        timing,
+        latestConfirmedWorkYearMonth,
+    });
 }
 
 export function listViewableYearMonths(employee: Employee, currentYearMonth: string): string[] {
@@ -167,6 +300,40 @@ export function listViewableYearMonths(employee: Employee, currentYearMonth: str
     return months;
 }
 
+export function listPremiumViewableYearMonths(
+    employee: Employee,
+    referenceYearMonth: string,
+    timing: InsurancePremiumCollectionTiming,
+    latestConfirmedWorkYearMonth: string | null = null,
+): string[] {
+    const minYm = viewableYearMonthMin(employee);
+    const maxYm = premiumViewableYearMonthMax(
+        employee,
+        referenceYearMonth,
+        timing,
+        latestConfirmedWorkYearMonth,
+    );
+    if (!minYm) return [];
+
+    const months: string[] = [];
+    let ym = minYm;
+    while (ym <= maxYm) {
+        if (
+            isPremiumViewableYearMonth(
+                employee,
+                ym,
+                referenceYearMonth,
+                timing,
+                latestConfirmedWorkYearMonth,
+            )
+        ) {
+            months.push(ym);
+        }
+        ym = addMonthsToYearMonth(ym, 1);
+    }
+    return months;
+}
+
 export function viewableYearMonthReason(
     employee: Employee,
     targetYearMonth: string,
@@ -175,6 +342,43 @@ export function viewableYearMonthReason(
     if (isViewableYearMonth(employee, targetYearMonth, currentYearMonth)) return null;
 
     return rewardTargetMonthReason(employee, targetYearMonth, currentYearMonth);
+}
+
+export function premiumViewableYearMonthReason(
+    employee: Employee,
+    targetYearMonth: string,
+    referenceYearMonth: string,
+    timing: InsurancePremiumCollectionTiming,
+    latestConfirmedWorkYearMonth: string | null = null,
+): string | null {
+    if (
+        isPremiumViewableYearMonth(
+            employee,
+            targetYearMonth,
+            referenceYearMonth,
+            timing,
+            latestConfirmedWorkYearMonth,
+        )
+    ) {
+        return null;
+    }
+
+    const joinYm = yearMonthFromDateString(employee.joinedDate);
+    if (joinYm && targetYearMonth < joinYm) {
+        return `${formatYearMonthLabel(joinYm)}入社のため、この月は対象外です。`;
+    }
+
+    const maxYm = premiumViewableYearMonthMax(
+        employee,
+        referenceYearMonth,
+        timing,
+        latestConfirmedWorkYearMonth,
+    );
+    if (targetYearMonth > maxYm) {
+        return `${formatYearMonthLabel(maxYm)}まで表示できます。`;
+    }
+
+    return 'この月は保険料表示の対象外です。';
 }
 
 /** 入社月〜現在月の翌月（退職予定月があればその月まで）なら報酬登録対象 */

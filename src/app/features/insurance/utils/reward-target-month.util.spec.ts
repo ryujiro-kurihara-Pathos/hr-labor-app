@@ -6,7 +6,9 @@ import {
     inputableYearMonthMax,
     isBonusPaymentDateAllowed,
     isDateWithinEmploymentPeriod,
+    isPremiumViewableYearMonth,
     isRewardTargetMonth,
+    premiumViewableYearMonthMax,
 } from './reward-target-month.util';
 
 function employee(overrides: Partial<ReturnType<typeof createEmptyEmployeeInput>> = {}): Employee {
@@ -63,6 +65,48 @@ describe('reward-target-month.util', () => {
                 retiredDate: Timestamp.fromDate(new Date(2026, 5, 30)),
             });
             expect(inputableYearMonthMax(retired, '2026-06')).toBe('2026-06');
+        });
+    });
+
+    describe('premiumViewableYearMonthMax', () => {
+        it('matches input max for same_month collection', () => {
+            const ref = '2026-04';
+            expect(premiumViewableYearMonthMax(employee(), ref, 'same_month')).toBe('2026-05');
+        });
+
+        it('extends one month beyond input max for next_month collection', () => {
+            const ref = '2026-04';
+            expect(inputableYearMonthMax(employee(), ref)).toBe('2026-05');
+            expect(premiumViewableYearMonthMax(employee(), ref, 'next_month')).toBe('2026-06');
+        });
+
+        it('caps at retirement month + 1 for next_month collection', () => {
+            const retired = employee({
+                retiredDate: Timestamp.fromDate(new Date(2026, 4, 31)),
+            });
+            const ref = '2026-04';
+            expect(premiumViewableYearMonthMax(retired, ref, 'next_month')).toBe('2026-06');
+        });
+
+        it('extends to latest confirmed work month + 1 under next_month collection', () => {
+            const ref = '2025-07';
+            expect(premiumViewableYearMonthMax(employee(), ref, 'next_month')).toBe('2025-09');
+            expect(
+                premiumViewableYearMonthMax(employee(), ref, 'next_month', '2025-09'),
+            ).toBe('2025-10');
+        });
+    });
+
+    describe('isPremiumViewableYearMonth', () => {
+        it('allows premium-only month under next_month collection', () => {
+            const ref = '2026-04';
+            expect(isRewardTargetMonth(employee(), '2026-06', ref)).toBeFalse();
+            expect(isPremiumViewableYearMonth(employee(), '2026-06', ref, 'next_month')).toBeTrue();
+        });
+
+        it('does not allow premium-only month under same_month collection', () => {
+            const ref = '2026-04';
+            expect(isPremiumViewableYearMonth(employee(), '2026-06', ref, 'same_month')).toBeFalse();
         });
     });
 
