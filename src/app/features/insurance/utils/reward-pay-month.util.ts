@@ -103,6 +103,51 @@ export function resolvePayMonthFromWorkMonth(
     return addMonthsToYearMonth(workYearMonth, 1);
 }
 
+/** 月ナビの最小支給年月（入社月を含む） */
+export function rewardNavigationMinPayYearMonth(
+    employee: Employee,
+): string | null {
+    return yearMonthFromDateString(employee.joinedDate);
+}
+
+/** 入社月の支給年月表示か */
+export function isJoinPayMonthView(
+    employee: Employee,
+    payYearMonth: string,
+): boolean {
+    const joinYm = yearMonthFromDateString(employee.joinedDate);
+    return Boolean(joinYm && payYearMonth === joinYm);
+}
+
+/** 入社月表示時の説明（翌月払いで給与支給がない場合） */
+export function joinPayMonthDisplayNote(
+    employee: Employee,
+    payYearMonth: string,
+    payrollPaymentMonthOffset: PayrollPaymentMonthOffset,
+): string | null {
+    if (!isJoinPayMonthView(employee, payYearMonth)) return null;
+    if (payrollPaymentMonthOffset !== 1) return null;
+    if (isSalaryPayMonthTarget(employee, payYearMonth, payrollPaymentMonthOffset)) return null;
+
+    const joinYm = yearMonthFromDateString(employee.joinedDate)!;
+    const nextPayLabel = formatYearMonthLabel(addMonthsToYearMonth(joinYm, 1));
+    return `翌月払いのため、入社月（${formatYearMonthLabel(joinYm)}）の給与支給はありません。資格取得届用の報酬は見込み給与または賞与で登録できます。給与の入力は${nextPayLabel}支給分から行ってください。`;
+}
+
+export function clampRewardNavigationPayYearMonth(
+    employee: Employee,
+    payYearMonth: string,
+    referenceYearMonth: string = currentYearMonth(),
+    payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+): string {
+    const minYm = rewardNavigationMinPayYearMonth(employee);
+    const maxYm = salaryPayYearMonthMax(employee, referenceYearMonth, payrollPaymentMonthOffset);
+    let ym = payYearMonth;
+    if (minYm && ym < minYm) ym = minYm;
+    if (ym > maxYm) ym = maxYm;
+    return ym;
+}
+
 /** 給与入力の最小支給年月（翌月払いは入社月の翌月から） */
 export function salaryPayYearMonthMin(
     employee: Employee,

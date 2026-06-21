@@ -172,7 +172,9 @@
                 <span class="card-type-badge monthly">月次報酬</span>
                 <h2 class="section-title">報酬入力</h2>
 
-                @if (!isSalaryInputTargetMonth()) {
+                @if (joinPayMonthDisplayNote(); as note) {
+                    <p class="join-month-pay-note">{{ note }}</p>
+                } @else if (!isSalaryInputTargetMonth()) {
                     <p class="period-excluded-note">{{ salaryInputExcludedReason() }}</p>
                 }
 
@@ -3395,13 +3397,15 @@
     }
 
     .reward-locked-note,
-    .period-excluded-note {
+    .period-excluded-note,
+    .join-month-pay-note {
         margin: 12px 0 0;
         font-size: 13px;
         color: #6b7280;
     }
 
-    .period-excluded-note {
+    .period-excluded-note,
+    .join-month-pay-note {
         padding: 10px 12px;
         background: #f9fafb;
         border: 1px solid #e5e7eb;

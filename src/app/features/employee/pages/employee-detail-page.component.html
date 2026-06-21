@@ -27,18 +27,18 @@
                                 }
                                 <div class="profile-meta">
                                     <span class="meta-chip">社員番号 {{ employee()!.employeeNumber || '—' }}</span>
-                                    <span
-                                        class="status-badge"
+                    <span
+                        class="status-badge"
                                         [class.before-join]="isBeforeJoin(employee()!)"
                                         [class.retired]="isFullyRetired(employee()!)"
                                         [class.pending-retirement]="isPendingRetirement(employee()!)"
-                                    >
+                    >
                                         {{ employeeStatusLabel(employee()!) }}
-                                    </span>
+                    </span>
                                     @if (officeName()) {
                                         <span class="meta-chip muted">{{ officeName() }}</span>
                                     }
-                                </div>
+                </div>
                             </div>
                         </div>
                     }
@@ -58,22 +58,22 @@
                 <section class="profile-section">
                     <h2 class="section-title">基本情報</h2>
                     <div class="form-grid-two">
-                        <div class="form-field">
-                            <label for="last-name">姓</label>
-                            <input id="last-name" type="text" name="lastName" [(ngModel)]="lastName" />
-                        </div>
-                        <div class="form-field">
-                            <label for="first-name">名</label>
-                            <input id="first-name" type="text" name="firstName" [(ngModel)]="firstName" />
-                        </div>
-                        <div class="form-field">
-                            <label for="last-name-kana">姓（カナ）</label>
-                            <input id="last-name-kana" type="text" name="lastNameKana" [(ngModel)]="lastNameKana" />
-                        </div>
-                        <div class="form-field">
-                            <label for="first-name-kana">名（カナ）</label>
-                            <input id="first-name-kana" type="text" name="firstNameKana" [(ngModel)]="firstNameKana" />
-                        </div>
+                <div class="form-field">
+                    <label for="last-name">姓</label>
+                    <input id="last-name" type="text" name="lastName" [(ngModel)]="lastName" />
+                </div>
+                <div class="form-field">
+                    <label for="first-name">名</label>
+                    <input id="first-name" type="text" name="firstName" [(ngModel)]="firstName" />
+                </div>
+                <div class="form-field">
+                    <label for="last-name-kana">姓（カナ）</label>
+                    <input id="last-name-kana" type="text" name="lastNameKana" [(ngModel)]="lastNameKana" />
+                </div>
+                <div class="form-field">
+                    <label for="first-name-kana">名（カナ）</label>
+                    <input id="first-name-kana" type="text" name="firstNameKana" [(ngModel)]="firstNameKana" />
+                </div>
                         <div class="form-field">
                             <label for="gender">性別<span class="required-mark" aria-hidden="true">*</span></label>
                             <select id="gender" name="gender" [(ngModel)]="gender" required>
@@ -101,28 +101,28 @@
                             />
                             <p class="field-note">登録時に自動付与されます。変更できません。</p>
                         </div>
-                        <div class="form-field">
-                            <label for="my-number">マイナンバー</label>
-                            <input
-                                id="my-number"
-                                type="text"
-                                name="myNumber"
+                <div class="form-field">
+                    <label for="my-number">マイナンバー</label>
+                    <input
+                        id="my-number"
+                        type="text"
+                        name="myNumber"
                                 [ngModel]="myNumber"
                                 readonly
                             />
                             <p class="field-note">登録時に自動生成されます。変更できません。</p>
-                        </div>
+                </div>
                     </div>
                 </section>
 
                 <section class="profile-section">
                     <h2 class="section-title">勤務・所属</h2>
                     <div class="form-grid-two">
-                        <div class="form-field">
+                <div class="form-field">
                             <label for="joined-date">入社日</label>
                             <input id="joined-date" type="date" name="joinedDate" [(ngModel)]="joinedDate" />
-                        </div>
-                        <div class="form-field">
+                </div>
+                <div class="form-field">
                             <span class="readonly-field-label">在籍状況</span>
                             <p class="readonly-field-value">{{ editingEmploymentStatusLabel() }}</p>
                             <p class="field-note">入社日・退職日から自動で判定されます。</p>
@@ -151,13 +151,13 @@
                                 placeholder="example@company.com"
                                 autocomplete="email"
                             />
-                        </div>
-                        <div class="form-field">
-                            <label for="phone-number">電話番号</label>
-                            <input id="phone-number" type="text" name="phoneNumber" [(ngModel)]="phoneNumber" />
-                        </div>
+                </div>
+                <div class="form-field">
+                    <label for="phone-number">電話番号</label>
+                    <input id="phone-number" type="text" name="phoneNumber" [(ngModel)]="phoneNumber" />
+                </div>
                         <div class="form-field form-field-wide">
-                            <label for="postal-code">郵便番号</label>
+                    <label for="postal-code">郵便番号</label>
                             <div class="postal-code-row">
                                 <input
                                     id="postal-code"
@@ -180,24 +180,24 @@
                             @if (postalLookupError()) {
                                 <p class="field-note warn">{{ postalLookupError() }}</p>
                             }
-                        </div>
-                        <div class="form-field">
-                            <label for="prefecture">都道府県</label>
-                            <input id="prefecture" type="text" name="prefecture" [(ngModel)]="prefecture" />
-                        </div>
-                        <div class="form-field">
-                            <label for="city">市区町村</label>
-                            <input id="city" type="text" name="city" [(ngModel)]="city" />
-                        </div>
+                </div>
+                <div class="form-field">
+                    <label for="prefecture">都道府県</label>
+                    <input id="prefecture" type="text" name="prefecture" [(ngModel)]="prefecture" />
+                </div>
+                <div class="form-field">
+                    <label for="city">市区町村</label>
+                    <input id="city" type="text" name="city" [(ngModel)]="city" />
+                </div>
                         <div class="form-field form-field-wide">
-                            <label for="street-address">丁目番地</label>
-                            <input id="street-address" type="text" name="streetAddress" [(ngModel)]="streetAddress" />
-                        </div>
+                    <label for="street-address">丁目番地</label>
+                    <input id="street-address" type="text" name="streetAddress" [(ngModel)]="streetAddress" />
+                </div>
                         <div class="form-field form-field-wide">
-                            <label for="building-name">建物名・号室</label>
-                            <input id="building-name" type="text" name="buildingName" [(ngModel)]="buildingName" />
-                        </div>
-                    </div>
+                    <label for="building-name">建物名・号室</label>
+                    <input id="building-name" type="text" name="buildingName" [(ngModel)]="buildingName" />
+                </div>
+                </div>
                 </section>
             } @else {
                 <div class="summary-strip">
@@ -211,7 +211,7 @@
                         >
                             {{ displayInsuranceStatus(healthInsuranceJoinStatus()) }}
                         </span>
-                    </div>
+                </div>
                     <div class="summary-card">
                         <span class="summary-card-label">厚生年金</span>
                         <span
@@ -222,7 +222,7 @@
                         >
                             {{ displayInsuranceStatus(pensionInsuranceJoinStatus()) }}
                         </span>
-                    </div>
+                </div>
                     <div class="summary-card">
                         <span class="summary-card-label">介護保険</span>
                         <span
@@ -233,25 +233,25 @@
                         >
                             {{ displayInsuranceStatus(careInsuranceJoinStatus()) }}
                         </span>
-                    </div>
+                </div>
                     <div class="summary-card">
                         <span class="summary-card-label">被扶養者</span>
                         <span class="summary-card-value neutral">
                             {{ activeDependentCount() }}人
                             <span class="summary-card-sub">／ 計{{ dependents().length }}人</span>
                         </span>
-                    </div>
+                </div>
                     <div class="summary-card" [class.attention]="pendingProcedureCount() > 0">
                         <span class="summary-card-label">手続き</span>
                         <span class="summary-card-value" [class.attention-text]="pendingProcedureCount() > 0">
                             @if (pendingProcedureCount() > 0) {
                                 要対応 {{ pendingProcedureCount() }}件
-                            } @else {
+            } @else {
                                 対応なし
                             }
                         </span>
                     </div>
-                </div>
+                    </div>
 
                 <nav class="section-nav" aria-label="ページ内リンク">
                     <button type="button" class="section-nav-link" (click)="scrollToSection('overview')">基本情報</button>
@@ -274,7 +274,7 @@
                         <div class="info-tile">
                             <span class="info-tile-label">性別</span>
                             <span class="info-tile-value">{{ genderLabel(employee()!.gender) }}</span>
-                        </div>
+                    </div>
                         <div class="info-tile">
                             <span class="info-tile-label">生年月日</span>
                             <span class="info-tile-value">
@@ -283,15 +283,15 @@
                                     <span class="sub-text">（満{{ age() }}歳）</span>
                                 }
                             </span>
-                        </div>
+                    </div>
                         <div class="info-tile">
                             <span class="info-tile-label">入社日</span>
                             <span class="info-tile-value">{{ formatInsuranceDate(employee()!.joinedDate) }}</span>
-                        </div>
+                    </div>
                         <div class="info-tile">
                             <span class="info-tile-label">雇用区分</span>
                             <span class="info-tile-value">{{ employmentTypeLabel(employmentType) }}</span>
-                        </div>
+                    </div>
                         <div class="info-tile">
                             <span class="info-tile-label">部署 / 役職</span>
                             <span class="info-tile-value">
@@ -300,23 +300,23 @@
                                     <span class="sub-text">／ {{ employee()!.position }}</span>
                                 }
                             </span>
-                        </div>
+                    </div>
                         <div class="info-tile">
                             <span class="info-tile-label">在籍状況</span>
                             <span class="info-tile-value">{{ employeeStatusLabel(employee()!) }}</span>
-                        </div>
+                    </div>
                         <div class="info-tile">
                             <span class="info-tile-label">電話番号</span>
                             <span class="info-tile-value">{{ employee()!.phoneNumber || '—' }}</span>
-                        </div>
+                    </div>
                         <div class="info-tile">
                             <span class="info-tile-label">メール</span>
                             <span class="info-tile-value mono">{{ employee()!.email || '—' }}</span>
-                        </div>
+                    </div>
                         <div class="info-tile info-tile-wide">
                             <span class="info-tile-label">住所</span>
                             <span class="info-tile-value">{{ formatAddress(employee()!) }}</span>
-                        </div>
+                    </div>
                         <div class="info-tile">
                             <span class="info-tile-label">マイナンバー</span>
                             <span class="info-tile-value mono">{{ employee()!.myNumber || '—' }}</span>
@@ -361,24 +361,24 @@
                             <h2 class="section-title">被扶養者</h2>
                             <p class="section-card-desc">扶養家族 {{ dependents().length }}人（扶養中 {{ activeDependentCount() }}人）</p>
                         </div>
-                        @if (openDependentChangeProcedure()) {
-                            <a
-                                [routerLink]="['/procedures', openDependentChangeProcedure()!.id]"
+                            @if (openDependentChangeProcedure()) {
+                                <a
+                                    [routerLink]="['/procedures', openDependentChangeProcedure()!.id]"
                                 class="section-card-action"
-                            >
-                                扶養変更届へ
-                            </a>
-                        } @else {
+                                >
+                                    扶養変更届へ
+                                </a>
+                            } @else {
                             <button type="button" class="section-card-action" (click)="createDependentProcedure()">
                                 扶養家族を変更
-                            </button>
-                        }
+                                </button>
+                            }
                     </div>
                     @if (dependents().length > 0) {
                         <div class="dependent-list" role="list">
                             @for (dependent of sortedDependents(); track dependent.id) {
-                                <button
-                                    type="button"
+                            <button
+                                type="button"
                                     class="dependent-list-item"
                                     role="listitem"
                                     [class.selected]="selectedDependentId() === dependent.id"
@@ -412,7 +412,7 @@
                                     </span>
                                 </button>
                             }
-                        </div>
+                            </div>
 
                         @if (selectedDependent(); as dep) {
                             <article class="dependent-detail-panel">
@@ -466,7 +466,7 @@
                                         <dd>
                                             @if (dep.income !== null && dep.income !== undefined) {
                                                 {{ dep.income | number }} 円
-                                            } @else {
+                    } @else {
                                                 —
                                             }
                                         </dd>
@@ -484,7 +484,7 @@
                                 </dl>
                             </article>
                         }
-                    } @else {
+                            } @else {
                         <p class="dependent-empty-note">登録されている被扶養者はいません。</p>
                     }
                 </section>
@@ -564,17 +564,17 @@
                     <div class="judgment-conditions-box">
                         <p class="subsection-title">短時間労働者の加入要件</p>
                         <p class="judgment-sub-note">4分の3基準を満たさない場合に参照します</p>
-                        <div class="form-field checkbox-field">
-                            <label>
-                                <input type="checkbox" name="isStudent" [(ngModel)]="isStudent" />
-                                学生
-                            </label>
-                        </div>
-                        <div class="form-field checkbox-field">
-                            <label>
-                                <input type="checkbox" name="expectedEmploymentOver2Months" [(ngModel)]="expectedEmploymentOver2Months" />
+                    <div class="form-field checkbox-field">
+                        <label>
+                            <input type="checkbox" name="isStudent" [(ngModel)]="isStudent" />
+                            学生
+                        </label>
+                    </div>
+                    <div class="form-field checkbox-field">
+                        <label>
+                            <input type="checkbox" name="expectedEmploymentOver2Months" [(ngModel)]="expectedEmploymentOver2Months" />
                                 雇用見込みが2か月超
-                            </label>
+                        </label>
                         </div>
                     </div>
                 }
@@ -625,15 +625,15 @@
                         <p class="subsection-title">短時間労働者の加入要件</p>
                         <p class="judgment-sub-note">4分の3基準を満たさない場合に参照します</p>
                         <dl class="detail-list compact-list">
-                            <div class="detail-row">
-                                <dt>学生</dt>
-                                <dd>{{ yesNoLabel(isStudent) }}</dd>
-                            </div>
-                            <div class="detail-row">
+                        <div class="detail-row">
+                            <dt>学生</dt>
+                            <dd>{{ yesNoLabel(isStudent) }}</dd>
+                        </div>
+                        <div class="detail-row">
                                 <dt>雇用見込みが2か月超</dt>
-                                <dd>{{ yesNoLabel(expectedEmploymentOver2Months) }}</dd>
-                            </div>
-                        </dl>
+                            <dd>{{ yesNoLabel(expectedEmploymentOver2Months) }}</dd>
+                        </div>
+                    </dl>
                     </div>
                 }
             }
@@ -832,7 +832,7 @@
                         <p class="section-card-desc">
                             @if (pendingProcedureCount() > 0) {
                                 要対応 {{ pendingProcedureCount() }}件
-                            } @else {
+                                } @else {
                                 すべて完了、または手続きなし
                             }
                         </p>
@@ -852,20 +852,20 @@
                                     [routerLink]="['/procedures', procedure.id]"
                                 >
                                     <span class="procedure-row-label">{{ procedureListLabel(procedure) }}</span>
-                                    <span
+                                <span
                                         class="procedure-row-status"
                                         [class.not-started]="procedure.status === 'notStarted'"
                                         [class.in-progress]="procedure.status === 'inProgress'"
                                         [class.completed]="procedure.status === 'completed'"
                                     >
                                         {{ procedureStatusLabel(procedure.status) }}
-                                    </span>
+                                </span>
                                     <span class="procedure-row-meta">{{ procedureDueDateLabel(procedure) }}</span>
                                 </a>
                             </li>
                         }
                     </ul>
-                } @else {
+                        } @else {
                     <p class="empty-section-note">この従業員の手続きはまだありません。</p>
                 }
 
@@ -893,7 +893,7 @@
                             扶養変更届を作成
                         </button>
                     }
-                    @if (hasRetiredDate()) {
+                @if (hasRetiredDate()) {
                         <button
                             type="button"
                             class="btn sub-btn"
@@ -904,7 +904,7 @@
                                 作成中...
                             } @else if (lossProcedureExists()) {
                                 資格喪失届を開く
-                            } @else {
+                                } @else {
                                 資格喪失届を作成
                             }
                         </button>
@@ -932,7 +932,7 @@
                     <div class="info-tile">
                         <span class="info-tile-label">在籍状況</span>
                         <span class="info-tile-value">
-                            <span
+                                <span
                                 class="status-badge status-badge-inline"
                                 [class.before-join]="isBeforeJoin(employee()!)"
                                 [class.retired]="isFullyRetired(employee()!)"
@@ -940,7 +940,7 @@
                             >
                                 {{ employeeStatusLabel(employee()!) }}
                             </span>
-                        </span>
+                                </span>
                     </div>
                     <div class="info-tile">
                         <span class="info-tile-label">入社日</span>
@@ -965,8 +965,8 @@
                             >
                                 退職処理
                             </button>
-                        </div>
-                    } @else {
+                            </div>
+                        } @else {
                         <div class="enrollment-retire-form">
                             <div class="enrollment-retire-row">
                                 <div class="form-field enrollment-date-field">

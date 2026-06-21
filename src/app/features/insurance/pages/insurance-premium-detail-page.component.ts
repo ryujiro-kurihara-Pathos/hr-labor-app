@@ -173,15 +173,18 @@ import {
     formatYearMonthLabel as formatRewardNavigationYearMonthLabel,
 } from '../utils/reward-input-navigation.util';
 import {
-    clampSalaryPayYearMonth,
+    clampRewardNavigationPayYearMonth,
     findLatestConfirmedPayYearMonth,
     formatPayMonthListFromWorkMonths,
     formatPayYearMonthLabelFromWorkMonth,
+    isJoinPayMonthView as isEmployeeJoinPayMonthView,
     isRewardConfirmedForPayMonth,
     isSalaryPayMonthTarget,
+    joinPayMonthDisplayNote,
     lookupRewardByPayMonth,
     resolvePayrollPaymentDate,
     rewardLookupKeysForPayMonth,
+    rewardNavigationMinPayYearMonth,
     rewardRecordKeyForPayMonth,
     salaryPayMonthTargetReason,
     salaryPayYearMonthMax,
@@ -254,7 +257,7 @@ export class InsurancePremiumDetailPageComponent {
                         timing: this.insurancePremiumCollectionTiming(),
                         latestConfirmedWorkYearMonth: this.latestConfirmedWorkYearMonth(),
                     })
-                    : clampSalaryPayYearMonth(
+                    : clampRewardNavigationPayYearMonth(
                         employee,
                         ym,
                         this.currentYearMonth(),
@@ -573,7 +576,7 @@ export class InsurancePremiumDetailPageComponent {
         const employee = this.employee();
         if (!employee) return null;
         if (this.pageMode() === 'input') {
-            return salaryPayYearMonthMin(employee, this.payrollPaymentMonthOffset());
+            return rewardNavigationMinPayYearMonth(employee);
         }
         return viewableYearMonthMin(employee);
     });
@@ -877,13 +880,30 @@ export class InsurancePremiumDetailPageComponent {
 
     isQualificationMonth = computed((): boolean => {
         const employee = this.employee();
-        const yearMonth = this.workYearMonth();
+        const payYearMonth = this.targetYearMonth();
         const qualificationDate = this.resolvedQualificationDate();
-        if (!employee || !yearMonth || !qualificationDate) return false;
-        if (!isRewardTargetMonth(employee, yearMonth)) return false;
+        if (!employee || !payYearMonth || !qualificationDate) return false;
 
         const qualificationYearMonth = yearMonthFromDateString(qualificationDate);
-        return qualificationYearMonth === yearMonth;
+        return qualificationYearMonth === payYearMonth;
+    });
+
+    isJoinPayMonthView = computed((): boolean => {
+        const employee = this.employee();
+        const payYearMonth = this.targetYearMonth();
+        if (!employee || !payYearMonth) return false;
+        return isEmployeeJoinPayMonthView(employee, payYearMonth);
+    });
+
+    joinPayMonthDisplayNote = computed((): string | null => {
+        const employee = this.employee();
+        const payYearMonth = this.targetYearMonth();
+        if (!employee || !payYearMonth) return null;
+        return joinPayMonthDisplayNote(
+            employee,
+            payYearMonth,
+            this.payrollPaymentMonthOffset(),
+        );
     });
 
     /** 入社月は見込み給与を反映した固定的賃金を変更不可 */
@@ -988,9 +1008,21 @@ export class InsurancePremiumDetailPageComponent {
         );
     });
 
-    showQualificationProcedureSection = computed(
-        () => this.isQualificationMonth() && this.isHealthInsuranceEligible(),
-    );
+    showQualificationProcedureSection = computed(() => {
+        if (!this.isHealthInsuranceEligible()) return false;
+        if (this.qualificationProcedureStatus() === 'completed') return false;
+
+        const qualificationDate = this.resolvedQualificationDate();
+        const payYearMonth = this.targetYearMonth();
+        if (!qualificationDate || !payYearMonth) return false;
+
+        const firstRegularYm = getFirstRegularDeterminationYearMonth(qualificationDate);
+        if (payYearMonth < firstRegularYm) return true;
+        if (this.isJoinPayMonthView()) return true;
+        if (this.qualificationProcedureExists()) return true;
+
+        return false;
+    });
 
     qualificationProcedureExists = computed(() => this.qualificationProcedure() !== null);
 
@@ -1021,8 +1053,12 @@ export class InsurancePremiumDetailPageComponent {
 
     qualificationProcedureNudgeSummary = computed((): string | null => {
         const dueDate = this.qualificationProcedureDueDate();
-        if (!dueDate) return null;
-        return `提出期限 ${dateLabel(dueDate)}`;
+        const prefix = this.isJoinPayMonthView() ? '入社月' : null;
+        if (!dueDate) {
+            return prefix;
+        }
+        const dueLabel = `提出期限 ${dateLabel(dueDate)}`;
+        return prefix ? `${prefix} · ${dueLabel}` : dueLabel;
     });
 
     revisionProceduresByApplyFrom = signal<Record<string, Procedure | null>>({});
@@ -1498,7 +1534,9 @@ export class InsurancePremiumDetailPageComponent {
         const yearMonth = this.targetYearMonth();
         if (!employee || !yearMonth) return true;
         if (this.pageMode() === 'input') {
-            return this.isSalaryInputTargetMonth();
+            if (this.isSalaryInputTargetMonth()) return true;
+            if (this.isJoinPayMonthView()) return true;
+            return false;
         }
         return isRewardTargetMonth(employee, yearMonth);
     }
@@ -1611,7 +1649,7 @@ export class InsurancePremiumDetailPageComponent {
                             latestConfirmedWorkYearMonth: this.latestConfirmedWorkYearMonth(),
                         },
                     )
-                    : clampSalaryPayYearMonth(
+                    : clampRewardNavigationPayYearMonth(
                         employee,
                         initialYearMonth,
                         this.currentYearMonth(),
@@ -1628,6 +1666,7 @@ export class InsurancePremiumDetailPageComponent {
                 ]);
                 await Promise.all([this.loadOffice(), this.loadCompany()]);
                 await Promise.all([
+                    this.loadQualificationProcedure(),
                     this.loadRegularDecisionProcedure(),
                     this.loadRevisionProcedure(),
                     this.loadBonusPaymentProcedure(),
@@ -1731,7 +1770,7 @@ export class InsurancePremiumDetailPageComponent {
                     timing: this.insurancePremiumCollectionTiming(),
                     latestConfirmedWorkYearMonth: this.latestConfirmedWorkYearMonth(),
                 })
-                : clampSalaryPayYearMonth(
+                : clampRewardNavigationPayYearMonth(
                     employee,
                     yearMonth,
                     this.currentYearMonth(),
