@@ -21,6 +21,17 @@
                             }
                         </a>
                     }
+                    @if (pageMode() === 'input' && joinPayYearMonth(); as joinYm) {
+                        <a
+                            [routerLink]="rewardDetailLink()"
+                            [queryParams]="{ ym: joinYm }"
+                            class="context-link"
+                            [class.context-link-current]="isJoinPayMonthView()"
+                        >
+                            <span class="context-link-value">入社月</span>
+                            <span class="context-link-sub">{{ joinPayYearMonthLabel() }}</span>
+                        </a>
+                    }
                 </div>
             </div>
         </header>
@@ -1627,6 +1638,15 @@
 
     .context-link:hover .context-link-value {
         color: #2563eb;
+    }
+
+    .context-link-current {
+        border-color: #bfdbfe;
+        background: #eff6ff;
+    }
+
+    .context-link-current .context-link-value {
+        color: #1d4ed8;
     }
 
     .context-link-avatar {

@@ -7,7 +7,7 @@
                 <div>
                     <a routerLink="/employees" class="back-link">← 従業員一覧</a>
                     <h1>従業員を追加</h1>
-                    <p class="page-note">必須項目を入力して登録してください。性別・住所・パートの労働条件など手続き用の項目もここで入力できます（任意）。登録後も編集できます。</p>
+                    <p class="page-note">必須項目を入力して登録してください。性別・住所は資格取得届などの手続き提出に必要です。パートの労働条件は雇用区分に応じて入力してください。</p>
                 </div>
             </header>
 
@@ -174,13 +174,12 @@
                             }
                         </div>
                         <div class="form-field">
-                            <label for="gender">性別</label>
-                            <select id="gender" name="gender" [(ngModel)]="employee.gender">
-                                <option [ngValue]="null">未設定</option>
+                            <label for="gender">性別 <span class="required">必須</span></label>
+                            <select id="gender" name="gender" [(ngModel)]="employee.gender" required>
+                                <option [ngValue]="null" disabled>選択してください</option>
                                 <option ngValue="male">男性</option>
                                 <option ngValue="female">女性</option>
                             </select>
-                            <p class="field-note">資格取得届などの手続き提出時に必要です。</p>
                         </div>
                         <div class="form-field">
                             <label for="birth-date">生年月日 <span class="required">必須</span></label>
@@ -197,7 +196,7 @@
                 <section class="form-section">
                     <h2 class="section-title">連絡先・住所</h2>
                     <p class="section-lead">
-                        メールアドレスは登録後のログイン招待にも使えます。都道府県・市区町村・丁目番地は資格取得届などの手続き提出時に必要です。
+                        メールアドレスは登録後のログイン招待にも使えます。都道府県・市区町村・丁目番地は手続き提出に必須です。
                     </p>
                     <div class="form-grid">
                         <div class="form-field">
@@ -249,21 +248,21 @@
                             }
                         </div>
                         <div class="form-field">
-                            <label for="prefecture">都道府県</label>
-                            <select id="prefecture" name="prefecture" [(ngModel)]="employee.prefecture">
-                                <option value="">選択してください</option>
+                            <label for="prefecture">都道府県 <span class="required">必須</span></label>
+                            <select id="prefecture" name="prefecture" [(ngModel)]="employee.prefecture" required>
+                                <option value="" disabled>選択してください</option>
                                 @for (prefecture of prefectures; track prefecture) {
                                     <option [value]="prefecture">{{ prefecture }}</option>
                                 }
                             </select>
                         </div>
                         <div class="form-field form-field-wide">
-                            <label for="city">市区町村</label>
-                            <input id="city" type="text" name="city" [(ngModel)]="employee.city" placeholder="千代田区" />
+                            <label for="city">市区町村 <span class="required">必須</span></label>
+                            <input id="city" type="text" name="city" [(ngModel)]="employee.city" placeholder="千代田区" required />
                         </div>
                         <div class="form-field form-field-wide">
-                            <label for="street-address">丁目番地</label>
-                            <input id="street-address" type="text" name="streetAddress" [(ngModel)]="employee.streetAddress" placeholder="永田町1-7-1" />
+                            <label for="street-address">丁目番地 <span class="required">必須</span></label>
+                            <input id="street-address" type="text" name="streetAddress" [(ngModel)]="employee.streetAddress" placeholder="永田町1-7-1" required />
                         </div>
                         <div class="form-field form-field-wide">
                             <label for="building-name">建物名・号室</label>

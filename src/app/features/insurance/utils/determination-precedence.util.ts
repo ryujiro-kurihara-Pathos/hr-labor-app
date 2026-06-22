@@ -1,10 +1,8 @@
 import { BonusReward } from '../../bonus/models/bonus-reward.model';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
-import { effectiveMonthlyRewardTotal } from './effective-monthly-reward.util';
 import {
     formatYearMonthLabel,
     getAprJunYearMonths,
-    getRegularBaseMonths,
     getRegularCalculationMonths,
     getRegularDeterminationBaseYear,
     PayrollPaymentMonthOffset,
@@ -15,12 +13,16 @@ import {
     RevisionCalculateFn,
     RevisionEligibilityResult,
     RevisionGradePair,
+    calculateRegularDeterminationAverageMonthlyReward,
     calculateRevisionAverageMonthlyReward,
     getRevisionApplyFromMonth,
     getRevisionCalculationMonths,
     hasRevisionGradeDifference,
+    hasRevisionGradeDirectionMatch,
     formatRevisionGradeComparison,
     formatRevisionApplyFromPayMonthLabel,
+    resolveFixedWageChangeDirection,
+    revisionCalculationMonthsMeetPaymentBaseDays,
 } from './revision-determination.util';
 import { SalaryCondition } from '../models/salary-condition.model';
 import { salaryConditionRevisionOriginMonths } from './salary-condition.util';
@@ -90,12 +92,6 @@ function buildInitialRegularCandidates(
         });
     } else {
         const baseYear = getRegularDeterminationBaseYear(targetYearMonth);
-        const baseMonths = getRegularBaseMonths(
-            employee,
-            baseYear,
-            qualificationDate,
-            payrollPaymentMonthOffset,
-        );
         const calculationMonths = getRegularCalculationMonths(
             employee,
             baseYear,
@@ -105,7 +101,6 @@ function buildInitialRegularCandidates(
 
         if (
             calculationMonths.length > 0 &&
-            baseMonths.every((ym) => Boolean(rewardsByYearMonth[ym])) &&
             calculationMonths.every((ym) => Boolean(rewardsByYearMonth[ym]))
         ) {
             candidates.push({
@@ -169,13 +164,11 @@ function resolveGradesFromWinner(
             );
             if (!calculationMonths.every((ym) => rewardsByYearMonth[ym])) return null;
 
-            const total = calculationMonths.reduce(
-                (sum, ym) =>
-                    sum +
-                    effectiveMonthlyRewardTotal(rewardsByYearMonth[ym], ym, allBonuses),
-                0,
+            const average = calculateRegularDeterminationAverageMonthlyReward(
+                rewardsByYearMonth,
+                calculationMonths,
             );
-            const average = Math.round(total / calculationMonths.length);
+            if (average === null) return null;
             const calculation = calculate(average);
             if (!calculation.health || !calculation.pension) return null;
             return {
@@ -273,6 +266,17 @@ export function evaluateRevisionAtOrigin(
         return { eligible: false, reason: 'missing_months' };
     }
 
+    if (
+        !revisionCalculationMonthsMeetPaymentBaseDays(
+            employee,
+            originMonth,
+            qualificationDate,
+            payrollPaymentMonthOffset,
+        )
+    ) {
+        return { eligible: false, reason: 'insufficient_payment_base_days' };
+    }
+
     const priorOrigins = originMonths
         .filter((ym) => ym >= qualificationYearMonth && ym < originMonth)
         .sort();
@@ -361,6 +365,18 @@ export function evaluateRevisionAtOrigin(
 
     if (!hasRevisionGradeDifference(previousGrades, revisedGrades)) {
         return { eligible: false, reason: 'insufficient_grade_difference' };
+    }
+
+    const fixedWageDirection = resolveFixedWageChangeDirection(
+        rewardsByYearMonth,
+        originMonth,
+        salaryConditions,
+    );
+    if (
+        !fixedWageDirection
+        || !hasRevisionGradeDirectionMatch(previousGrades, revisedGrades, fixedWageDirection)
+    ) {
+        return { eligible: false, reason: 'grade_direction_mismatch' };
     }
 
     return {

@@ -128,15 +128,12 @@ export function resolvePremiumLiabilityYearMonth(
 
 /**
  * 保険料算定に参照する標準報酬月額の決定月。
- * 翌月徴収は根拠月（何月分）の先月時点の標準報酬月額を使う。
+ * 保険料対象月（liabilityYearMonth）時点で有効な標準報酬月額を使う。
  */
 export function resolvePremiumStandardDeterminationYearMonth(
     liabilityYearMonth: string,
-    timing: InsurancePremiumCollectionTiming,
+    _timing: InsurancePremiumCollectionTiming,
 ): string {
-    if (timing === 'next_month') {
-        return addMonthsToYearMonth(liabilityYearMonth, -1);
-    }
     return liabilityYearMonth;
 }
 

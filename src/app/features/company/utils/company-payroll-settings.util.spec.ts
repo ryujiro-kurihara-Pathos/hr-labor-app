@@ -30,8 +30,8 @@ describe('company-payroll-settings.util', () => {
             expect(resolvePremiumStandardDeterminationYearMonth('2026-09', 'same_month')).toBe('2026-09');
         });
 
-        it('uses previous month of liability for next_month timing', () => {
-            expect(resolvePremiumStandardDeterminationYearMonth('2026-09', 'next_month')).toBe('2026-08');
+        it('uses liability month for next_month timing', () => {
+            expect(resolvePremiumStandardDeterminationYearMonth('2026-09', 'next_month')).toBe('2026-09');
         });
     });
 

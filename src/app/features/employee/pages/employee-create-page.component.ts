@@ -154,6 +154,13 @@ export class EmployeeCreatePageComponent {
         if (lastNameKanaMessage) this.lastNameKanaError.set(lastNameKanaMessage);
         if (firstNameKanaMessage) this.firstNameKanaError.set(firstNameKanaMessage);
 
+        const procedureFieldError = this.validateProcedureRequiredFields();
+        if (procedureFieldError) {
+            this.errorMessage.set(procedureFieldError);
+            this.isLoadingEmployee.set(false);
+            return;
+        }
+
         if (
             this.isFormEmpty(this.employee.lastName)
             || this.isFormEmpty(this.employee.firstName)
@@ -368,6 +375,22 @@ export class EmployeeCreatePageComponent {
 
     private generateMyNumber(): string {
         return Math.floor(Math.random() * 1_000_000_000_000).toString().padStart(12, '0');
+    }
+
+    private validateProcedureRequiredFields(): string | null {
+        if (this.employee.gender !== 'male' && this.employee.gender !== 'female') {
+            return '性別を選択してください。';
+        }
+        if (this.isFormEmpty(this.employee.prefecture)) {
+            return '都道府県を選択してください。';
+        }
+        if (this.isFormEmpty(this.employee.city)) {
+            return '市区町村を入力してください。';
+        }
+        if (this.isFormEmpty(this.employee.streetAddress)) {
+            return '丁目番地を入力してください。';
+        }
+        return null;
     }
 
     private isFormEmpty(value: string): boolean {

@@ -133,6 +133,34 @@ export function getRegularBaseMonths(
     });
 }
 
+/** 支給年月 → 支払基礎日数の判定に使う勤務月 */
+export function resolveWorkMonthForPaymentBaseDays(
+    payYearMonth: string,
+    payrollPaymentMonthOffset: PayrollPaymentMonthOffset,
+): string {
+    if (payrollPaymentMonthOffset === 0) {
+        return payYearMonth;
+    }
+    return addMonthsToYearMonth(payYearMonth, -1);
+}
+
+/**
+ * 支給月キーの報酬に対する支払基礎日数。
+ * 翌月払いは勤務月（支給月の前月）の在籍日数で判定する。
+ */
+export function getPaymentBaseDaysForPayMonth(
+    payYearMonth: string,
+    qualificationDate: string,
+    retiredDate: Timestamp | null,
+    payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+): number {
+    const workYearMonth = resolveWorkMonthForPaymentBaseDays(
+        payYearMonth,
+        payrollPaymentMonthOffset,
+    );
+    return getPaymentBaseDays(workYearMonth, qualificationDate, retiredDate);
+}
+
 /** 定時決定の平均算定に使う報酬月（支払基礎日数17日以上） */
 export function getRegularCalculationMonths(
     employee: Employee,
@@ -146,13 +174,17 @@ export function getRegularCalculationMonths(
         qualificationDate,
         payrollPaymentMonthOffset,
     ).filter(
-        (ym) =>
-            getPaymentBaseDays(ym, qualificationDate, employee.retiredDate) >=
-            REGULAR_DETERMINATION_MIN_PAYMENT_BASE_DAYS,
+        (payYearMonth) =>
+            getPaymentBaseDaysForPayMonth(
+                payYearMonth,
+                qualificationDate,
+                employee.retiredDate,
+                payrollPaymentMonthOffset,
+            ) >= REGULAR_DETERMINATION_MIN_PAYMENT_BASE_DAYS,
     );
 }
 
-/** 対象月の支払基礎日数（資格取得日〜退職日ベース） */
+/** 勤務月の支払基礎日数（資格取得日〜退職日ベース） */
 export function getPaymentBaseDays(
     yearMonth: string,
     qualificationDate: string,

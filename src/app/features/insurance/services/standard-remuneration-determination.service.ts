@@ -7,6 +7,7 @@ import { EffectiveStandardRemuneration } from '../models/standard-remuneration-d
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 import { effectiveMonthlyRewardTotal } from '../utils/effective-monthly-reward.util';
 import { pickWinningDeterminationCandidate } from '../utils/determination-precedence.util';
+import { calculateRegularDeterminationAverageMonthlyReward } from '../utils/revision-determination.util';
 import { addMonthsToYearMonth, yearMonthFromDateString } from '../utils/reward-target-month.util';
 import { formatPayMonthListFromWorkMonths, formatPayYearMonthLabelFromWorkMonth, lookupQualificationInitialReward, resolveQualificationRewardPayYearMonth } from '../utils/reward-pay-month.util';
 import {
@@ -295,24 +296,32 @@ export class StandardRemunerationDeterminationService {
             );
         }
 
-        const missingMonths = baseMonths.filter((ym) => !rewardsByYearMonth[ym]);
+        const missingMonths = calculationMonths.filter((ym) => !rewardsByYearMonth[ym]);
         if (missingMonths.length > 0) {
             return this.incomplete(
                 'regular',
                 '定時決定',
-                `${formatYearMonthLabel(applyFrom)}〜${formatYearMonthLabel(applyUntil)}の定時決定。${paymentMonthsLabel}に支払われた給与（${formatYearMonthList(baseMonths)}分）の報酬情報が必要です（未登録: ${formatYearMonthList(missingMonths)}）。`,
+                `${formatYearMonthLabel(applyFrom)}〜${formatYearMonthLabel(applyUntil)}の定時決定。${paymentMonthsLabel}に支払われた給与（${formatYearMonthList(calculationMonths)}分・支払基礎日数17日以上）の報酬情報が必要です（未登録: ${formatYearMonthList(missingMonths)}）。`,
                 qualificationYearMonth,
-                baseMonths,
+                calculationMonths,
                 missingMonths,
             );
         }
 
-        const total = calculationMonths.reduce(
-            (sum, ym) =>
-                sum + this.monthlyReward(rewardsByYearMonth[ym], ym, allBonuses),
-            0,
+        const averageMonthlyReward = calculateRegularDeterminationAverageMonthlyReward(
+            rewardsByYearMonth,
+            calculationMonths,
         );
-        const averageMonthlyReward = Math.round(total / calculationMonths.length);
+        if (averageMonthlyReward === null) {
+            return this.incomplete(
+                'regular',
+                '定時決定',
+                '定時決定の平均報酬月額を計算できませんでした。',
+                qualificationYearMonth,
+                calculationMonths,
+                missingMonths,
+            );
+        }
         const calculation = this.calculator.calculate(averageMonthlyReward);
 
         if (!calculation.health || !calculation.pension) {
@@ -378,13 +387,13 @@ export class StandardRemunerationDeterminationService {
             );
         }
 
-        const missingMonths = baseMonths.filter((ym) => !rewardsByYearMonth[ym]);
+        const missingMonths = calculationMonths.filter((ym) => !rewardsByYearMonth[ym]);
         return this.incomplete(
             'regular',
             '定時決定',
-            `${formatYearMonthLabel(applyFrom)}〜${formatYearMonthLabel(applyUntil)}の定時決定。${paymentMonthsLabel}に支払われた給与（${formatYearMonthList(baseMonths)}分）の報酬情報が必要です（未登録: ${formatYearMonthList(missingMonths)}）。`,
+            `${formatYearMonthLabel(applyFrom)}〜${formatYearMonthLabel(applyUntil)}の定時決定。${paymentMonthsLabel}に支払われた給与（${formatYearMonthList(calculationMonths)}分・支払基礎日数17日以上）の報酬情報が必要です（未登録: ${formatYearMonthList(missingMonths)}）。`,
             qualificationYearMonth,
-            baseMonths,
+            calculationMonths,
             missingMonths,
         );
     }

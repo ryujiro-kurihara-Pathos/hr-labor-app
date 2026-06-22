@@ -23,7 +23,7 @@ import {
 import { StandardMonthlyRewardService } from '../../insurance/services/standard-monthly-reward.service';
 import {
     getFirstRegularDeterminationYearMonth,
-    getPaymentBaseDays,
+    getPaymentBaseDaysForPayMonth,
     getQualificationDate,
     getRegularBaseMonths,
     getRegularCalculationMonths,
@@ -48,6 +48,7 @@ import {
 import {
     calculateRevisionAverageMonthlyReward,
     formatRevisionApplyFromPayMonthLabel,
+    monthlyRewardTotal,
 } from '../../insurance/utils/revision-determination.util';
 import {
     FIXED_WAGE_FIELD_LABELS,
@@ -497,6 +498,10 @@ export class EmployeeProcedureSheetComponent {
                 return '改定後の等級を判定できません';
             case 'insufficient_grade_difference':
                 return '等級差が2未満のため随時改定の対象外';
+            case 'insufficient_payment_base_days':
+                return '算定3か月のいずれかで支払基礎日数が17日未満のため随時改定の対象外';
+            case 'grade_direction_mismatch':
+                return '固定的賃金の変動方向と等級の変動方向が一致しないため随時改定の対象外';
             default:
                 return null;
         }
@@ -595,7 +600,7 @@ export class EmployeeProcedureSheetComponent {
             );
             const baseMonthSet = new Set(baseMonths);
 
-            const missingMonths = baseMonths.filter((ym) => !rewardsByYearMonth[ym]);
+            const missingMonths = calculationMonths.filter((ym) => !rewardsByYearMonth[ym]);
             this.missingMonthlyRewardMonths.set(missingMonths);
 
             this.regularDecisionMonths.set(
@@ -608,6 +613,7 @@ export class EmployeeProcedureSheetComponent {
                         rewardsByYearMonth[rewardMonths[index]!] ?? null,
                         bonuses,
                         baseMonthSet.has(rewardMonths[index]!),
+                        payrollPaymentMonthOffset,
                     ),
                 ),
             );
@@ -760,6 +766,8 @@ export class EmployeeProcedureSheetComponent {
 
         isInBaseMonths: boolean,
 
+        payrollPaymentMonthOffset: 0 | 1,
+
     ): RegularDecisionMonthBreakdown {
 
         if (!isInBaseMonths) {
@@ -782,14 +790,11 @@ export class EmployeeProcedureSheetComponent {
 
 
 
-        const paymentBaseDays = getPaymentBaseDays(
-
+        const paymentBaseDays = getPaymentBaseDaysForPayMonth(
             rewardYearMonth,
-
             qualificationDate,
-
             employee.retiredDate,
-
+            payrollPaymentMonthOffset,
         );
 
 
@@ -814,7 +819,7 @@ export class EmployeeProcedureSheetComponent {
 
 
 
-        const totalAmount = effectiveMonthlyRewardTotal(reward, rewardYearMonth, bonuses);
+        const totalAmount = monthlyRewardTotal(reward);
 
 
 

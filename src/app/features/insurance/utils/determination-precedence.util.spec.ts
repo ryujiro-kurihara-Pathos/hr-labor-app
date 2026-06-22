@@ -4,6 +4,7 @@ import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 import { getRevisionApplyFromMonth } from './revision-determination.util';
 import {
     collapseConsecutiveRevisionOrigins,
+    evaluateRevisionAtOrigin,
     pickWinningDeterminationCandidate,
 } from './determination-precedence.util';
 
@@ -269,10 +270,94 @@ describe('determination-precedence.util revision apply timing', () => {
         expect(septemberWinner?.revisionOriginMonth).toBe('2026-06');
     });
 
+    it('rejects revision when payment base days are insufficient in calculation months', () => {
+        const rewards = {
+            ...buildBaselineRewards(),
+            '2026-06': makeReward('2026-06', 400000, { fixedWageChanged: true }),
+            '2026-07': makeReward('2026-07', 400000),
+            '2026-08': makeReward('2026-08', 400000),
+        };
+
+        const result = evaluateRevisionAtOrigin(
+            '2026-06',
+            '2024-04',
+            '2024-09',
+            employee({ joinedDate: '2026-06-20' }),
+            '2026-06-20',
+            rewards,
+            calculate,
+        );
+
+        expect(result.eligible).toBeFalse();
+        if (!result.eligible) {
+            expect(result.reason).toBe('insufficient_payment_base_days');
+        }
+    });
+
+    it('rejects revision when grade direction does not match fixed wage change', () => {
+        const mismatchCalculate = (monthlyReward: number) => {
+            if (monthlyReward >= 400000) {
+                return {
+                    health: { grade: 16, standardMonthlyAmount: 200000 },
+                    pension: { grade: 14, standardMonthlyAmount: 200000 },
+                };
+            }
+            return {
+                health: { grade: 20, standardMonthlyAmount: 300000 },
+                pension: { grade: 18, standardMonthlyAmount: 300000 },
+            };
+        };
+        const rewards = {
+            ...buildBaselineRewards(),
+            '2026-06': makeReward('2026-06', 400000, { fixedWageChanged: true }),
+            '2026-07': makeReward('2026-07', 400000),
+            '2026-08': makeReward('2026-08', 400000),
+        };
+
+        const result = evaluateRevisionAtOrigin(
+            '2026-06',
+            '2024-04',
+            '2024-09',
+            employee(),
+            '2024-04-01',
+            rewards,
+            mismatchCalculate,
+        );
+
+        expect(result.eligible).toBeFalse();
+        if (!result.eligible) {
+            expect(result.reason).toBe('grade_direction_mismatch');
+        }
+    });
+
+    it('prefers revision over regular determination when both apply from the same month', () => {
+        const rewards = {
+            ...buildBaselineRewards(),
+            '2026-06': makeReward('2026-06', 400000, { fixedWageChanged: true }),
+            '2026-07': makeReward('2026-07', 400000),
+            '2026-08': makeReward('2026-08', 400000),
+            '2026-09': makeReward('2026-09', 400000),
+        };
+
+        const winner = pickWinningDeterminationCandidate(
+            '2026-09',
+            '2024-04',
+            '2024-09',
+            employee(),
+            '2024-04-01',
+            rewards,
+            calculate,
+        );
+
+        expect(winner?.kind).toBe('revision');
+        expect(winner?.effectiveFrom).toBe('2026-09');
+        expect(winner?.revisionOriginMonth).toBe('2026-06');
+    });
+
     it('ignores spurious reward fixedWageChanged when salary condition defines June origin', () => {
         const rewards = {
             ...buildBaselineRewards(),
-            '2026-05': makeReward('2026-05', 400000, { fixedWageChanged: true }),
+            '2026-05': makeReward('2026-05', 300000, { fixedWageChanged: true }),
             '2026-06': makeReward('2026-06', 400000),
             '2026-07': makeReward('2026-07', 400000),
             '2026-08': makeReward('2026-08', 400000),

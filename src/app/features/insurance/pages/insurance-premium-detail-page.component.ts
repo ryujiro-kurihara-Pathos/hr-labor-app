@@ -46,6 +46,7 @@ import {
     formatYearMonthLabel,
     getFirstRegularDeterminationYearMonth,
     getPaymentBaseDays,
+    getPaymentBaseDaysForPayMonth,
     getQualificationDate,
     getRegularDeterminationRewardMonths,
     isRegularDecisionProcedureRequiredForBaseYear,
@@ -438,6 +439,17 @@ export class InsurancePremiumDetailPageComponent {
     showOldestUnregisteredLink = computed(() => {
         const oldest = this.oldestUnregisteredYearMonth();
         return Boolean(oldest && oldest !== this.targetYearMonth());
+    });
+
+    joinPayYearMonth = computed((): string | null => {
+        const employee = this.employee();
+        if (!employee || this.pageMode() !== 'input') return null;
+        return rewardNavigationMinPayYearMonth(employee);
+    });
+
+    joinPayYearMonthLabel = computed(() => {
+        const ym = this.joinPayYearMonth();
+        return ym ? formatRewardNavigationYearMonthLabel(ym) : '';
     });
 
     listBackRoute = computed(() => (this.pageMode() === 'input' ? '/rewards' : '/premium'));
@@ -1531,11 +1543,18 @@ export class InsurancePremiumDetailPageComponent {
         const qualificationDate = this.resolvedQualificationDate();
         if (!qualificationDate) return null;
 
-        const days = getPaymentBaseDays(
-            targetYearMonth,
-            qualificationDate,
-            employee.retiredDate,
-        );
+        const days = this.pageMode() === 'input'
+            ? getPaymentBaseDaysForPayMonth(
+                this.targetYearMonth(),
+                qualificationDate,
+                employee.retiredDate,
+                this.payrollPaymentMonthOffset(),
+            )
+            : getPaymentBaseDays(
+                targetYearMonth,
+                qualificationDate,
+                employee.retiredDate,
+            );
         return days > 0 ? days : null;
     });
 

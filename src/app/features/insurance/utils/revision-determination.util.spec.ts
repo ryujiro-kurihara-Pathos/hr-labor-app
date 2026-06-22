@@ -1,11 +1,17 @@
 import {
+    calculateRegularDeterminationAverageMonthlyReward,
     calculateRevisionAverageMonthlyReward,
     formatRevisionApplyFromPayMonthLabel,
     getRevisionApplyFromMonth,
     getRevisionCalculationMonths,
     hasRevisionGradeDifference,
+    hasRevisionGradeDirectionMatch,
+    resolveFixedWageChangeDirection,
+    revisionCalculationMonthsMeetPaymentBaseDays,
     REVISION_GRADE_THRESHOLD,
 } from './revision-determination.util';
+import { createEmptyEmployeeInput, Employee } from '../../employee/models/employee.models';
+import { SalaryCondition } from '../models/salary-condition.model';
 
 describe('revision-determination.util', () => {
     describe('hasRevisionGradeDifference', () => {
@@ -57,6 +63,35 @@ describe('revision-determination.util', () => {
         });
     });
 
+    describe('calculateRegularDeterminationAverageMonthlyReward', () => {
+        it('returns average of calculation months without bonus', () => {
+            const rewards = {
+                '2026-04': makeReward('2026-04', 300000),
+                '2026-05': makeReward('2026-05', 360000),
+            };
+
+            expect(
+                calculateRegularDeterminationAverageMonthlyReward(rewards, [
+                    '2026-04',
+                    '2026-05',
+                ]),
+            ).toBe(330000);
+        });
+
+        it('returns null when a calculation month is missing', () => {
+            const rewards = {
+                '2026-04': makeReward('2026-04', 300000),
+            };
+
+            expect(
+                calculateRegularDeterminationAverageMonthlyReward(rewards, [
+                    '2026-04',
+                    '2026-05',
+                ]),
+            ).toBeNull();
+        });
+    });
+
     describe('calculateRevisionAverageMonthlyReward', () => {
         it('変更月から3か月分の平均を返す', () => {
             const rewards = {
@@ -93,6 +128,110 @@ describe('revision-determination.util', () => {
             expect(formatRevisionApplyFromPayMonthLabel('2026-09', 0)).toBe('2026年9月');
         });
     });
+
+    describe('revisionCalculationMonthsMeetPaymentBaseDays', () => {
+        it('3か月すべて17日以上なら true', () => {
+            const emp = employee({ joinedDate: '2024-04-01' });
+            expect(
+                revisionCalculationMonthsMeetPaymentBaseDays(
+                    emp,
+                    '2026-06',
+                    '2024-04-01',
+                    1,
+                ),
+            ).toBeTrue();
+        });
+
+        it('起算月が17日未満なら false', () => {
+            const emp = employee({ joinedDate: '2026-06-20' });
+            expect(
+                revisionCalculationMonthsMeetPaymentBaseDays(
+                    emp,
+                    '2026-06',
+                    '2026-06-20',
+                    1,
+                ),
+            ).toBeFalse();
+        });
+    });
+
+    describe('resolveFixedWageChangeDirection', () => {
+        it('前月報酬より固定的賃金が増えていれば increase', () => {
+            const rewards = {
+                '2026-05': makeReward('2026-05', 300000),
+                '2026-06': makeReward('2026-06', 400000),
+            };
+            expect(resolveFixedWageChangeDirection(rewards, '2026-06')).toBe('increase');
+        });
+
+        it('給与条件を優先して方向を判定する', () => {
+            const rewards = {
+                '2026-05': makeReward('2026-05', 300000),
+                '2026-06': makeReward('2026-06', 300000),
+            };
+            const conditions: SalaryCondition[] = [
+                {
+                    id: 'sc1',
+                    companyId: 'c1',
+                    employeeId: 'e1',
+                    effectiveStartMonth: '2026-05',
+                    basicSalary: 300000,
+                    commutingAllowance: 0,
+                    positionAllowance: 0,
+                    housingAllowance: 0,
+                    fixedOvertimePay: 0,
+                    otherFixedAllowance: 0,
+                    fixedWageTotal: 300000,
+                    note: '',
+                    changeReason: '',
+                    triggersRevision: true,
+                    createdAt: {} as never,
+                    updatedAt: {} as never,
+                },
+                {
+                    id: 'sc2',
+                    companyId: 'c1',
+                    employeeId: 'e1',
+                    effectiveStartMonth: '2026-06',
+                    basicSalary: 400000,
+                    commutingAllowance: 0,
+                    positionAllowance: 0,
+                    housingAllowance: 0,
+                    fixedOvertimePay: 0,
+                    otherFixedAllowance: 0,
+                    fixedWageTotal: 400000,
+                    note: '',
+                    changeReason: '',
+                    triggersRevision: true,
+                    createdAt: {} as never,
+                    updatedAt: {} as never,
+                },
+            ];
+            expect(resolveFixedWageChangeDirection(rewards, '2026-06', conditions)).toBe('increase');
+        });
+    });
+
+    describe('hasRevisionGradeDirectionMatch', () => {
+        it('固定的賃金増と等級上昇が一致すれば true', () => {
+            expect(
+                hasRevisionGradeDirectionMatch(
+                    { health: { grade: 20 }, pension: { grade: 18 } },
+                    { health: { grade: 22 }, pension: { grade: 20 } },
+                    'increase',
+                ),
+            ).toBeTrue();
+        });
+
+        it('固定的賃金増なのに等級が下がれば false', () => {
+            expect(
+                hasRevisionGradeDirectionMatch(
+                    { health: { grade: 22 }, pension: { grade: 20 } },
+                    { health: { grade: 20 }, pension: { grade: 20 } },
+                    'increase',
+                ),
+            ).toBeFalse();
+        });
+    });
 });
 
 function makeReward(targetYearMonth: string, total: number) {
@@ -120,5 +259,17 @@ function makeReward(targetYearMonth: string, total: number) {
         changedFixedWageFields: [],
         createdAt: {} as never,
         updatedAt: {} as never,
+    };
+}
+
+function employee(overrides: Partial<ReturnType<typeof createEmptyEmployeeInput>> = {}): Employee {
+    return {
+        id: 'e1',
+        ...createEmptyEmployeeInput({
+            joinedDate: '2024-04-01',
+            ...overrides,
+        }),
+        createdAt: {} as Employee['createdAt'],
+        updatedAt: {} as Employee['updatedAt'],
     };
 }
