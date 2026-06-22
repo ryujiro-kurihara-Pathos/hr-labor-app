@@ -85,6 +85,24 @@ describe('getRegularCalculationMonths', () => {
         expect(months).not.toContain('2026-05');
         expect(months).toContain('2026-06');
     });
+
+    it('includes additional pay months when short-time worker uses 11-day threshold', () => {
+        const months17 = getRegularCalculationMonths(
+            employee('2026-04-20'),
+            2026,
+            '2026-04-20',
+            1,
+        );
+        const months11 = getRegularCalculationMonths(
+            employee('2026-04-20'),
+            2026,
+            '2026-04-20',
+            1,
+            11,
+        );
+        expect(months17).toEqual(['2026-06']);
+        expect(months11).toEqual(['2026-05', '2026-06']);
+    });
 });
 
 describe('isRegularDecisionProcedureRequiredForBaseYear', () => {

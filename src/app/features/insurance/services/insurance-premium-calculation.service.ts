@@ -12,6 +12,7 @@ import {
     isPensionInsurancePremiumTargetMonth,
 } from '../../social-insurance/utils/age-premium-period.util';
 import { ManualInsurancePremiumRates } from '../models/manual-insurance-premium-rate.model';
+import { SocialInsuranceJoinJudgmentContext } from '../../social-insurance/utils/social-insurance-join-status.util';
 import { SalaryCondition } from '../models/salary-condition.model';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 import { StandardRemunerationDeterminationService } from './standard-remuneration-determination.service';
@@ -60,6 +61,7 @@ export type InsurancePremiumCalculationParams = {
     manualRates?: ManualInsurancePremiumRates | null;
     payrollPaymentMonthOffset?: PayrollPaymentMonthOffset;
     salaryConditions?: SalaryCondition[];
+    joinJudgmentContext?: SocialInsuranceJoinJudgmentContext | null;
 };
 
 @Injectable({
@@ -94,6 +96,7 @@ export class InsurancePremiumCalculationService {
             manualRates = null,
             payrollPaymentMonthOffset = 1,
             salaryConditions = [],
+            joinJudgmentContext = null,
         } = params;
 
         const liabilityYearMonth = resolvePremiumLiabilityYearMonth(payYearMonth, collectionTiming);
@@ -116,6 +119,7 @@ export class InsurancePremiumCalculationService {
             bonuses,
             payrollPaymentMonthOffset,
             salaryConditions,
+            joinJudgmentContext,
         );
         if (!effective?.isComplete || !effective.calculation?.health) return null;
 

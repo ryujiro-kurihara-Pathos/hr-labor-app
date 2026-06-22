@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 
 import { BonusReward } from '../../bonus/models/bonus-reward.model';
 import { Employee } from '../../employee/models/employee.models';
+import { SocialInsuranceJoinJudgmentContext, resolveRegularDeterminationMinPaymentBaseDays } from '../../social-insurance/utils/social-insurance-join-status.util';
 import { SalaryCondition } from '../models/salary-condition.model';
 import { EffectiveStandardRemuneration } from '../models/standard-remuneration-determination.model';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
@@ -19,6 +20,7 @@ import {
     getRegularCalculationMonths,
     getRegularDeterminationBaseYear,
     getRegularDeterminationPaymentMonths,
+    formatRegularDeterminationMinPaymentBaseDaysLabel,
     PayrollPaymentMonthOffset,
 } from '../utils/standard-remuneration-determination.util';
 import {
@@ -41,9 +43,13 @@ export class StandardRemunerationDeterminationService {
         allBonuses: BonusReward[] = [],
         payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
         salaryConditions: SalaryCondition[] = [],
+        joinJudgmentContext: SocialInsuranceJoinJudgmentContext | null = null,
     ): EffectiveStandardRemuneration {
         // 資格取得日を取得
         const qualificationDate = getQualificationDate(employee, healthInsuranceStartDate);
+        const regularMinPaymentBaseDays = resolveRegularDeterminationMinPaymentBaseDays(
+            joinJudgmentContext,
+        );
         // 資格取得月を取得
         const qualificationYearMonth = qualificationDate
             ? yearMonthFromDateString(qualificationDate)
@@ -74,6 +80,7 @@ export class StandardRemunerationDeterminationService {
             allBonuses,
             payrollPaymentMonthOffset,
             salaryConditions,
+            regularMinPaymentBaseDays,
         );
 
         if (!winner) {
@@ -93,6 +100,7 @@ export class StandardRemunerationDeterminationService {
                 rewardsByYearMonth,
                 targetYearMonth,
                 payrollPaymentMonthOffset,
+                regularMinPaymentBaseDays,
             );
         }
 
@@ -122,6 +130,7 @@ export class StandardRemunerationDeterminationService {
                     targetYearMonth,
                     allBonuses,
                     payrollPaymentMonthOffset,
+                    regularMinPaymentBaseDays,
                 );
         }
     }
@@ -265,6 +274,7 @@ export class StandardRemunerationDeterminationService {
         targetYearMonth: string,
         allBonuses: BonusReward[],
         payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+        minPaymentBaseDays: number,
     ): EffectiveStandardRemuneration {
         const baseYear = getRegularDeterminationBaseYear(targetYearMonth);
         const baseMonths = getRegularBaseMonths(
@@ -278,10 +288,12 @@ export class StandardRemunerationDeterminationService {
             baseYear,
             qualificationDate,
             payrollPaymentMonthOffset,
+            minPaymentBaseDays,
         );
         const paymentMonthsLabel = formatYearMonthList(
             getRegularDeterminationPaymentMonths(baseYear),
         );
+        const paymentBaseDaysLabel = formatRegularDeterminationMinPaymentBaseDaysLabel(minPaymentBaseDays);
         const applyFrom = `${baseYear}-09`;
         const applyUntil = `${baseYear + 1}-08`;
 
@@ -289,7 +301,7 @@ export class StandardRemunerationDeterminationService {
             return this.incomplete(
                 'regular',
                 '定時決定',
-                `${formatYearMonthLabel(applyFrom)}〜${formatYearMonthLabel(applyUntil)}の定時決定対象ですが、${paymentMonthsLabel}に支払われた給与のうち、支払基礎日数17日以上の月がありません。`,
+                `${formatYearMonthLabel(applyFrom)}〜${formatYearMonthLabel(applyUntil)}の定時決定対象ですが、${paymentMonthsLabel}に支払われた給与のうち、${paymentBaseDaysLabel}の月がありません。`,
                 qualificationYearMonth,
                 baseMonths,
                 [],
@@ -301,7 +313,7 @@ export class StandardRemunerationDeterminationService {
             return this.incomplete(
                 'regular',
                 '定時決定',
-                `${formatYearMonthLabel(applyFrom)}〜${formatYearMonthLabel(applyUntil)}の定時決定。${paymentMonthsLabel}に支払われた給与（${formatYearMonthList(calculationMonths)}分・支払基礎日数17日以上）の報酬情報が必要です（未登録: ${formatYearMonthList(missingMonths)}）。`,
+                `${formatYearMonthLabel(applyFrom)}〜${formatYearMonthLabel(applyUntil)}の定時決定。${paymentMonthsLabel}に支払われた給与（${formatYearMonthList(calculationMonths)}分・${paymentBaseDaysLabel}）の報酬情報が必要です（未登録: ${formatYearMonthList(missingMonths)}）。`,
                 qualificationYearMonth,
                 calculationMonths,
                 missingMonths,
@@ -356,6 +368,7 @@ export class StandardRemunerationDeterminationService {
         rewardsByYearMonth: Record<string, StandardMonthlyReward>,
         targetYearMonth: string,
         payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+        minPaymentBaseDays: number,
     ): EffectiveStandardRemuneration {
         const baseYear = getRegularDeterminationBaseYear(targetYearMonth);
         const baseMonths = getRegularBaseMonths(
@@ -369,10 +382,12 @@ export class StandardRemunerationDeterminationService {
             baseYear,
             qualificationDate,
             payrollPaymentMonthOffset,
+            minPaymentBaseDays,
         );
         const paymentMonthsLabel = formatYearMonthList(
             getRegularDeterminationPaymentMonths(baseYear),
         );
+        const paymentBaseDaysLabel = formatRegularDeterminationMinPaymentBaseDaysLabel(minPaymentBaseDays);
         const applyFrom = `${baseYear}-09`;
         const applyUntil = `${baseYear + 1}-08`;
 
@@ -380,7 +395,7 @@ export class StandardRemunerationDeterminationService {
             return this.incomplete(
                 'regular',
                 '定時決定',
-                `${formatYearMonthLabel(applyFrom)}〜${formatYearMonthLabel(applyUntil)}の定時決定対象ですが、${paymentMonthsLabel}に支払われた給与のうち、支払基礎日数17日以上の月がありません。`,
+                `${formatYearMonthLabel(applyFrom)}〜${formatYearMonthLabel(applyUntil)}の定時決定対象ですが、${paymentMonthsLabel}に支払われた給与のうち、${paymentBaseDaysLabel}の月がありません。`,
                 qualificationYearMonth,
                 baseMonths,
                 [],
@@ -391,7 +406,7 @@ export class StandardRemunerationDeterminationService {
         return this.incomplete(
             'regular',
             '定時決定',
-            `${formatYearMonthLabel(applyFrom)}〜${formatYearMonthLabel(applyUntil)}の定時決定。${paymentMonthsLabel}に支払われた給与（${formatYearMonthList(calculationMonths)}分・支払基礎日数17日以上）の報酬情報が必要です（未登録: ${formatYearMonthList(missingMonths)}）。`,
+            `${formatYearMonthLabel(applyFrom)}〜${formatYearMonthLabel(applyUntil)}の定時決定。${paymentMonthsLabel}に支払われた給与（${formatYearMonthList(calculationMonths)}分・${paymentBaseDaysLabel}）の報酬情報が必要です（未登録: ${formatYearMonthList(missingMonths)}）。`,
             qualificationYearMonth,
             calculationMonths,
             missingMonths,

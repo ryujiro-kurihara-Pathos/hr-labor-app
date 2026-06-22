@@ -6,6 +6,7 @@ import {
     getRegularCalculationMonths,
     getRegularDeterminationBaseYear,
     PayrollPaymentMonthOffset,
+    REGULAR_DETERMINATION_MIN_PAYMENT_BASE_DAYS,
 } from './standard-remuneration-determination.util';
 import { Employee } from '../../employee/models/employee.models';
 import { addMonthsToYearMonth } from './reward-target-month.util';
@@ -82,6 +83,7 @@ function buildInitialRegularCandidates(
     qualificationDate: string,
     rewardsByYearMonth: Record<string, StandardMonthlyReward>,
     payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+    minPaymentBaseDays: number = REGULAR_DETERMINATION_MIN_PAYMENT_BASE_DAYS,
 ): DeterminationCandidate[] {
     const candidates: DeterminationCandidate[] = [];
 
@@ -97,6 +99,7 @@ function buildInitialRegularCandidates(
             baseYear,
             qualificationDate,
             payrollPaymentMonthOffset,
+            minPaymentBaseDays,
         );
 
         if (
@@ -123,6 +126,7 @@ function resolveGradesFromWinner(
     calculate: RevisionCalculateFn,
     allBonuses: BonusReward[],
     payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+    minPaymentBaseDays: number = REGULAR_DETERMINATION_MIN_PAYMENT_BASE_DAYS,
 ): RevisionGradePair | null {
     switch (winner.kind) {
         case 'initial': {
@@ -161,6 +165,7 @@ function resolveGradesFromWinner(
                 baseYear,
                 qualificationDate,
                 payrollPaymentMonthOffset,
+                minPaymentBaseDays,
             );
             if (!calculationMonths.every((ym) => rewardsByYearMonth[ym])) return null;
 
@@ -205,6 +210,7 @@ export function listEligibleRevisionCandidates(
     allBonuses: BonusReward[] = [],
     salaryConditions: SalaryCondition[] = [],
     payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+    regularDeterminationMinPaymentBaseDays: number = REGULAR_DETERMINATION_MIN_PAYMENT_BASE_DAYS,
 ): DeterminationCandidate[] {
     const originMonths = resolveRevisionOriginMonths(rewardsByYearMonth, salaryConditions)
         .filter((ym) => ym >= qualificationYearMonth)
@@ -224,6 +230,7 @@ export function listEligibleRevisionCandidates(
             allBonuses,
             payrollPaymentMonthOffset,
             salaryConditions,
+            regularDeterminationMinPaymentBaseDays,
         );
 
         if (result.eligible) {
@@ -250,6 +257,7 @@ export function evaluateRevisionAtOrigin(
     allBonuses: BonusReward[] = [],
     payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
     salaryConditions: SalaryCondition[] = [],
+    regularDeterminationMinPaymentBaseDays: number = REGULAR_DETERMINATION_MIN_PAYMENT_BASE_DAYS,
 ): RevisionEligibilityResult {
     const originMonths = resolveRevisionOriginMonths(rewardsByYearMonth, salaryConditions);
     if (!originMonths.includes(originMonth)) {
@@ -294,6 +302,7 @@ export function evaluateRevisionAtOrigin(
             allBonuses,
             payrollPaymentMonthOffset,
             salaryConditions,
+            regularDeterminationMinPaymentBaseDays,
         );
         if (result.eligible) {
             priorEligible.push({
@@ -322,6 +331,7 @@ export function evaluateRevisionAtOrigin(
             qualificationDate,
             rewardsByYearMonth,
             payrollPaymentMonthOffset,
+            regularDeterminationMinPaymentBaseDays,
         ),
         ...priorEligible,
     ];
@@ -339,6 +349,7 @@ export function evaluateRevisionAtOrigin(
         calculate,
         allBonuses,
         payrollPaymentMonthOffset,
+        regularDeterminationMinPaymentBaseDays,
     );
     if (!previousGrades) {
         return { eligible: false, reason: 'no_previous_grades' };
@@ -518,6 +529,7 @@ export function hasEligibleRevisionBeforeMonth(
     allBonuses: BonusReward[] = [],
     salaryConditions: SalaryCondition[] = [],
     payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+    regularDeterminationMinPaymentBaseDays: number = REGULAR_DETERMINATION_MIN_PAYMENT_BASE_DAYS,
 ): boolean {
     const baseYear = Number(beforeYearMonth.slice(0, 4));
     const revisionCandidates = listEligibleRevisionCandidates(
@@ -530,6 +542,7 @@ export function hasEligibleRevisionBeforeMonth(
         allBonuses,
         salaryConditions,
         payrollPaymentMonthOffset,
+        regularDeterminationMinPaymentBaseDays,
     );
     return revisionSupersedesRegularDeterminationForBaseYear(baseYear, revisionCandidates);
 }
@@ -546,6 +559,7 @@ export function pickWinningDeterminationCandidate(
     allBonuses: BonusReward[] = [],
     payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
     salaryConditions: SalaryCondition[] = [],
+    regularDeterminationMinPaymentBaseDays: number = REGULAR_DETERMINATION_MIN_PAYMENT_BASE_DAYS,
 ): DeterminationCandidate | null {
     const revisionCandidates = listEligibleRevisionCandidates(
         qualificationYearMonth,
@@ -557,6 +571,7 @@ export function pickWinningDeterminationCandidate(
         allBonuses,
         salaryConditions,
         payrollPaymentMonthOffset,
+        regularDeterminationMinPaymentBaseDays,
     );
 
     const candidates = withoutRegularDeterminationsSuppressedByRevision(
@@ -569,6 +584,7 @@ export function pickWinningDeterminationCandidate(
                 qualificationDate,
                 rewardsByYearMonth,
                 payrollPaymentMonthOffset,
+                regularDeterminationMinPaymentBaseDays,
             ),
             ...revisionCandidates,
         ],
@@ -583,6 +599,7 @@ export function getRegularCalculationMonthsForTarget(
     employee: Employee,
     qualificationDate: string,
     payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+    minPaymentBaseDays: number = REGULAR_DETERMINATION_MIN_PAYMENT_BASE_DAYS,
 ): string[] {
     const baseYear = getRegularDeterminationBaseYear(targetYearMonth);
     return getRegularCalculationMonths(
@@ -590,6 +607,7 @@ export function getRegularCalculationMonthsForTarget(
         baseYear,
         qualificationDate,
         payrollPaymentMonthOffset,
+        minPaymentBaseDays,
     );
 }
 

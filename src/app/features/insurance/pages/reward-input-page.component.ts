@@ -9,6 +9,7 @@ import { AuthService } from '../../auth/services/auth.service';
 import { UserService } from '../../users/services/user.service';
 import { OfficeService } from '../../company/services/office.service';
 import { CompanyService } from '../../company/services/company.service';
+import { Office } from '../../company/models/office.model';
 import { SocialInsuranceStatus } from '../../social-insurance/models/social-insurance-status.model';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 import { EffectiveStandardRemuneration } from '../models/standard-remuneration-determination.model';
@@ -23,6 +24,7 @@ import {
     isSalaryPayMonthTarget,
     lookupExactRewardByPayMonth,
 } from '../utils/reward-pay-month.util';
+import { buildSocialInsuranceJoinJudgmentContext } from '../../social-insurance/utils/social-insurance-join-status.util';
 
 export type RewardInputListRow = {
     employee: Employee;
@@ -53,6 +55,7 @@ export class RewardInputPageComponent {
     errorMessage = signal('');
 
     employees = signal<Employee[]>([]);
+    officeById = signal<Record<string, Office>>({});
     officeNameById = signal<Record<string, string>>({});
     rewardsByEmployeeId = signal<Record<string, Record<string, StandardMonthlyReward>>>({});
     bonusesByEmployeeId = signal<Record<string, BonusReward[]>>({});
@@ -124,10 +127,13 @@ export class RewardInputPageComponent {
             this.payrollPaymentMonthOffset.set(company?.payrollPaymentMonthOffset ?? 1);
 
             const nameMap: Record<string, string> = {};
+            const officeMap: Record<string, Office> = {};
             for (const office of offices) {
                 nameMap[office.id] = office.name;
+                officeMap[office.id] = office;
             }
             this.officeNameById.set(nameMap);
+            this.officeById.set(officeMap);
 
             await this.loadSocialInsuranceStatuses(employees);
             await this.loadRewardsForMonth();
@@ -187,6 +193,7 @@ export class RewardInputPageComponent {
         const byEmployee = this.rewardsByEmployeeId();
         const bonusesByEmployee = this.bonusesByEmployeeId();
         const socialInsuranceByEmployee = this.socialInsuranceByEmployeeId();
+        const officeById = this.officeById();
         const payYearMonth = this.targetYearMonth();
         const offset = this.payrollPaymentMonthOffset();
         return this.employees().map((employee) => {
@@ -194,6 +201,11 @@ export class RewardInputPageComponent {
             const reward = lookupExactRewardByPayMonth(employeeRewards, payYearMonth);
             const isTargetMonth = isSalaryPayMonthTarget(employee, payYearMonth, offset);
             const socialInsurance = socialInsuranceByEmployee[employee.id] ?? null;
+            const joinJudgmentContext = buildSocialInsuranceJoinJudgmentContext(
+                employee,
+                socialInsurance,
+                officeById[employee.officeId] ?? null,
+            );
             const effective = this.determinationService.resolve(
                 employee,
                 employeeRewards,
@@ -201,6 +213,8 @@ export class RewardInputPageComponent {
                 socialInsurance?.healthInsuranceStartDate ?? null,
                 bonusesByEmployee[employee.id] ?? [],
                 offset,
+                [],
+                joinJudgmentContext,
             );
             return {
                 employee,

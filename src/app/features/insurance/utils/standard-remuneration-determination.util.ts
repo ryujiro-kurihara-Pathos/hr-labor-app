@@ -13,8 +13,15 @@ export type HealthInsuranceStartDateByEmployeeId = Record<string, string | null 
 
 const YEAR_MONTH_PATTERN = /^\d{4}-\d{2}$/;
 
-/** 定時決定の平均算定に必要な支払基礎日数の下限 */
+/** 定時決定の平均算定に必要な支払基礎日数の下限（4分の3基準・正社員） */
 export const REGULAR_DETERMINATION_MIN_PAYMENT_BASE_DAYS = 17;
+
+/** 定時決定の平均算定に必要な支払基礎日数の下限（短時間労働者として加入したパート・アルバイト） */
+export const SHORT_TIME_WORKER_REGULAR_DETERMINATION_MIN_PAYMENT_BASE_DAYS = 11;
+
+export function formatRegularDeterminationMinPaymentBaseDaysLabel(minDays: number): string {
+    return `支払基礎日数${minDays}日以上`;
+}
 
 /** 資格取得日（健康保険開始日があれば優先、なければ入社日） */
 export function getQualificationDate(
@@ -167,6 +174,7 @@ export function getRegularCalculationMonths(
     baseYear: number,
     qualificationDate: string,
     payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+    minPaymentBaseDays: number = REGULAR_DETERMINATION_MIN_PAYMENT_BASE_DAYS,
 ): string[] {
     return getRegularBaseMonths(
         employee,
@@ -180,7 +188,7 @@ export function getRegularCalculationMonths(
                 qualificationDate,
                 employee.retiredDate,
                 payrollPaymentMonthOffset,
-            ) >= REGULAR_DETERMINATION_MIN_PAYMENT_BASE_DAYS,
+            ) >= minPaymentBaseDays,
     );
 }
 

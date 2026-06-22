@@ -1204,6 +1204,7 @@ export class InsurancePremiumDetailPageComponent {
             this.confirmedEmployeeBonuses(),
             this.payrollPaymentMonthOffset(),
             this.salaryConditions(),
+            this.socialInsuranceJoinJudgmentContext(),
         );
     });
 
@@ -1230,6 +1231,7 @@ export class InsurancePremiumDetailPageComponent {
             this.confirmedEmployeeBonuses(),
             this.payrollPaymentMonthOffset(),
             this.salaryConditions(),
+            this.socialInsuranceJoinJudgmentContext(),
         );
     });
 
@@ -2708,6 +2710,7 @@ export class InsurancePremiumDetailPageComponent {
             manualRates: this.manualRates(),
             payrollPaymentMonthOffset: company.payrollPaymentMonthOffset ?? 1,
             salaryConditions: this.salaryConditions(),
+            joinJudgmentContext: this.socialInsuranceJoinJudgmentContext(),
         });
         if (!calculated) return;
 

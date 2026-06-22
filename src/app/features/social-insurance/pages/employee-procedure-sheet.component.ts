@@ -66,6 +66,10 @@ import {
     validateRegularDecisionProcedureSubmit,
     validateRevisionProcedureSubmit,
 } from '../utils/procedure-submit-validation.util';
+import {
+    buildSocialInsuranceJoinJudgmentContext,
+    resolveRegularDeterminationMinPaymentBaseDays,
+} from '../utils/social-insurance-join-status.util';
 
 type StandardRemunerationAmounts = {
     health: number;
@@ -547,6 +551,15 @@ export class EmployeeProcedureSheetComponent {
 
             const healthInsuranceStartDate = insuranceStatus?.healthInsuranceStartDate ?? null;
 
+            const joinJudgmentContext = buildSocialInsuranceJoinJudgmentContext(
+                employee,
+                insuranceStatus,
+                this.office(),
+            );
+            const regularMinPaymentBaseDays = resolveRegularDeterminationMinPaymentBaseDays(
+                joinJudgmentContext,
+            );
+
             const qualificationDate = getQualificationDate(employee, healthInsuranceStartDate);
 
             if (!qualificationDate) {
@@ -592,6 +605,7 @@ export class EmployeeProcedureSheetComponent {
                 baseYear,
                 qualificationDate,
                 payrollPaymentMonthOffset,
+                regularMinPaymentBaseDays,
             );
             const paymentMonths = getRegularDeterminationPaymentMonths(baseYear);
             const rewardMonths = getRegularDeterminationRewardMonths(
@@ -644,6 +658,10 @@ export class EmployeeProcedureSheetComponent {
 
                 payrollPaymentMonthOffset,
 
+                [],
+
+                regularMinPaymentBaseDays,
+
             );
 
             this.previousRevisionMonth.set(previousWinner?.effectiveFrom ?? null);
@@ -663,6 +681,10 @@ export class EmployeeProcedureSheetComponent {
                 bonuses,
 
                 payrollPaymentMonthOffset,
+
+                [],
+
+                joinJudgmentContext,
 
             );
 

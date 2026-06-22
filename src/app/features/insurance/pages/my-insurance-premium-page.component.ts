@@ -343,24 +343,24 @@ export class MyInsurancePremiumPageComponent implements OnInit {
     healthInsuranceJoinStatus = computed((): insuranceJoinStatus => {
         return resolveHealthInsuranceJoinStatus(
             this.insuranceStatus()?.healthInsuranceStatus,
-            buildSocialInsuranceJoinJudgmentContext(
-                this.employee(),
-                this.insuranceStatus(),
-                this.office(),
-            ),
+            this.socialInsuranceJoinJudgmentContext(),
         );
     });
 
     pensionInsuranceJoinStatus = computed((): insuranceJoinStatus => {
         return resolvePensionInsuranceJoinStatus(
             this.insuranceStatus()?.pensionInsuranceStatus,
-            buildSocialInsuranceJoinJudgmentContext(
-                this.employee(),
-                this.insuranceStatus(),
-                this.office(),
-            ),
+            this.socialInsuranceJoinJudgmentContext(),
         );
     });
+
+    socialInsuranceJoinJudgmentContext = computed(() =>
+        buildSocialInsuranceJoinJudgmentContext(
+            this.employee(),
+            this.insuranceStatus(),
+            this.office(),
+        ),
+    );
 
     careInsuranceLiabilityJoinStatus = computed((): insuranceJoinStatus => {
         const employee = this.employee();
@@ -515,6 +515,8 @@ export class MyInsurancePremiumPageComponent implements OnInit {
             this.insuranceStatus()?.healthInsuranceStartDate ?? null,
             this.allBonuses(),
             this.company()?.payrollPaymentMonthOffset ?? 1,
+            [],
+            this.socialInsuranceJoinJudgmentContext(),
         );
     });
 
@@ -900,6 +902,8 @@ export class MyInsurancePremiumPageComponent implements OnInit {
                     this.insuranceStatus()?.healthInsuranceStartDate ?? null,
                     this.allBonuses(),
                     this.company()?.payrollPaymentMonthOffset ?? 1,
+                    [],
+                    this.socialInsuranceJoinJudgmentContext(),
                 )
                 : null;
             this.effectiveStandard.set(effective);

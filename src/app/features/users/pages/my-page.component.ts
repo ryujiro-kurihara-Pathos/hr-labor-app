@@ -44,6 +44,7 @@ import {
     isHealthInsurancePremiumTargetMonth,
     isPensionInsurancePremiumTargetMonth,
 } from '../../social-insurance/utils/age-premium-period.util';
+import { buildSocialInsuranceJoinJudgmentContext } from '../../social-insurance/utils/social-insurance-join-status.util';
 
 type MyPageProcedureItem = {
     id: string;
@@ -346,6 +347,12 @@ export class MyPageComponent implements OnInit {
             Object.fromEntries(rewards.map((reward) => [reward.targetYearMonth, reward])),
         );
 
+        const joinJudgmentContext = buildSocialInsuranceJoinJudgmentContext(
+            employee,
+            this.insuranceStatus(),
+            office,
+        );
+
         const effective = liabilityYearMonth
             ? this.determinationService.resolve(
                 employee,
@@ -354,6 +361,8 @@ export class MyPageComponent implements OnInit {
                 this.insuranceStatus()?.healthInsuranceStartDate ?? null,
                 bonuses,
                 payrollOffset,
+                [],
+                joinJudgmentContext,
             )
             : null;
 

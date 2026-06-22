@@ -27,6 +27,7 @@ import { addMonthsToYearMonth, isPremiumViewableYearMonth } from '../utils/rewar
 import { lookupExactRewardByPayMonth, findLatestConfirmedPayYearMonth } from '../utils/reward-pay-month.util';
 import { isRewardConfirmed } from '../utils/reward-status.util';
 import { exportInsurancePremiumCsv } from '../utils/insurance-premium-csv-export.util';
+import { buildSocialInsuranceJoinJudgmentContext } from '../../social-insurance/utils/social-insurance-join-status.util';
 
 export type InsurancePremiumListRow = {
     employee: Employee;
@@ -249,6 +250,11 @@ export class InsurancePremiumPageComponent {
                 latestConfirmedWorkYearMonth,
             );
             const socialInsurance = socialInsuranceByEmployee[employee.id] ?? null;
+            const joinJudgmentContext = buildSocialInsuranceJoinJudgmentContext(
+                employee,
+                socialInsurance,
+                officeById[employee.officeId] ?? null,
+            );
             const effective = this.determinationService.resolve(
                 employee,
                 employeeRewards,
@@ -256,6 +262,8 @@ export class InsurancePremiumPageComponent {
                 socialInsurance?.healthInsuranceStartDate ?? null,
                 bonusesByEmployee[employee.id] ?? [],
                 offset,
+                [],
+                joinJudgmentContext,
             );
             const calculatedPremium = isTargetMonth
                 ? this.premiumCalculationService.calculateForPayMonth({
@@ -270,6 +278,7 @@ export class InsurancePremiumPageComponent {
                     pensionInsuranceEndDate: socialInsurance?.pensionInsuranceEndDate ?? null,
                     office: officeById[employee.officeId] ?? null,
                     manualRates: manualRatesByEmployee[employee.id] ?? null,
+                    joinJudgmentContext,
                 })
                 : null;
             return {
