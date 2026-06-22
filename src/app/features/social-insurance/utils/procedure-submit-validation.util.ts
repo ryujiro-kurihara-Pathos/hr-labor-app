@@ -11,6 +11,7 @@ import { QualificationMonthlyReward } from './qualification-reward.util';
 import {
     resolveInsuredPeriodBounds,
     validateDateWithinInsuredPeriod,
+    validateDependentBirthDate,
     validateDependentOccurredDate,
     validateLossDateRange,
     validateQualificationDateRange,
@@ -314,11 +315,27 @@ export function validateDependentProcedureSubmit(
     }
 
     if (options?.employee) {
+        const referenceDate = todayDateString();
         const bounds = resolveInsuredPeriodBounds({
             employee: options.employee,
             healthInsuranceStartDate: options.healthInsuranceStartDate,
             healthInsuranceEndDate: options.healthInsuranceEndDate,
         });
+
+        if (changeType === 'add' || changeType === 'change') {
+            const birthReason = validateDependentBirthDate({
+                birthDate: form.birthDate.trim(),
+                referenceDate,
+                eventDate:
+                    changeType === 'add'
+                        ? form.dependencyStartDate
+                        : form.changeDate,
+            });
+            if (birthReason) {
+                return errorFailure(birthReason);
+            }
+        }
+
         const eventDate =
             changeType === 'add'
                 ? form.dependencyStartDate.trim()
@@ -329,6 +346,8 @@ export function validateDependentProcedureSubmit(
             occurredDate: eventDate,
             changeType,
             bounds,
+            employee: options.employee,
+            referenceDate,
             dependencyStartDate:
                 options.dependencyStartDate
                 ?? (changeType === 'add' ? form.dependencyStartDate : undefined),

@@ -103,14 +103,58 @@ export function validateDateWithinInsuredPeriod(
     return null;
 }
 
+/** 被扶養者の生年月日 */
+export function validateDependentBirthDate(params: {
+    birthDate: string;
+    referenceDate: string;
+    eventDate?: string | null;
+}): string | null {
+    if (!isValidDateString(params.birthDate)) {
+        return '生年月日の形式が正しくありません。';
+    }
+
+    if (!isValidDateString(params.referenceDate)) {
+        return null;
+    }
+
+    if (params.birthDate > params.referenceDate) {
+        return '生年月日に未来の日付は指定できません。';
+    }
+
+    const event = params.eventDate?.trim();
+    if (event && isValidDateString(event) && params.birthDate > event) {
+        return `生年月日は${formatDateLabel(event)}以前の日付を指定してください。`;
+    }
+
+    return null;
+}
+
 /** 被扶養者異動日の追加チェック（削除・変更は扶養期間内） */
 export function validateDependentOccurredDate(params: {
     occurredDate: string;
     changeType: 'add' | 'change' | 'delete';
     bounds: InsuredPeriodBounds;
+    employee?: Employee | null;
+    referenceDate?: string | null;
     dependencyStartDate?: string | null;
     dependencyEndDate?: string | null;
 }): string | null {
+    if (!isValidDateString(params.occurredDate)) {
+        return '日付の形式が正しくありません。';
+    }
+
+    const reference = params.referenceDate?.trim();
+    if (reference && isValidDateString(reference) && params.occurredDate > reference) {
+        return '異動日に未来の日付は指定できません。';
+    }
+
+    if (params.changeType === 'add' && params.employee) {
+        const joinedDate = params.employee.joinedDate?.trim();
+        if (joinedDate && params.occurredDate < joinedDate) {
+            return `被扶養者になった日は入社日（${formatDateLabel(joinedDate)}）以降の日付を指定してください。`;
+        }
+    }
+
     const insuredReason = validateDateWithinInsuredPeriod(params.occurredDate, params.bounds);
     if (insuredReason) return insuredReason;
 
@@ -135,6 +179,7 @@ export function resolveDependentOccurredDateBounds(params: {
     changeType: 'add' | 'change' | 'delete' | null;
     bounds: InsuredPeriodBounds;
     dependent?: Dependent | null;
+    referenceDate?: string | null;
 }): { min: string | null; max: string | null } {
     const qualification = params.bounds.qualificationDate?.trim() || null;
     const loss = params.bounds.lossDate?.trim() || null;
@@ -153,6 +198,11 @@ export function resolveDependentOccurredDateBounds(params: {
         if (start && (!min || start > min)) {
             min = start;
         }
+    }
+
+    const reference = params.referenceDate?.trim();
+    if (reference && (!max || reference < max)) {
+        max = reference;
     }
 
     return { min, max };

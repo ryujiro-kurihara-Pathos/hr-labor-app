@@ -1333,6 +1333,18 @@ export class InsurancePremiumDetailPageComponent {
         return sumBonusAmountInTargetPeriod(this.confirmedEmployeeBonuses(), yearMonth);
     });
 
+    /** 当月登録済み・下書きの賞与合計（報酬月額パネル用） */
+    monthBonusTotalInPayMonth = computed(() =>
+        this.monthBonuses().reduce((sum, bonus) => sum + (bonus.bonusAmount ?? 0), 0),
+    );
+
+    monthBonusSummaryHint = computed((): string => {
+        if (this.treatBonusAsMonthlyRemuneration()) {
+            return '年4回以上の賞与のため、標準報酬月額に算入します（下の「うち賞与算入」を参照）';
+        }
+        return '給与の報酬月額とは別扱いです（賞与保険料の計算に使用）';
+    });
+
     // 月次報酬のステータス
     monthRewardStatus = computed((): MonthRewardStatus => {
         if (this.isLoadingMonth()) return 'loading';

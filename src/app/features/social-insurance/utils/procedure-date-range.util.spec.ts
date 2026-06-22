@@ -2,6 +2,7 @@ import { Employee } from '../../employee/models/employee.models';
 import {
     resolveInsuredPeriodBounds,
     validateDateWithinInsuredPeriod,
+    validateDependentBirthDate,
     validateDependentOccurredDate,
     validateLossDateRange,
     validateQualificationDateRange,
@@ -57,5 +58,56 @@ describe('procedure-date-range.util', () => {
                 dependencyStartDate: '2026-04-10',
             }),
         ).toContain('被扶養者になった日');
+    });
+
+    it('rejects future birth date', () => {
+        expect(
+            validateDependentBirthDate({
+                birthDate: '2030-01-01',
+                referenceDate: '2026-06-01',
+            }),
+        ).toContain('未来');
+    });
+
+    it('rejects birth date after dependency start date', () => {
+        expect(
+            validateDependentBirthDate({
+                birthDate: '2020-06-01',
+                referenceDate: '2026-06-01',
+                eventDate: '2020-01-01',
+            }),
+        ).toContain('以前');
+    });
+
+    it('rejects dependency start date before join date for add', () => {
+        const bounds = resolveInsuredPeriodBounds({
+            employee,
+            healthInsuranceStartDate: '2026-04-01',
+        });
+        expect(
+            validateDependentOccurredDate({
+                occurredDate: '2026-03-31',
+                changeType: 'add',
+                bounds,
+                employee,
+                referenceDate: '2026-06-01',
+            }),
+        ).toContain('入社日');
+    });
+
+    it('rejects future dependency occurred date', () => {
+        const bounds = resolveInsuredPeriodBounds({
+            employee,
+            healthInsuranceStartDate: '2026-04-01',
+        });
+        expect(
+            validateDependentOccurredDate({
+                occurredDate: '2026-07-01',
+                changeType: 'add',
+                bounds,
+                employee,
+                referenceDate: '2026-06-01',
+            }),
+        ).toContain('未来');
     });
 });

@@ -699,9 +699,18 @@
                         —
                     }
                 </span>
+                @if (monthBonusTotalInPayMonth() > 0) {
+                    <div class="month-bonus-summary">
+                        <span class="month-bonus-summary-label">この月の賞与支給額</span>
+                        <span class="month-bonus-summary-value">
+                            {{ monthBonusTotalInPayMonth() | number }}<span class="month-bonus-summary-unit">円</span>
+                        </span>
+                        <p class="month-bonus-summary-hint">{{ monthBonusSummaryHint() }}</p>
+                    </div>
+                }
                 @if (includedBonusInMonth() > 0) {
                     <p class="included-bonus-note">
-                        うち賞与算入 {{ includedBonusInMonth() | number }}円
+                        標準報酬月額への算入 {{ includedBonusInMonth() | number }}円
                             </p>
                         }
                 @if (effectiveStandard(); as effective) {
@@ -2885,6 +2894,42 @@
         font-size: 12px;
         font-weight: 500;
         color: #6b7280;
+    }
+
+    .month-bonus-summary {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px dashed #e2e8f0;
+        text-align: center;
+    }
+
+    .month-bonus-summary-label {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #64748b;
+    }
+
+    .month-bonus-summary-value {
+        display: block;
+        font-size: 22px;
+        font-weight: 700;
+        color: #475569;
+        line-height: 1.2;
+    }
+
+    .month-bonus-summary-unit {
+        margin-left: 2px;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .month-bonus-summary-hint {
+        margin: 6px 0 0;
+        font-size: 11px;
+        line-height: 1.45;
+        color: #94a3b8;
     }
 
     .month-bonus-status-block {

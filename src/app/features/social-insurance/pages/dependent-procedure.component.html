@@ -267,6 +267,7 @@
                             type="date"
                             [ngModel]="f.birthDate"
                             (ngModelChange)="updateForm('birthDate', $event)"
+                            [max]="birthDateBounds().max ?? undefined"
                         />
                     </div>
                     <div class="form-field">

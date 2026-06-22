@@ -139,6 +139,7 @@ export class DependentProcedureComponent {
             changeType: this.changeType(),
             bounds: this.insuredPeriodBounds(),
             dependent: this.selectedDependent(),
+            referenceDate: todayDateString(),
         }),
     );
 
@@ -147,6 +148,7 @@ export class DependentProcedureComponent {
             changeType: 'add',
             bounds: this.insuredPeriodBounds(),
             dependent: null,
+            referenceDate: todayDateString(),
         }),
     );
 
@@ -155,8 +157,19 @@ export class DependentProcedureComponent {
             changeType: 'delete',
             bounds: this.insuredPeriodBounds(),
             dependent: this.selectedDependent(),
+            referenceDate: todayDateString(),
         }),
     );
+
+    birthDateBounds = computed((): { min: string | null; max: string | null } => {
+        const today = todayDateString();
+        const start = this.form().dependencyStartDate?.trim();
+        let max = today;
+        if (start && start < max) {
+            max = start;
+        }
+        return { min: null, max };
+    });
 
     submitValidation = computed(() => {
         const changeType = this.changeType();

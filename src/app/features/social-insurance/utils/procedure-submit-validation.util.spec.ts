@@ -191,6 +191,58 @@ describe('procedure-submit-validation.util', () => {
                 expect(result.missingFields?.some((field) => field.label === '記載')).toBeTrue();
             }
         });
+
+        it('rejects future birth date on submit', () => {
+            const result = validateDependentProcedureSubmit(
+                'add',
+                {
+                    changeDate: '',
+                    dependentId: '',
+                    lastName: '山田',
+                    firstName: '花子',
+                    birthDate: '2099-01-01',
+                    gender: 'female',
+                    relationship: 'child',
+                    dependencyStartDate: '2026-04-01',
+                    addReason: 'birth',
+                    addReasonNote: '',
+                    dependencyEndDate: '',
+                    deleteReason: '',
+                },
+                undefined,
+                { employee },
+            );
+            expect(result.ok).toBeFalse();
+            if (!result.ok) {
+                expect(result.message).toContain('未来');
+            }
+        });
+
+        it('rejects dependency start date before join date on submit', () => {
+            const result = validateDependentProcedureSubmit(
+                'add',
+                {
+                    changeDate: '',
+                    dependentId: '',
+                    lastName: '山田',
+                    firstName: '花子',
+                    birthDate: '2020-01-01',
+                    gender: 'female',
+                    relationship: 'child',
+                    dependencyStartDate: '2026-03-31',
+                    addReason: 'birth',
+                    addReasonNote: '',
+                    dependencyEndDate: '',
+                    deleteReason: '',
+                },
+                undefined,
+                { employee },
+            );
+            expect(result.ok).toBeFalse();
+            if (!result.ok) {
+                expect(result.message).toContain('入社日');
+            }
+        });
     });
 
     describe('validateRegularDecisionProcedureSubmit', () => {
