@@ -1,4 +1,4 @@
-import { buildJoinMonthExpectedRewardInput } from './join-month-expected-reward.util';
+import { buildJoinMonthExpectedRewardInput, buildJoinMonthRewardFromSalaryCondition } from './join-month-expected-reward.util';
 import {
     findEmployeeOldestUnregisteredYearMonth,
     findOldestUnregisteredYearMonth,
@@ -43,6 +43,32 @@ describe('join-month-expected-reward.util', () => {
                 expectedMonthlySalary: 0,
             }),
         ).toBeNull();
+    });
+
+    it('builds full-time join month reward from salary condition for auto-confirm', () => {
+        const input = buildJoinMonthRewardFromSalaryCondition({
+            companyId: 'c1',
+            employeeId: 'e1',
+            joinedDate: '2024-04-01',
+            employmentType: 'full-time',
+            condition: {
+                companyId: 'c1',
+                employeeId: 'e1',
+                effectiveStartMonth: '2024-04',
+                basicSalary: 250_000,
+                commutingAllowance: 10_000,
+                positionAllowance: 0,
+                housingAllowance: 0,
+                fixedOvertimePay: 0,
+                otherFixedAllowance: 0,
+                note: '',
+                changeReason: '',
+            },
+        });
+
+        expect(input?.targetYearMonth).toBe('2024-04');
+        expect(input?.basicSalary).toBe(250_000);
+        expect(input?.commutingAllowance).toBe(10_000);
     });
 });
 

@@ -10,7 +10,8 @@ import { effectiveMonthlyRewardTotal } from '../utils/effective-monthly-reward.u
 import { pickWinningDeterminationCandidate } from '../utils/determination-precedence.util';
 import { calculateRegularDeterminationAverageMonthlyReward } from '../utils/revision-determination.util';
 import { addMonthsToYearMonth, yearMonthFromDateString } from '../utils/reward-target-month.util';
-import { formatPayMonthListFromWorkMonths, formatPayYearMonthLabelFromWorkMonth, lookupQualificationInitialReward, resolveQualificationRewardPayYearMonth } from '../utils/reward-pay-month.util';
+import { resolveQualificationJoinMonthReward } from '../../social-insurance/utils/qualification-reward.util';
+import { formatPayMonthListFromWorkMonths, formatPayYearMonthLabelFromWorkMonth, isConfirmedExactRewardRegisteredForPayMonth, lookupConfirmedExactRewardByPayMonth, resolveQualificationRewardPayYearMonth } from '../utils/reward-pay-month.util';
 import {
     formatYearMonthLabel,
     formatYearMonthList,
@@ -86,11 +87,13 @@ export class StandardRemunerationDeterminationService {
         if (!winner) {
             if (targetYearMonth < firstRegularYm) {
                 return this.resolveInitial(
+                    employee,
                     qualificationYearMonth,
                     rewardsByYearMonth,
                     qualificationDate,
                     allBonuses,
                     payrollPaymentMonthOffset,
+                    salaryConditions,
                 );
             }
             return this.resolveRegularIncomplete(
@@ -107,11 +110,13 @@ export class StandardRemunerationDeterminationService {
         switch (winner.kind) {
             case 'initial':
                 return this.resolveInitial(
+                    employee,
                     qualificationYearMonth,
                     rewardsByYearMonth,
                     qualificationDate,
                     allBonuses,
                     payrollPaymentMonthOffset,
+                    salaryConditions,
                 );
             case 'revision':
                 return this.resolveRevision(
@@ -137,11 +142,13 @@ export class StandardRemunerationDeterminationService {
 
     // 資格取得時決定
     private resolveInitial(
+        employee: Employee,
         qualificationYearMonth: string,
         rewardsByYearMonth: Record<string, StandardMonthlyReward>,
         qualificationDate: string,
         allBonuses: BonusReward[],
         payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+        salaryConditions: SalaryCondition[] = [],
     ): EffectiveStandardRemuneration {
         const firstRegularYm = getFirstRegularDeterminationYearMonth(qualificationDate);
         const untilYm = this.addMonths(firstRegularYm, -1);
@@ -151,14 +158,18 @@ export class StandardRemunerationDeterminationService {
             payrollPaymentMonthOffset,
         );
 
-        const initialReward = lookupQualificationInitialReward(
+        const { reward: initialReward, fromExpectedSalaryCondition } = resolveQualificationJoinMonthReward({
+            joinedDate: qualificationDate,
+            companyId: employee.companyId,
+            employeeId: employee.id,
+            employmentType: employee.employmentType,
+            salaryConditions,
             rewardsByYearMonth,
-            qualificationYearMonth,
             payrollPaymentMonthOffset,
-        );
+        });
         if (!initialReward) {
             const missingMessage = payrollPaymentMonthOffset === 1
-                ? `${formatYearMonthLabel(rewardPayYearMonth)}支給分の報酬を確定してください（${formatYearMonthLabel(qualificationYearMonth)}入社・資格取得時）。${untilLabel}までこの標準報酬月額が適用されます。`
+                ? `${formatYearMonthLabel(qualificationYearMonth)}入社時の見込み報酬または${formatYearMonthLabel(rewardPayYearMonth)}支給分の報酬を登録してください。${untilLabel}までこの標準報酬月額が適用されます。`
                 : `${formatYearMonthLabel(qualificationYearMonth)}の報酬情報（資格取得時）を登録してください。${untilLabel}までこの標準報酬月額が適用されます。`;
             return this.incomplete(
                 'initial',
@@ -170,14 +181,16 @@ export class StandardRemunerationDeterminationService {
             );
         }
 
-        const appliedLabel = payrollPaymentMonthOffset === 1
-            ? `${formatYearMonthLabel(qualificationYearMonth)}分（${formatYearMonthLabel(rewardPayYearMonth)}支給）`
-            : formatYearMonthLabel(qualificationYearMonth);
+        const appliedLabel = fromExpectedSalaryCondition
+            ? `${formatYearMonthLabel(qualificationYearMonth)}入社時の見込み報酬`
+            : payrollPaymentMonthOffset === 1
+                ? `${formatYearMonthLabel(qualificationYearMonth)}分（${formatYearMonthLabel(rewardPayYearMonth)}支給）`
+                : formatYearMonthLabel(qualificationYearMonth);
 
         return {
             determinationType: 'initial',
             determinationLabel: '資格取得時決定',
-            description: `${appliedLabel}の報酬に基づく標準報酬月額を適用（${untilLabel}まで）。`,
+            description: `${appliedLabel}に基づく標準報酬月額を適用（${untilLabel}まで）。`,
             qualificationYearMonth,
             calculationMonths: [qualificationYearMonth],
             averageMonthlyReward: this.monthlyReward(
@@ -213,7 +226,9 @@ export class StandardRemunerationDeterminationService {
             payrollPaymentMonthOffset,
         );
 
-        const missingMonths = calculationMonths.filter((ym) => !rewardsByYearMonth[ym]);
+        const missingMonths = calculationMonths.filter(
+            (ym) => !isConfirmedExactRewardRegisteredForPayMonth(rewardsByYearMonth, ym),
+        );
 
         if (missingMonths.length > 0) {
             return this.incomplete(
@@ -226,11 +241,11 @@ export class StandardRemunerationDeterminationService {
             );
         }
 
-        const total = calculationMonths.reduce(
-            (sum, ym) =>
-                sum + this.monthlyReward(rewardsByYearMonth[ym], ym, allBonuses),
-            0,
-        );
+        const total = calculationMonths.reduce((sum, ym) => {
+            const reward = lookupConfirmedExactRewardByPayMonth(rewardsByYearMonth, ym);
+            if (!reward) return sum;
+            return sum + this.monthlyReward(reward, ym, allBonuses);
+        }, 0);
 
         const averageMonthlyReward = Math.round(total / calculationMonths.length);
         const calculation = this.calculator.calculate(averageMonthlyReward);
@@ -308,7 +323,9 @@ export class StandardRemunerationDeterminationService {
             );
         }
 
-        const missingMonths = calculationMonths.filter((ym) => !rewardsByYearMonth[ym]);
+        const missingMonths = calculationMonths.filter(
+            (ym) => !isConfirmedExactRewardRegisteredForPayMonth(rewardsByYearMonth, ym),
+        );
         if (missingMonths.length > 0) {
             return this.incomplete(
                 'regular',

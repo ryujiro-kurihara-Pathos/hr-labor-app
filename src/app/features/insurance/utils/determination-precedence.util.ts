@@ -26,27 +26,41 @@ import {
     revisionCalculationMonthsMeetPaymentBaseDays,
 } from './revision-determination.util';
 import { SalaryCondition } from '../models/salary-condition.model';
-import { salaryConditionRevisionOriginMonths } from './salary-condition.util';
-import { formatPayMonthRangeFromWorkMonths, formatPayYearMonthLabelFromWorkMonth, lookupQualificationInitialReward } from './reward-pay-month.util';
+import { mergeFixedWageChangedMonths, salaryConditionRevisionOriginMonths } from './salary-condition.util';
+import { formatPayMonthRangeFromWorkMonths, formatPayYearMonthLabelFromWorkMonth, isConfirmedExactRewardRegisteredForPayMonth, lookupConfirmedExactRewardByPayMonth, resolveQualificationRewardPayYearMonth } from './reward-pay-month.util';
+import { resolveQualificationJoinMonthReward } from '../../social-insurance/utils/qualification-reward.util';
+import { effectiveMonthlyRewardTotal } from './effective-monthly-reward.util';
+import { yearMonthFromDateString } from './reward-target-month.util';
+import { isRewardConfirmed } from './reward-status.util';
 
 export type WinningDeterminationKind = 'initial' | 'regular' | 'revision';
 
-/** 随時改定の起算月。給与条件がある場合は給与条件のみ（報酬の fixedWageChanged は使わない） */
+/** 随時改定の起算月（給与条件と確定済み報酬の fixedWageChanged を統合） */
 export function resolveRevisionOriginMonths(
     rewardsByYearMonth: Record<string, StandardMonthlyReward>,
     salaryConditions: SalaryCondition[] = [],
 ): string[] {
     const fromConditions = salaryConditionRevisionOriginMonths(salaryConditions);
-    if (fromConditions.length > 0) {
-        return fromConditions;
-    }
+    const fromRewards = Object.entries(rewardsByYearMonth)
+        .filter(([, reward]) => reward.fixedWageChanged && isRewardConfirmed(reward))
+        .map(([ym]) => ym);
 
-    const rewardOrigins = Object.entries(rewardsByYearMonth)
-        .filter(([, reward]) => reward.fixedWageChanged)
-        .map(([ym]) => ym)
-        .sort();
+    return collapseConsecutiveRevisionOrigins(
+        mergeFixedWageChangedMonths(fromRewards, fromConditions),
+    );
+}
 
-    return collapseConsecutiveRevisionOrigins(rewardOrigins);
+/** 随時改定起算月の下限（資格取得後の初回支給月以降の支給年月） */
+export function filterRevisionOriginMonthsAfterQualification(
+    originMonths: string[],
+    qualificationYearMonth: string,
+    payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+): string[] {
+    const minPayYearMonth = resolveQualificationRewardPayYearMonth(
+        qualificationYearMonth,
+        payrollPaymentMonthOffset,
+    );
+    return originMonths.filter((ym) => ym >= minPayYearMonth);
 }
 
 /**
@@ -90,7 +104,10 @@ function buildInitialRegularCandidates(
     if (targetYearMonth < firstRegularYearMonth) {
         candidates.push({
             kind: 'initial',
-            effectiveFrom: qualificationYearMonth,
+            effectiveFrom: resolveQualificationRewardPayYearMonth(
+                qualificationYearMonth,
+                payrollPaymentMonthOffset,
+            ),
         });
     } else {
         const baseYear = getRegularDeterminationBaseYear(targetYearMonth);
@@ -104,7 +121,9 @@ function buildInitialRegularCandidates(
 
         if (
             calculationMonths.length > 0 &&
-            calculationMonths.every((ym) => Boolean(rewardsByYearMonth[ym]))
+            calculationMonths.every((ym) =>
+                isConfirmedExactRewardRegisteredForPayMonth(rewardsByYearMonth, ym),
+            )
         ) {
             candidates.push({
                 kind: 'regular',
@@ -117,6 +136,92 @@ function buildInitialRegularCandidates(
     return candidates;
 }
 
+/**
+ * 随時改定の改定前等級を、起算月前月時点の決定から解決する。
+ * 標準報酬決定サービスと同様、定時決定前で候補が無い場合は資格取得時決定にフォールバックする。
+ */
+function resolveRevisionPreviousGrades(
+    baselineReferenceMonth: string,
+    qualificationYearMonth: string,
+    firstRegularYearMonth: string,
+    baselineCandidates: DeterminationCandidate[],
+    rewardsByYearMonth: Record<string, StandardMonthlyReward>,
+    employee: Employee,
+    qualificationDate: string,
+    calculate: RevisionCalculateFn,
+    allBonuses: BonusReward[],
+    payrollPaymentMonthOffset: PayrollPaymentMonthOffset,
+    regularDeterminationMinPaymentBaseDays: number,
+    salaryConditions: SalaryCondition[],
+): RevisionGradePair | null {
+    const baselineWinner = pickBestCandidateForMonth(baselineReferenceMonth, baselineCandidates);
+    if (baselineWinner) {
+        return resolveGradesFromWinner(
+            baselineWinner,
+            rewardsByYearMonth,
+            employee,
+            qualificationDate,
+            qualificationYearMonth,
+            calculate,
+            allBonuses,
+            payrollPaymentMonthOffset,
+            regularDeterminationMinPaymentBaseDays,
+            salaryConditions,
+        );
+    }
+
+    if (baselineReferenceMonth >= firstRegularYearMonth) {
+        return null;
+    }
+
+    return resolveGradesFromWinner(
+        {
+            kind: 'initial',
+            effectiveFrom: resolveQualificationRewardPayYearMonth(
+                qualificationYearMonth,
+                payrollPaymentMonthOffset,
+            ),
+        },
+        rewardsByYearMonth,
+        employee,
+        qualificationDate,
+        qualificationYearMonth,
+        calculate,
+        allBonuses,
+        payrollPaymentMonthOffset,
+        regularDeterminationMinPaymentBaseDays,
+        salaryConditions,
+    );
+}
+
+/** 随時改定の改定前等級に使う資格取得時決定の報酬（入社月見込み給料を優先し、資格取得時決定と同じ基準） */
+function resolveRevisionBaselineInitialReward(
+    employee: Employee,
+    qualificationDate: string,
+    rewardsByYearMonth: Record<string, StandardMonthlyReward>,
+    payrollPaymentMonthOffset: PayrollPaymentMonthOffset,
+    salaryConditions: SalaryCondition[],
+): { reward: StandardMonthlyReward; referenceYearMonth: string } | null {
+    const qualificationYearMonth = yearMonthFromDateString(qualificationDate);
+    if (!qualificationYearMonth) return null;
+
+    const { reward } = resolveQualificationJoinMonthReward({
+        joinedDate: qualificationDate,
+        companyId: employee.companyId,
+        employeeId: employee.id,
+        employmentType: employee.employmentType,
+        salaryConditions,
+        rewardsByYearMonth,
+        payrollPaymentMonthOffset,
+    });
+    if (!reward) return null;
+
+    return {
+        reward,
+        referenceYearMonth: qualificationYearMonth,
+    };
+}
+
 function resolveGradesFromWinner(
     winner: DeterminationCandidate,
     rewardsByYearMonth: Record<string, StandardMonthlyReward>,
@@ -127,18 +232,28 @@ function resolveGradesFromWinner(
     allBonuses: BonusReward[],
     payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
     minPaymentBaseDays: number = REGULAR_DETERMINATION_MIN_PAYMENT_BASE_DAYS,
+    salaryConditions: SalaryCondition[] = [],
 ): RevisionGradePair | null {
     switch (winner.kind) {
         case 'initial': {
-            const reward = lookupQualificationInitialReward(
+            const baseline = resolveRevisionBaselineInitialReward(
+                employee,
+                qualificationDate,
                 rewardsByYearMonth,
-                qualificationYearMonth,
                 payrollPaymentMonthOffset,
+                salaryConditions,
             );
-            if (!reward) return null;
+            if (!baseline) return null;
+            const monthlyReward = effectiveMonthlyRewardTotal(
+                baseline.reward,
+                baseline.referenceYearMonth,
+                allBonuses,
+            );
+            const calculation = calculate(monthlyReward);
+            if (!calculation.health || !calculation.pension) return null;
             return {
-                health: { grade: reward.healthInsuranceGrade },
-                pension: { grade: reward.pensionInsuranceGrade },
+                health: { grade: calculation.health.grade },
+                pension: { grade: calculation.pension.grade },
             };
         }
         case 'revision': {
@@ -167,7 +282,9 @@ function resolveGradesFromWinner(
                 payrollPaymentMonthOffset,
                 minPaymentBaseDays,
             );
-            if (!calculationMonths.every((ym) => rewardsByYearMonth[ym])) return null;
+            if (!calculationMonths.every((ym) =>
+                isConfirmedExactRewardRegisteredForPayMonth(rewardsByYearMonth, ym),
+            )) return null;
 
             const average = calculateRegularDeterminationAverageMonthlyReward(
                 rewardsByYearMonth,
@@ -212,9 +329,11 @@ export function listEligibleRevisionCandidates(
     payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
     regularDeterminationMinPaymentBaseDays: number = REGULAR_DETERMINATION_MIN_PAYMENT_BASE_DAYS,
 ): DeterminationCandidate[] {
-    const originMonths = resolveRevisionOriginMonths(rewardsByYearMonth, salaryConditions)
-        .filter((ym) => ym >= qualificationYearMonth)
-        .sort();
+    const originMonths = filterRevisionOriginMonthsAfterQualification(
+        resolveRevisionOriginMonths(rewardsByYearMonth, salaryConditions),
+        qualificationYearMonth,
+        payrollPaymentMonthOffset,
+    ).sort();
 
     const eligible: DeterminationCandidate[] = [];
 
@@ -236,7 +355,7 @@ export function listEligibleRevisionCandidates(
         if (result.eligible) {
             eligible.push({
                 kind: 'revision',
-                effectiveFrom: result.applyFromMonth,
+                effectiveFrom: getRevisionApplyFromMonth(originMonth),
                 revisionOriginMonth: originMonth,
             });
         }
@@ -264,13 +383,17 @@ export function evaluateRevisionAtOrigin(
         return { eligible: false, reason: 'no_fixed_wage_change' };
     }
 
-    const originReward = rewardsByYearMonth[originMonth];
+    const originReward = lookupConfirmedExactRewardByPayMonth(rewardsByYearMonth, originMonth);
     if (!originReward) {
         return { eligible: false, reason: 'missing_months' };
     }
 
     const calculationMonths = getRevisionCalculationMonths(originMonth);
-    if (!calculationMonths.every((ym) => rewardsByYearMonth[ym])) {
+    if (
+        !calculationMonths.every((ym) =>
+            isConfirmedExactRewardRegisteredForPayMonth(rewardsByYearMonth, ym),
+        )
+    ) {
         return { eligible: false, reason: 'missing_months' };
     }
 
@@ -285,9 +408,12 @@ export function evaluateRevisionAtOrigin(
         return { eligible: false, reason: 'insufficient_payment_base_days' };
     }
 
-    const priorOrigins = originMonths
-        .filter((ym) => ym >= qualificationYearMonth && ym < originMonth)
-        .sort();
+    const allOriginMonths = filterRevisionOriginMonthsAfterQualification(
+        resolveRevisionOriginMonths(rewardsByYearMonth, salaryConditions),
+        qualificationYearMonth,
+        payrollPaymentMonthOffset,
+    );
+    const priorOrigins = allOriginMonths.filter((ym) => ym < originMonth).sort();
 
     const priorEligible: DeterminationCandidate[] = [];
     for (const priorOrigin of priorOrigins) {
@@ -307,7 +433,7 @@ export function evaluateRevisionAtOrigin(
         if (result.eligible) {
             priorEligible.push({
                 kind: 'revision',
-                effectiveFrom: result.applyFromMonth,
+                effectiveFrom: getRevisionApplyFromMonth(priorOrigin),
                 revisionOriginMonth: priorOrigin,
             });
         }
@@ -335,21 +461,19 @@ export function evaluateRevisionAtOrigin(
         ),
         ...priorEligible,
     ];
-    const baselineWinner = pickBestCandidateForMonth(baselineReferenceMonth, baselineCandidates);
-    if (!baselineWinner) {
-        return { eligible: false, reason: 'no_previous_grades' };
-    }
-
-    const previousGrades = resolveGradesFromWinner(
-        baselineWinner,
+    const previousGrades = resolveRevisionPreviousGrades(
+        baselineReferenceMonth,
+        qualificationYearMonth,
+        firstRegularYearMonth,
+        baselineCandidates,
         rewardsByYearMonth,
         employee,
         qualificationDate,
-        qualificationYearMonth,
         calculate,
         allBonuses,
         payrollPaymentMonthOffset,
         regularDeterminationMinPaymentBaseDays,
+        salaryConditions,
     );
     if (!previousGrades) {
         return { eligible: false, reason: 'no_previous_grades' };
@@ -401,6 +525,92 @@ export function evaluateRevisionAtOrigin(
 }
 
 export { formatRevisionGradeComparison };
+export type { RevisionEligibilityResult };
+
+export type RevisionEligibilityForPayMonth = {
+    originMonth: string;
+    result: RevisionEligibilityResult;
+};
+
+/** 表示中の支給月が随時改定の起算月または算定3か月に含まれる場合、その成立可否を評価する */
+export function evaluateRevisionEligibilityForPayMonth(
+    payYearMonth: string,
+    qualificationYearMonth: string,
+    firstRegularYearMonth: string,
+    employee: Employee,
+    qualificationDate: string,
+    rewardsByYearMonth: Record<string, StandardMonthlyReward>,
+    calculate: RevisionCalculateFn,
+    allBonuses: BonusReward[] = [],
+    payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+    salaryConditions: SalaryCondition[] = [],
+    regularDeterminationMinPaymentBaseDays: number = REGULAR_DETERMINATION_MIN_PAYMENT_BASE_DAYS,
+): RevisionEligibilityForPayMonth | null {
+    const originMonths = filterRevisionOriginMonthsAfterQualification(
+        resolveRevisionOriginMonths(rewardsByYearMonth, salaryConditions),
+        qualificationYearMonth,
+        payrollPaymentMonthOffset,
+    ).sort();
+
+    for (const originMonth of originMonths) {
+        const calculationMonths = getRevisionCalculationMonths(originMonth);
+        if (!calculationMonths.includes(payYearMonth)) continue;
+
+        const result = evaluateRevisionAtOrigin(
+            originMonth,
+            qualificationYearMonth,
+            firstRegularYearMonth,
+            employee,
+            qualificationDate,
+            rewardsByYearMonth,
+            calculate,
+            allBonuses,
+            payrollPaymentMonthOffset,
+            salaryConditions,
+            regularDeterminationMinPaymentBaseDays,
+        );
+
+        return { originMonth, result };
+    }
+
+    return null;
+}
+
+/** 随時改定の成立状況に応じた注意メッセージ（成立済み・届出表示中は null） */
+export function formatRevisionEligibilityWarningMessage(
+    entry: RevisionEligibilityForPayMonth,
+    changedFieldLabels: string[],
+    payrollPaymentMonthOffset: PayrollPaymentMonthOffset,
+): string | null {
+    if (entry.result.eligible) return null;
+
+    const calculationMonths = getRevisionCalculationMonths(entry.originMonth);
+    const windowLabel = formatPayMonthRangeFromWorkMonths(
+        calculationMonths[0]!,
+        calculationMonths[2]!,
+        payrollPaymentMonthOffset,
+    );
+    const fieldsLabel = changedFieldLabels.length > 0
+        ? changedFieldLabels.join('・')
+        : '固定的賃金';
+
+    switch (entry.result.reason) {
+        case 'missing_months':
+            return `固定的賃金に変更があります（${fieldsLabel}）。随時改定の算定対象期間（${windowLabel}）の報酬がすべて確定すると、月額変更届の対象になります。`;
+        case 'insufficient_payment_base_days':
+            return `固定的賃金に変更があります（${fieldsLabel}）が、算定対象期間（${windowLabel}）の支払基礎日数が17日未満の月があるため、随時改定は成立しません。`;
+        case 'insufficient_grade_difference':
+            return `固定的賃金に変更があります（${fieldsLabel}）が、改定前後で2等級以上の差がないため、随時改定は成立しません（算定期間: ${windowLabel}）。`;
+        case 'grade_direction_mismatch':
+            return `固定的賃金に変更があります（${fieldsLabel}）が、固定的賃金の増減と等級変動の方向が一致しないため、随時改定は成立しません（算定期間: ${windowLabel}）。`;
+        case 'no_previous_grades':
+            return `固定的賃金に変更があります（${fieldsLabel}）が、改定前の標準報酬月額を特定できないため、随時改定を判定できません。`;
+        case 'no_revised_grades':
+            return `固定的賃金に変更があります（${fieldsLabel}）が、算定対象期間（${windowLabel}）の平均報酬から等級を判定できません。`;
+        case 'no_fixed_wage_change':
+            return null;
+    }
+}
 
 export type RevisionProcedureDisplayContext = {
     originMonth: string;
@@ -452,10 +662,13 @@ export function listEligibleRevisionProcedureContextsForMonth(
     allBonuses: BonusReward[] = [],
     payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
     salaryConditions: SalaryCondition[] = [],
+    regularDeterminationMinPaymentBaseDays: number = REGULAR_DETERMINATION_MIN_PAYMENT_BASE_DAYS,
 ): RevisionProcedureDisplayContext[] {
-    const originMonths = resolveRevisionOriginMonths(rewardsByYearMonth, salaryConditions)
-        .filter((ym) => ym >= qualificationYearMonth)
-        .sort();
+    const originMonths = filterRevisionOriginMonthsAfterQualification(
+        resolveRevisionOriginMonths(rewardsByYearMonth, salaryConditions),
+        qualificationYearMonth,
+        payrollPaymentMonthOffset,
+    ).sort();
 
     const contexts: RevisionProcedureDisplayContext[] = [];
 
@@ -463,6 +676,7 @@ export function listEligibleRevisionProcedureContextsForMonth(
         const calculationMonths = getRevisionCalculationMonths(originMonth);
         if (!calculationMonths.includes(yearMonth)) continue;
 
+        // 随時改定が成立するか評価
         const result = evaluateRevisionAtOrigin(
             originMonth,
             qualificationYearMonth,
@@ -474,6 +688,7 @@ export function listEligibleRevisionProcedureContextsForMonth(
             allBonuses,
             payrollPaymentMonthOffset,
             salaryConditions,
+            regularDeterminationMinPaymentBaseDays,
         );
         if (!result.eligible) continue;
 

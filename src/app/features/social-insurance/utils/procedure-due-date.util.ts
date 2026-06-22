@@ -71,6 +71,23 @@ export function isRegularDecisionProcedureSubmissionAllowed(
     return referenceDate >= startDate && referenceDate <= dueDate;
 }
 
+/**
+ * 算定基礎届を提出できるか（期間内、または提出期限を過ぎた過去分）。
+ * 提出開始前は不可。
+ */
+export function canSubmitRegularDecisionProcedure(
+    determinationYear: number | string,
+    referenceDate: string,
+): boolean {
+    if (isRegularDecisionProcedureSubmissionAllowed(determinationYear, referenceDate)) {
+        return true;
+    }
+
+    const dueDate = regularDecisionProcedureDueDate(determinationYear);
+    if (!DATE_PATTERN.test(referenceDate) || !dueDate) return false;
+    return referenceDate > dueDate;
+}
+
 export function resolveLossProcedureOccurredAndDueDate(params: {
     retirementDate?: string | null;
     lossReason?: LossReason | null;

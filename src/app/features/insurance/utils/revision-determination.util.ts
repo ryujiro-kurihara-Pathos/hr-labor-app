@@ -5,7 +5,7 @@ import { SalaryCondition } from '../models/salary-condition.model';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 import { effectiveMonthlyRewardTotal } from './effective-monthly-reward.util';
 import { sumFixedWageFields } from './fixed-wage-change.util';
-import { formatPayYearMonthLabelFromWorkMonth } from './reward-pay-month.util';
+import { formatPayYearMonthLabelFromWorkMonth, isConfirmedExactRewardRegisteredForPayMonth, lookupConfirmedExactRewardByPayMonth } from './reward-pay-month.util';
 import { addMonthsToYearMonth } from './reward-target-month.util';
 import { salaryConditionRevisionOriginMonths } from './salary-condition.util';
 import {
@@ -36,6 +36,19 @@ export function getRevisionCalculationMonths(originMonth: string): string[] {
 
 export function getRevisionApplyFromMonth(originMonth: string): string {
     return addMonthsToYearMonth(originMonth, 3);
+}
+
+/** 随時改定の適用開始支給月（起算支給月+3） */
+export function resolveRevisionEffectiveFromPayMonth(originPayYearMonth: string): string {
+    return getRevisionApplyFromMonth(originPayYearMonth);
+}
+
+/** @deprecated resolveRevisionEffectiveFromPayMonth を使用（支給月座標） */
+export function resolveRevisionEffectiveFromLiabilityMonth(
+    originPayYearMonth: string,
+    _payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+): string {
+    return resolveRevisionEffectiveFromPayMonth(originPayYearMonth);
 }
 
 /** 随時改定の3か月すべてが支払基礎日数17日以上か */
@@ -135,6 +148,21 @@ export function resolveFixedWageChangeDirection(
         rewardsByYearMonth,
         salaryConditions,
     );
+    const priorPayMonth = addMonthsToYearMonth(blockStart, -1);
+    const originReward = lookupConfirmedExactRewardByPayMonth(rewardsByYearMonth, blockStart);
+    const priorReward = lookupConfirmedExactRewardByPayMonth(rewardsByYearMonth, priorPayMonth);
+    if (originReward?.fixedWageChanged) {
+        const originFixedFromReward = sumFixedWageFields(originReward);
+        const baselineFixed = priorReward
+            ? sumFixedWageFields(priorReward)
+            : resolveFixedWageAtMonth(priorPayMonth, rewardsByYearMonth, salaryConditions);
+        if (baselineFixed !== null) {
+            if (originFixedFromReward > baselineFixed) return 'increase';
+            if (originFixedFromReward < baselineFixed) return 'decrease';
+            return null;
+        }
+    }
+
     const originFixed = resolveFixedWageAtMonth(originMonth, rewardsByYearMonth, salaryConditions);
     const baselineFixed = resolveFixedWageAtMonth(
         addMonthsToYearMonth(blockStart, -1),
@@ -211,18 +239,25 @@ export function monthlyRewardTotal(reward: StandardMonthlyReward): number {
     );
 }
 
-/** 定時決定の平均報酬月額（賞与は含めない） */
+/** 定時決定の平均報酬月額（賞与は含めない。未確定の報酬は算入しない） */
 export function calculateRegularDeterminationAverageMonthlyReward(
     rewardsByYearMonth: Record<string, StandardMonthlyReward>,
     calculationMonths: string[],
 ): number | null {
     if (calculationMonths.length === 0) return null;
-    if (!calculationMonths.every((ym) => rewardsByYearMonth[ym])) return null;
+    if (
+        !calculationMonths.every((ym) =>
+            isConfirmedExactRewardRegisteredForPayMonth(rewardsByYearMonth, ym),
+        )
+    ) {
+        return null;
+    }
 
-    const total = calculationMonths.reduce(
-        (sum, ym) => sum + monthlyRewardTotal(rewardsByYearMonth[ym]),
-        0,
-    );
+    const total = calculationMonths.reduce((sum, ym) => {
+        const reward = lookupConfirmedExactRewardByPayMonth(rewardsByYearMonth, ym);
+        if (!reward) return sum;
+        return sum + monthlyRewardTotal(reward);
+    }, 0);
     return Math.round(total / calculationMonths.length);
 }
 
@@ -232,15 +267,19 @@ export function calculateRevisionAverageMonthlyReward(
     allBonuses: BonusReward[] = [],
 ): number | null {
     const calculationMonths = getRevisionCalculationMonths(originMonth);
-    if (!calculationMonths.every((ym) => rewardsByYearMonth[ym])) {
+    if (
+        !calculationMonths.every((ym) =>
+            isConfirmedExactRewardRegisteredForPayMonth(rewardsByYearMonth, ym),
+        )
+    ) {
         return null;
     }
 
-    const total = calculationMonths.reduce(
-        (sum, ym) =>
-            sum + effectiveMonthlyRewardTotal(rewardsByYearMonth[ym], ym, allBonuses),
-        0,
-    );
+    const total = calculationMonths.reduce((sum, ym) => {
+        const reward = lookupConfirmedExactRewardByPayMonth(rewardsByYearMonth, ym);
+        if (!reward) return sum;
+        return sum + effectiveMonthlyRewardTotal(reward, ym, allBonuses);
+    }, 0);
     return Math.round(total / calculationMonths.length);
 }
 

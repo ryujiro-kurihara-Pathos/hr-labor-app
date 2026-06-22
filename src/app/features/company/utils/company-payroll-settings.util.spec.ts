@@ -5,12 +5,10 @@ import {
     insurancePremiumCollectionTimingLabel,
     isValidInsurancePremiumCollectionSetting,
     allowedInsurancePremiumCollectionTimings,
-    lastDayOfMonth,
     resolveInsurancePremiumCollectionTiming,
-    resolvePayrollDateInMonth,
-    resolvePayrollDayInMonth,
     resolvePayrollDeductionYearMonth,
     resolvePremiumLiabilityYearMonth,
+    resolvePremiumDeductionApplyFromPayMonth,
     resolvePremiumStandardDeterminationYearMonth,
 } from './company-payroll-settings.util';
 
@@ -26,12 +24,23 @@ describe('company-payroll-settings.util', () => {
     });
 
     describe('resolvePremiumStandardDeterminationYearMonth', () => {
-        it('uses liability month for same_month timing', () => {
+        it('uses pay month for same_month timing', () => {
             expect(resolvePremiumStandardDeterminationYearMonth('2026-09', 'same_month')).toBe('2026-09');
         });
 
-        it('uses liability month for next_month timing', () => {
-            expect(resolvePremiumStandardDeterminationYearMonth('2026-09', 'next_month')).toBe('2026-09');
+        it('uses premium basis month (pay month - 1) for next_month timing', () => {
+            expect(resolvePremiumStandardDeterminationYearMonth('2026-10', 'next_month')).toBe('2026-09');
+            expect(resolvePremiumStandardDeterminationYearMonth('2026-09', 'next_month')).toBe('2026-08');
+        });
+    });
+
+    describe('resolvePremiumDeductionApplyFromPayMonth', () => {
+        it('returns apply month for same_month timing', () => {
+            expect(resolvePremiumDeductionApplyFromPayMonth('2026-09', 'same_month')).toBe('2026-09');
+        });
+
+        it('returns next pay month for next_month timing', () => {
+            expect(resolvePremiumDeductionApplyFromPayMonth('2026-09', 'next_month')).toBe('2026-10');
         });
     });
 
@@ -67,24 +76,6 @@ describe('company-payroll-settings.util', () => {
             expect(formatPremiumCollectionSummary('2026-04', 'same_month')).toBe(
                 '2026年4月分の保険料を、2026年4月の給与から控除します（当月徴収）。',
             );
-        });
-    });
-
-    describe('resolvePayrollDayInMonth', () => {
-        it('uses the last day when configured day exceeds month length', () => {
-            expect(resolvePayrollDayInMonth(31, 2026, 4)).toBe(30);
-            expect(resolvePayrollDayInMonth(31, 2026, 2)).toBe(28);
-            expect(resolvePayrollDayInMonth(30, 2026, 2)).toBe(28);
-        });
-
-        it('keeps configured day when it exists in the month', () => {
-            expect(resolvePayrollDayInMonth(15, 2026, 4)).toBe(15);
-            expect(resolvePayrollDayInMonth(31, 2026, 1)).toBe(31);
-        });
-
-        it('resolves configured date string for a year month', () => {
-            expect(resolvePayrollDateInMonth(31, 2026, 4)).toBe('2026-04-30');
-            expect(lastDayOfMonth(2026, 4)).toBe(30);
         });
     });
 

@@ -357,7 +357,7 @@ export class MyPageComponent implements OnInit {
             ? this.determinationService.resolve(
                 employee,
                 rewardsByYearMonth,
-                resolvePremiumStandardDeterminationYearMonth(liabilityYearMonth, collectionTiming),
+                resolvePremiumStandardDeterminationYearMonth(payYearMonth, collectionTiming),
                 this.insuranceStatus()?.healthInsuranceStartDate ?? null,
                 bonuses,
                 payrollOffset,

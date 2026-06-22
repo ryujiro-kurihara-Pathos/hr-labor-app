@@ -8,13 +8,7 @@ import {
 
 export function normalizeCompanyPayrollSettings(
     company: Partial<Company>,
-): Pick<
-    Company,
-    | 'payrollClosingDay'
-    | 'payrollPaymentDay'
-    | 'payrollPaymentMonthOffset'
-    | 'insurancePremiumCollectionTiming'
-> {
+): Pick<Company, 'payrollPaymentMonthOffset' | 'insurancePremiumCollectionTiming'> {
     const payrollPaymentMonthOffset =
         company.payrollPaymentMonthOffset ?? DEFAULT_COMPANY_PAYROLL_SETTINGS.payrollPaymentMonthOffset;
 
@@ -28,8 +22,6 @@ export function normalizeCompanyPayrollSettings(
     }
 
     return {
-        payrollClosingDay: company.payrollClosingDay ?? DEFAULT_COMPANY_PAYROLL_SETTINGS.payrollClosingDay,
-        payrollPaymentDay: company.payrollPaymentDay ?? DEFAULT_COMPANY_PAYROLL_SETTINGS.payrollPaymentDay,
         payrollPaymentMonthOffset,
         insurancePremiumCollectionTiming,
     };
@@ -40,29 +32,6 @@ export function normalizeCompany(company: Partial<Company> & { id: string }): Co
         ...company,
         ...normalizeCompanyPayrollSettings(company),
     } as Company;
-}
-
-export function formatPayrollDay(day: number): string {
-    return day === 31 ? '末日' : `${day}日`;
-}
-
-export function formatPayrollClosingDayLabel(day: number | null): string {
-    if (day === null) return '未設定';
-    return `毎月${formatPayrollDay(day)}`;
-}
-
-export function formatConfiguredPayrollDayLabel(day: number | null): string {
-    if (day === null) return '未設定';
-    return formatPayrollDay(day);
-}
-
-export function formatPayrollPaymentDayLabel(
-    day: number | null,
-    monthOffset: 0 | 1,
-): string {
-    if (day === null) return '未設定';
-    const monthLabel = monthOffset === 1 ? '翌月' : '当月';
-    return `${monthLabel}${formatPayrollDay(day)}`;
 }
 
 export function insurancePremiumCollectionTimingLabel(
@@ -127,14 +96,28 @@ export function resolvePremiumLiabilityYearMonth(
 }
 
 /**
- * 保険料算定に参照する標準報酬月額の決定月。
- * 保険料対象月（liabilityYearMonth）時点で有効な標準報酬月額を使う。
+ * 保険料算定に参照する標準報酬月額の決定月（支給年月）。
+ * 当月徴収: 給与控除月と同じ。
+ * 翌月徴収: 給与控除月の前月（その給与から控除する保険料の対象月に合わせる）。
+ * 例）随時改定が9月支給から適用 → 翌月徴収では10月給与控除（9月分）から新標準を反映。
  */
 export function resolvePremiumStandardDeterminationYearMonth(
-    liabilityYearMonth: string,
-    _timing: InsurancePremiumCollectionTiming,
+    payYearMonth: string,
+    timing: InsurancePremiumCollectionTiming,
 ): string {
-    return liabilityYearMonth;
+    return resolvePremiumLiabilityYearMonth(payYearMonth, timing);
+}
+
+/**
+ * 随時改定の標準報酬適用支給月から、保険料額に初めて反映される給与控除月を返す。
+ */
+export function resolvePremiumDeductionApplyFromPayMonth(
+    revisionApplyFromPayMonth: string,
+    timing: InsurancePremiumCollectionTiming,
+): string {
+    return timing === 'next_month'
+        ? addMonthsToYearMonth(revisionApplyFromPayMonth, 1)
+        : revisionApplyFromPayMonth;
 }
 
 /** 給与控除を行う年月（画面の選択月） */
@@ -192,63 +175,4 @@ export function formatZeroPremiumBeforeEmploymentReason(params: {
     }
 
     return `この月の給与から控除する保険料はありません。${nextPayLabel}を選ぶと、${payLabel}の報酬に基づく保険料が表示されます。`;
-}
-
-export function isValidPayrollDay(day: number | null): boolean {
-    return isValidOptionalPayrollDay(day);
-}
-
-/** 給与締日（未設定可） */
-export function isValidOptionalPayrollDay(day: number | null): boolean {
-    if (day === null) return true;
-    return Number.isInteger(day) && day >= 1 && day <= 31;
-}
-
-/** 給与支払日（必須） */
-export function isValidRequiredPayrollDay(day: number | null): boolean {
-    return day !== null && Number.isInteger(day) && day >= 1 && day <= 31;
-}
-
-/** 指定年月の末日（month は 1〜12） */
-export function lastDayOfMonth(year: number, month: number): number {
-    return new Date(year, month, 0).getDate();
-}
-
-/**
- * 設定日（1〜31、31=末日）を、その月の暦日に解決する。
- * 設定日がその月に存在しない場合は月末日とする（例: 31日設定かつ4月 → 30日）。
- */
-export function resolvePayrollDayInMonth(
-    configuredDay: number,
-    year: number,
-    month: number,
-): number {
-    if (!Number.isInteger(configuredDay) || configuredDay < 1 || configuredDay > 31) {
-        throw new Error('Invalid payroll day');
-    }
-    return Math.min(configuredDay, lastDayOfMonth(year, month));
-}
-
-/** 設定日を YYYY-MM-DD に解決する（month は 1〜12） */
-export function resolvePayrollDateInMonth(
-    configuredDay: number,
-    year: number,
-    month: number,
-): string {
-    const day = resolvePayrollDayInMonth(configuredDay, year, month);
-    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-}
-
-/** 設定日を YYYY-MM-DD に解決する（yearMonth は YYYY-MM） */
-export function resolvePayrollDateInYearMonth(
-    configuredDay: number,
-    yearMonth: string,
-): string {
-    const [yearText, monthText] = yearMonth.split('-');
-    const year = Number(yearText);
-    const month = Number(monthText);
-    if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
-        throw new Error('Invalid year month');
-    }
-    return resolvePayrollDateInMonth(configuredDay, year, month);
 }

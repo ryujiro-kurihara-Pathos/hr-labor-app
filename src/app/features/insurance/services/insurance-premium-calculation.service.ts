@@ -102,13 +102,18 @@ export class InsurancePremiumCalculationService {
         const liabilityYearMonth = resolvePremiumLiabilityYearMonth(payYearMonth, collectionTiming);
         if (!liabilityYearMonth) return null;
 
-        if (!isPremiumBasisRewardConfirmed(rewardsByYearMonth, payYearMonth, collectionTiming)) {
+        if (!isPremiumBasisRewardConfirmed(
+            rewardsByYearMonth,
+            payYearMonth,
+            collectionTiming,
+            payrollPaymentMonthOffset,
+        )) {
             return null;
         }
 
         const savedRewards = savedRewardsForPremiumCalculation(rewardsByYearMonth);
         const standardDeterminationYearMonth = resolvePremiumStandardDeterminationYearMonth(
-            liabilityYearMonth,
+            payYearMonth,
             collectionTiming,
         );
         const effective = this.determinationService.resolve(

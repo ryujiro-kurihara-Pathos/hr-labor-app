@@ -4,8 +4,6 @@ import { Timestamp } from 'firebase/firestore';
 export type InsurancePremiumCollectionTiming = 'same_month' | 'next_month';
 
 export const DEFAULT_COMPANY_PAYROLL_SETTINGS = {
-    payrollClosingDay: null,
-    payrollPaymentDay: null,
     payrollPaymentMonthOffset: 1 as const,
     insurancePremiumCollectionTiming: 'next_month' as InsurancePremiumCollectionTiming,
 };
@@ -17,10 +15,6 @@ export type Company = {
     address: string;
     createdBy: string;
 
-    /** 給与締日（1-31、31=末日）。未設定可 */
-    payrollClosingDay: number | null;
-    /** 給与支払日（1-31、31=末日）。必須 */
-    payrollPaymentDay: number | null;
     /** 支払日が当月か翌月か（0=当月、1=翌月） */
     payrollPaymentMonthOffset: 0 | 1;
     /** 社会保険料の給与控除タイミング（payrollPaymentMonthOffset から自動決定） */
@@ -37,8 +31,6 @@ export type CompanyUpdateInput = Pick<
     | 'name'
     | 'representativeName'
     | 'address'
-    | 'payrollClosingDay'
-    | 'payrollPaymentDay'
     | 'payrollPaymentMonthOffset'
     | 'insurancePremiumCollectionTiming'
 >;

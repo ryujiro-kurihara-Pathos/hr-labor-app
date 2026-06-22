@@ -52,6 +52,8 @@ import {
     isRegularDecisionProcedureRequiredForBaseYear,
 } from '../utils/standard-remuneration-determination.util';
 import {
+    evaluateRevisionEligibilityForPayMonth,
+    formatRevisionEligibilityWarningMessage,
     hasEligibleRevisionBeforeMonth,
     listEligibleRevisionProcedureContextsForMonth,
     RevisionProcedureDisplayContext,
@@ -64,6 +66,7 @@ import {
     formatPremiumCollectionSummary,
     formatZeroPremiumBeforeEmploymentReason,
     resolvePremiumLiabilityYearMonth,
+    resolvePremiumDeductionApplyFromPayMonth,
     resolvePremiumStandardDeterminationYearMonth,
 } from '../../company/utils/company-payroll-settings.util';
 import { OfficeService } from '../../company/services/office.service';
@@ -78,6 +81,7 @@ import {
     buildSocialInsuranceJoinJudgmentContext,
     resolveHealthInsuranceJoinStatus,
     resolvePensionInsuranceJoinStatus,
+    resolveRegularDeterminationMinPaymentBaseDays,
 } from '../../social-insurance/utils/social-insurance-join-status.util';
 import {
     isHealthInsurancePremiumTargetMonth,
@@ -129,13 +133,17 @@ import {
     savedRateToPercentInput,
 } from '../utils/insurance-premium-rate-resolution.util';
 import { Procedure, ProcedureStatus } from '../../social-insurance/models/procedures.model';
-import { dateLabel, isProcedureOverdue, todayDateString } from '../../social-insurance/utils/procedure-display.util';
+import { dateLabel, formatProcedureNudgeDueOrSubmitted, isProcedureOverdue, todayDateString } from '../../social-insurance/utils/procedure-display.util';
 import {
     procedureDueDateFromOccurredDate,
     qualificationProcedureDueDate,
     regularDecisionProcedureDueDate,
 } from '../../social-insurance/utils/procedure-due-date.util';
 import { isPartTimeEmployment } from '../../social-insurance/utils/part-time-insurance-judgment.util';
+import {
+    resolveQualificationJoinMonthReward,
+    resolveQualificationMonthlyReward,
+} from '../../social-insurance/utils/qualification-reward.util';
 import {
     getDaysInMonth,
     resolveDaysInMonthForPayMonth,
@@ -187,16 +195,14 @@ import {
     isSalaryPayMonthTarget,
     joinPayMonthDisplayNote,
     lookupRewardByPayMonth,
-    resolvePayrollPaymentDate,
     rewardNavigationMinPayYearMonth,
     rewardRecordKeyForPayMonth,
-    resolvePremiumBasisRewardPayYearMonth,
     salaryPayMonthTargetReason,
     salaryPayYearMonthMax,
     salaryPayYearMonthMin,
 } from '../utils/reward-pay-month.util';
 import { EffectiveStandardRemuneration } from '../models/standard-remuneration-determination.model';
-import { formatRevisionApplyFromPayMonthLabel } from '../utils/revision-determination.util';
+import { formatRevisionApplyFromPayMonthLabel, getRevisionApplyFromMonth } from '../utils/revision-determination.util';
 
 type MonthRewardStatus = 'loading' | 'draft' | 'confirmed' | 'unregistered' | 'excluded';
 type PremiumPageMode = 'input' | 'premium';
@@ -404,26 +410,12 @@ export class InsurancePremiumDetailPageComponent {
 
     /** 報酬レコードの targetYearMonth（支給年月） */
     workYearMonth = computed((): string => {
-        const payYm = this.targetYearMonth();
-        if (!payYm) return '';
-        if (this.pageMode() === 'premium') {
-            return this.premiumLiabilityYearMonth() ?? payYm;
-        }
-        return payYm;
+        return this.targetYearMonth();
     });
 
     workYearMonthLabel = computed(() => {
         const ym = this.workYearMonth();
         return ym ? formatYearMonthLabel(ym) : '';
-    });
-
-    payrollPaymentDateLabel = computed((): string => {
-        const payYm = this.targetYearMonth();
-        if (!payYm || this.pageMode() !== 'input') return '';
-        const date = resolvePayrollPaymentDate(this.company(), payYm);
-        if (!date) return '未設定';
-        const [y, m, d] = date.split('-');
-        return `${y}年${Number(m)}月${Number(d)}日`;
     });
 
     insurancePremiumCollectionTiming = signal<InsurancePremiumCollectionTiming>('next_month');
@@ -456,7 +448,7 @@ export class InsurancePremiumDetailPageComponent {
 
     joinPayYearMonth = computed((): string | null => {
         const employee = this.employee();
-        if (!employee || this.pageMode() !== 'input') return null;
+        if (!employee) return null;
         return rewardNavigationMinPayYearMonth(employee);
     });
 
@@ -653,6 +645,10 @@ export class InsurancePremiumDetailPageComponent {
     premiumTabLeadRewardHint = computed((): string | null => {
         if (this.isPremiumEnrollmentUndetermined()) return null;
         if (this.isJoinMonthZeroPremiumDeductionView()) return null;
+
+        const revisionHint = this.revisionMissingRewardHint();
+        if (revisionHint) return revisionHint;
+
         if (this.liabilityMonthHasConfirmedReward()) return null;
         if (this.showZeroMonthlyPremiumDueToCollectionTiming()) return null;
 
@@ -662,24 +658,52 @@ export class InsurancePremiumDetailPageComponent {
         return `${basisLabel}の給与を入力してください。`;
     });
 
+    private revisionMissingRewardHint = computed((): string | null => {
+        const effective = this.effectiveStandardForPremium();
+        if (
+            effective?.determinationType !== 'revision'
+            || effective.isComplete
+            || effective.missingMonths.length === 0
+        ) {
+            return null;
+        }
+
+        const label = formatPayMonthListFromWorkMonths(
+            effective.missingMonths,
+            this.payrollPaymentMonthOffset(),
+        );
+        return `随時改定の算定に${label}の報酬が必要です。`;
+    });
+
     hasUndeterminedPremiumDueToMissingReward = computed(
         (): boolean => this.premiumTabLeadRewardHint() !== null,
     );
 
-    /** 報酬入力リンク先（保険料対象月の支給年月） */
+    /** 報酬入力リンク先（未登録の算定月 or 保険料対象月の支給年月） */
     rewardInputQueryParamsForPremiumBasis = computed((): { ym?: string } => {
-        const payYm = this.targetYearMonth();
-        if (!payYm) return {};
-        return {
-            ym: resolvePremiumBasisRewardPayYearMonth(
-                payYm,
-                this.insurancePremiumCollectionTiming(),
-            ),
-        };
+        const effective = this.effectiveStandardForPremium();
+        if (
+            effective?.determinationType === 'revision'
+            && !effective.isComplete
+            && effective.missingMonths.length > 0
+        ) {
+            return { ym: effective.missingMonths[0] };
+        }
+
+        const liabilityYm = this.premiumLiabilityYearMonth();
+        if (!liabilityYm) return {};
+        return { ym: liabilityYm };
     });
 
-    /** 未確定時に案内する給与の月（保険料対象月） */
+    /** 未確定時に案内する給与の月（保険料対象月 or 随時改定の算定月） */
     premiumUndeterminedRewardMonthLabel = computed((): string => {
+        const effective = this.effectiveStandardForPremium();
+        if (effective?.missingMonths.length) {
+            return formatPayMonthListFromWorkMonths(
+                effective.missingMonths,
+                this.payrollPaymentMonthOffset(),
+            );
+        }
         return this.premiumLiabilityYearMonthLabel() || this.targetYearMonthLabel();
     });
 
@@ -820,28 +844,28 @@ export class InsurancePremiumDetailPageComponent {
     qualificationProcedure = signal<Procedure | null>(null);
     isCreatingQualificationProcedure = signal(false);
 
-    /** 算定基礎届の対象報酬月（支給設定に応じた勤務月）か */
+    /** 算定基礎届の対象支給月（4〜6月に支払われた給与）か */
     isRegularDecisionBaseMonth = computed((): boolean => {
-        const yearMonth = this.workYearMonth();
-        if (!/^\d{4}-\d{2}$/.test(yearMonth)) return false;
-        const baseYear = Number(yearMonth.slice(0, 4));
+        const payYearMonth = this.targetYearMonth();
+        if (!/^\d{4}-\d{2}$/.test(payYearMonth)) return false;
+        const baseYear = Number(payYearMonth.slice(0, 4));
         return getRegularDeterminationRewardMonths(
             baseYear,
             this.payrollPaymentMonthOffset(),
-        ).includes(yearMonth);
+        ).includes(payYearMonth);
     });
 
     regularDecisionYearLabel = computed((): string => {
-        const yearMonth = this.workYearMonth();
-        if (!yearMonth) return '';
-        return `${yearMonth.slice(0, 4)}年`;
+        const payYearMonth = this.targetYearMonth();
+        if (!payYearMonth) return '';
+        return `${payYearMonth.slice(0, 4)}年`;
     });
 
     /** 算定基礎届の対象年月キー（YYYY-06） */
     regularDecisionTargetYearMonth = computed((): string | null => {
-        const yearMonth = this.workYearMonth();
+        const payYearMonth = this.targetYearMonth();
         if (!this.isRegularDecisionBaseMonth()) return null;
-        return `${yearMonth.slice(0, 4)}-06`;
+        return `${payYearMonth.slice(0, 4)}-06`;
     });
 
     regularDecisionProcedureExists = computed(() => this.regularDecisionProcedure() !== null);
@@ -852,18 +876,21 @@ export class InsurancePremiumDetailPageComponent {
 
     /** 算定3か月が揃い随時改定が成立した場合、該当3か月すべてで月額変更届を表示（複数可） */
     revisionProcedureContexts = computed((): RevisionProcedureDisplayContext[] => {
-        const yearMonth = this.workYearMonth();
+        // 対象月が支給月であることを確認
+        const payYearMonth = this.targetYearMonth();
         const employee = this.employee();
-        if (!yearMonth || !employee || !isRewardTargetMonth(employee, yearMonth)) return [];
+        if (!payYearMonth || !employee || !isRewardTargetMonth(employee, payYearMonth)) return [];
 
+        // 資格取得月を取得
         const qualificationDate = this.resolvedQualificationDate();
         const qualificationYearMonth = qualificationDate
             ? yearMonthFromDateString(qualificationDate)
             : null;
         if (!qualificationDate || !qualificationYearMonth) return [];
 
+        // 随時改定の対象月を取得
         return listEligibleRevisionProcedureContextsForMonth(
-            yearMonth,
+            payYearMonth,
             qualificationYearMonth,
             getFirstRegularDeterminationYearMonth(qualificationDate),
             employee,
@@ -873,24 +900,69 @@ export class InsurancePremiumDetailPageComponent {
             this.confirmedEmployeeBonuses(),
             this.payrollPaymentMonthOffset(),
             this.salaryConditions(),
+            resolveRegularDeterminationMinPaymentBaseDays(this.socialInsuranceJoinJudgmentContext()),
         );
     });
 
     showRevisionProcedureSection = computed(() => this.revisionProcedureContexts().length > 0);
 
-    /** 同年9月の定時決定より先に随時改定が成立している */
-    revisionSupersedesRegularDecision = computed(() => {
-        const yearMonth = this.workYearMonth();
+    /** 随時改定の成立状況に応じた注意（届出ナッジ表示中・成立済みは非表示） */
+    revisionWarningMessage = computed((): string | null => {
+        if (this.pageMode() !== 'input') return null;
+        if (this.monthRewardStatus() !== 'confirmed') return null;
+        if (this.showRevisionProcedureSection()) return null;
+
+        const payYearMonth = this.targetYearMonth();
         const employee = this.employee();
         const qualificationDate = this.resolvedQualificationDate();
-        if (!yearMonth || !employee || !qualificationDate || !this.isRegularDecisionBaseMonth()) {
+        if (!payYearMonth || !employee || !qualificationDate) return null;
+
+        const qualificationYearMonth = yearMonthFromDateString(qualificationDate);
+        if (!qualificationYearMonth) return null;
+
+        const entry = evaluateRevisionEligibilityForPayMonth(
+            payYearMonth,
+            qualificationYearMonth,
+            getFirstRegularDeterminationYearMonth(qualificationDate),
+            employee,
+            qualificationDate,
+            confirmedRewardsByYearMonth(this.employeeRewards()),
+            (monthlyReward) => this.calculator.calculate(monthlyReward),
+            this.confirmedEmployeeBonuses(),
+            this.payrollPaymentMonthOffset(),
+            this.salaryConditions(),
+            resolveRegularDeterminationMinPaymentBaseDays(this.socialInsuranceJoinJudgmentContext()),
+        );
+
+        if (entry) {
+            return formatRevisionEligibilityWarningMessage(
+                entry,
+                this.changedFixedWageFieldLabels(),
+                this.payrollPaymentMonthOffset(),
+            );
+        }
+
+        const reward = this.standardReward();
+        if (reward?.fixedWageChanged && this.changedFixedWageFieldLabels().length > 0) {
+            return `前月から固定的賃金に変更があります（${this.changedFixedWageFieldLabels().join('・')}）。随時改定の起算月として認識されていないため、給与条件または報酬の確定状態を確認してください。`;
+        }
+
+        return null;
+    });
+
+    /** 同年9月の定時決定より先に随時改定が成立している */
+    revisionSupersedesRegularDecision = computed(() => {
+        const payYearMonth = this.targetYearMonth();
+        const employee = this.employee();
+        const qualificationDate = this.resolvedQualificationDate();
+        if (!payYearMonth || !employee || !qualificationDate || !this.isRegularDecisionBaseMonth()) {
             return false;
         }
 
         const qualificationYearMonth = yearMonthFromDateString(qualificationDate);
         if (!qualificationYearMonth) return false;
 
-        const baseYear = Number(yearMonth.slice(0, 4));
+        const baseYear = Number(payYearMonth.slice(0, 4));
         const regularEffectiveFrom = `${baseYear}-09`;
 
         return hasEligibleRevisionBeforeMonth(
@@ -904,6 +976,7 @@ export class InsurancePremiumDetailPageComponent {
             this.confirmedEmployeeBonuses(),
             this.salaryConditions(),
             this.payrollPaymentMonthOffset(),
+            resolveRegularDeterminationMinPaymentBaseDays(this.socialInsuranceJoinJudgmentContext()),
         );
     });
 
@@ -915,10 +988,10 @@ export class InsurancePremiumDetailPageComponent {
         }
 
         const qualificationDate = this.resolvedQualificationDate();
-        const yearMonth = this.workYearMonth();
-        if (!qualificationDate || !yearMonth) return false;
+        const payYearMonth = this.targetYearMonth();
+        if (!qualificationDate || !payYearMonth) return false;
 
-        const baseYear = Number(yearMonth.slice(0, 4));
+        const baseYear = Number(payYearMonth.slice(0, 4));
         return isRegularDecisionProcedureRequiredForBaseYear(qualificationDate, baseYear);
     });
 
@@ -1108,13 +1181,14 @@ export class InsurancePremiumDetailPageComponent {
     });
 
     qualificationProcedureNudgeSummary = computed((): string | null => {
-        const dueDate = this.qualificationProcedureDueDate();
         const prefix = this.isJoinPayMonthView() ? '入社月' : null;
-        if (!dueDate) {
-            return prefix;
-        }
-        const dueLabel = `提出期限 ${dateLabel(dueDate)}`;
-        return prefix ? `${prefix} · ${dueLabel}` : dueLabel;
+        const suffix = formatProcedureNudgeDueOrSubmitted(
+            this.qualificationProcedureStatus(),
+            this.qualificationProcedureDueDate(),
+        );
+        if (!suffix && !prefix) return null;
+        if (prefix && suffix) return `${prefix} · ${suffix}`;
+        return prefix || suffix;
     });
 
     revisionProceduresByApplyFrom = signal<Record<string, Procedure | null>>({});
@@ -1122,6 +1196,19 @@ export class InsurancePremiumDetailPageComponent {
 
     revisionProcedureExistsFor(applyFromMonth: string): boolean {
         return Boolean(this.revisionProceduresByApplyFrom()[applyFromMonth]);
+    }
+
+    revisionProcedureNudgeSummary(
+        applyFromMonth: string,
+        applyFromLabel: string,
+        windowLabel: string,
+    ): string {
+        const base = `${applyFromLabel}（算定 ${windowLabel}）`;
+        const procedure = this.revisionProceduresByApplyFrom()[applyFromMonth];
+        if (procedure?.status === 'completed') {
+            return `${base} · 提出済`;
+        }
+        return base;
     }
 
     isCreatingRevisionProcedureFor(applyFromMonth: string): boolean {
@@ -1150,11 +1237,12 @@ export class InsurancePremiumDetailPageComponent {
 
     regularDecisionProcedureNudgeSummary = computed((): string | null => {
         const year = this.regularDecisionYearLabel();
-        const dueDate = this.regularDecisionProcedureDueDate();
         const parts = [`${year}年4〜6月`];
-        if (dueDate) {
-            parts.push(`提出期限 ${dateLabel(dueDate)}`);
-        }
+        const suffix = formatProcedureNudgeDueOrSubmitted(
+            this.regularDecisionProcedureStatus(),
+            this.regularDecisionProcedureDueDate(),
+        );
+        if (suffix) parts.push(suffix);
         return parts.join(' ');
     });
 
@@ -1179,9 +1267,12 @@ export class InsurancePremiumDetailPageComponent {
     });
 
     bonusPaymentProcedureNudgeSummary = computed((): string | null => {
-        const dueDate = this.bonusPaymentProcedureDueDate();
-        if (!dueDate) return this.targetYearMonthLabel();
-        return `提出期限 ${dateLabel(dueDate)}`;
+        const suffix = formatProcedureNudgeDueOrSubmitted(
+            this.bonusPaymentProcedureStatus(),
+            this.bonusPaymentProcedureDueDate(),
+        );
+        if (suffix) return suffix;
+        return this.targetYearMonthLabel();
     });
 
     /** 未入力月を開いたとき、初期表示に使った直近登録済み月（YYYY-MM） */
@@ -1215,10 +1306,10 @@ export class InsurancePremiumDetailPageComponent {
 
     effectiveStandardForPremium = computed(() => {
         const employee = this.employee();
-        const liabilityYearMonth = this.premiumLiabilityYearMonth();
-        if (!employee || !liabilityYearMonth) return null;
+        const payYearMonth = this.targetYearMonth();
+        if (!employee || !payYearMonth) return null;
         const standardDeterminationYearMonth = resolvePremiumStandardDeterminationYearMonth(
-            liabilityYearMonth,
+            payYearMonth,
             this.insurancePremiumCollectionTiming(),
         );
         return this.determinationService.resolve(
@@ -1243,11 +1334,14 @@ export class InsurancePremiumDetailPageComponent {
     /** 保険料の根拠月の報酬が確定済みか */
     liabilityMonthHasConfirmedReward = computed((): boolean => {
         const payYearMonth = this.targetYearMonth();
+        const employee = this.employee();
         if (!payYearMonth) return false;
         return isPremiumBasisRewardConfirmed(
             this.employeeRewards(),
             payYearMonth,
             this.insurancePremiumCollectionTiming(),
+            this.payrollPaymentMonthOffset(),
+            employee ? yearMonthFromDateString(employee.joinedDate) : null,
         );
     });
 
@@ -1918,9 +2012,46 @@ export class InsurancePremiumDetailPageComponent {
                 employee.companyId,
             );
             this.qualificationProcedure.set(procedure);
+            await this.syncQualificationProcedureRewardIfNeeded();
         } catch (error) {
             console.error('資格取得届の取得に失敗しました', error);
             this.errorMessage.set('資格取得届の取得に失敗しました');
+        }
+    }
+
+    private async syncQualificationProcedureRewardIfNeeded(): Promise<void> {
+        const employee = this.employee();
+        if (!employee || !this.showQualificationProcedureSection()) return;
+
+        let procedure = this.qualificationProcedure();
+        if (!procedure) return;
+        if (procedure.status === 'completed') return;
+
+        const { reward: joinReward, fromExpectedSalaryCondition } = resolveQualificationJoinMonthReward({
+            joinedDate: employee.joinedDate,
+            companyId: employee.companyId,
+            employeeId: employee.id,
+            employmentType: employee.employmentType,
+            salaryConditions: this.salaryConditions(),
+            rewardsByYearMonth: this.employeeRewards(),
+            payrollPaymentMonthOffset: this.payrollPaymentMonthOffset(),
+        });
+        const monthlyReward = resolveQualificationMonthlyReward(
+            employee.joinedDate,
+            joinReward,
+            this.confirmedEmployeeBonuses(),
+            employee.employmentType,
+            fromExpectedSalaryCondition,
+        );
+
+        try {
+            const updated = await this.procedureService.syncQualificationProcedureRewardPreview(
+                procedure,
+                monthlyReward,
+            );
+            this.qualificationProcedure.set(updated);
+        } catch (error) {
+            console.error('資格取得届への報酬反映に失敗しました', error);
         }
     }
 
@@ -2149,7 +2280,7 @@ export class InsurancePremiumDetailPageComponent {
 
     async loadStandardReward() {
         const employeeId = this.employeeId();
-        const payYearMonth = this.workYearMonth();
+        const payYearMonth = this.targetYearMonth();
         if (!employeeId || !payYearMonth) return;
 
         this.errorMessage.set('');
@@ -2592,6 +2723,7 @@ export class InsurancePremiumDetailPageComponent {
                 liabilityMonths.add(bonus.targetYearMonth);
             }
             await this.syncSavedPremiumResultsForLiabilityMonths([...liabilityMonths]);
+            await this.syncQualificationProcedureRewardIfNeeded();
 
             const labels: string[] = [];
             if (confirmReward) {
@@ -2651,6 +2783,7 @@ export class InsurancePremiumDetailPageComponent {
                 ...current,
                 [saved.targetYearMonth]: saved,
             }));
+            await this.syncQualificationProcedureRewardIfNeeded();
             if (mode === 'confirmed') {
             await Promise.all([
                 this.loadRegularDecisionProcedure(),
@@ -2802,8 +2935,26 @@ export class InsurancePremiumDetailPageComponent {
     );
 
     premiumRevisionApplyFromLabel = computed(() =>
-        this.revisionApplyFromLabelFromEffective(this.effectiveStandardForPremium()),
+        this.revisionPremiumApplyFromLabelFromEffective(this.effectiveStandardForPremium()),
     );
+
+    private revisionPremiumApplyFromLabelFromEffective(
+        effective: EffectiveStandardRemuneration | null | undefined,
+    ): string | null {
+        if (effective?.determinationType !== 'revision' || !effective.calculationMonths.length) {
+            return null;
+        }
+        const originMonth = effective.calculationMonths[0]!;
+        const revisionApplyFromPayMonth = getRevisionApplyFromMonth(originMonth);
+        const premiumDeductionFromPayMonth = resolvePremiumDeductionApplyFromPayMonth(
+            revisionApplyFromPayMonth,
+            this.insurancePremiumCollectionTiming(),
+        );
+        return formatRevisionApplyFromPayMonthLabel(
+            premiumDeductionFromPayMonth,
+            this.payrollPaymentMonthOffset(),
+        );
+    }
 
     private revisionApplyFromLabelFromEffective(
         effective: EffectiveStandardRemuneration | null | undefined,
@@ -3855,6 +4006,11 @@ export class InsurancePremiumDetailPageComponent {
         const employee = this.employee();
         const targetYearMonth = this.regularDecisionTargetYearMonth();
         if (!employee || !targetYearMonth || this.isCreatingRegularDecisionProcedure()) return;
+
+        if (this.revisionSupersedesRegularDecision()) {
+            this.errorMessage.set('随時改定が成立しているため、算定基礎届は不要です。');
+            return;
+        }
 
         const existing = this.regularDecisionProcedure();
         if (existing) {

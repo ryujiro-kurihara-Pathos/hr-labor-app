@@ -23,7 +23,7 @@ import { InsurancePremiumCalculationService, CalculatedInsurancePremium } from '
 import { ManualInsurancePremiumRateService } from '../services/manual-insurance-premium-rate.service';
 import { ManualInsurancePremiumRates } from '../models/manual-insurance-premium-rate.model';
 import { resolvePremiumLiabilityYearMonth, resolvePremiumStandardDeterminationYearMonth } from '../../company/utils/company-payroll-settings.util';
-import { addMonthsToYearMonth, isPremiumViewableYearMonth } from '../utils/reward-target-month.util';
+import { addMonthsToYearMonth, isPremiumViewableYearMonth, yearMonthFromDateString } from '../utils/reward-target-month.util';
 import {
     findLatestConfirmedPayYearMonth,
     lookupPremiumBasisReward,
@@ -86,6 +86,7 @@ export class InsurancePremiumPageComponent {
         resolvePremiumBasisRewardPayYearMonth(
             this.targetYearMonth(),
             this.insurancePremiumCollectionTiming(),
+            this.payrollPaymentMonthOffset(),
         ),
     );
 
@@ -243,7 +244,13 @@ export class InsurancePremiumPageComponent {
         return this.employees().map((employee) => {
             const employeeRewards = byEmployee[employee.id] ?? {};
             const liabilityYearMonth = resolvePremiumLiabilityYearMonth(payYearMonth, collectionTiming) ?? payYearMonth;
-            const reward = lookupPremiumBasisReward(employeeRewards, payYearMonth, collectionTiming);
+            const reward = lookupPremiumBasisReward(
+                employeeRewards,
+                payYearMonth,
+                collectionTiming,
+                offset,
+                yearMonthFromDateString(employee.joinedDate),
+            );
             const latestConfirmedWorkYearMonth = findLatestConfirmedPayYearMonth(employeeRewards, offset);
             const isTargetMonth = isPremiumViewableYearMonth(
                 employee,
@@ -261,7 +268,7 @@ export class InsurancePremiumPageComponent {
             const effective = this.determinationService.resolve(
                 employee,
                 employeeRewards,
-                resolvePremiumStandardDeterminationYearMonth(liabilityYearMonth, collectionTiming),
+                resolvePremiumStandardDeterminationYearMonth(payYearMonth, collectionTiming),
                 socialInsurance?.healthInsuranceStartDate ?? null,
                 bonusesByEmployee[employee.id] ?? [],
                 offset,

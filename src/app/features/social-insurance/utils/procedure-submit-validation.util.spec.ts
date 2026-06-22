@@ -16,8 +16,6 @@ const company = {
     representativeName: '代表太郎',
     address: '',
     createdBy: 'u1',
-    payrollClosingDay: null,
-    payrollPaymentDay: 25,
     payrollPaymentMonthOffset: 1 as const,
     insurancePremiumCollectionTiming: 'next_month' as const,
     createdAt: {} as Company['createdAt'],
@@ -102,6 +100,7 @@ describe('procedure-submit-validation.util', () => {
             if (!result.ok) {
                 expect(result.message).toBe('未入力の項目があります');
                 expect(result.missingFields?.[0]?.label).toContain('報酬月額');
+                expect(result.missingFields?.[0]?.queryParams).toEqual({ ym: '2026-05' });
             }
         });
     });
@@ -264,7 +263,7 @@ describe('procedure-submit-validation.util', () => {
             }
         });
 
-        it('fails outside the submission period even when data is complete', () => {
+        it('fails before the submission period even when data is complete', () => {
             const result = validateRegularDecisionProcedureSubmit({
                 employee,
                 office,
@@ -278,7 +277,22 @@ describe('procedure-submit-validation.util', () => {
             expect(result.ok).toBeFalse();
             if (!result.ok) {
                 expect(result.message).toContain('提出期間は2026-07-01〜2026-07-10');
+                expect(result.message).toContain('提出開始前');
             }
+        });
+
+        it('allows submission after the due date when data is complete', () => {
+            const result = validateRegularDecisionProcedureSubmit({
+                employee,
+                office,
+                company,
+                targetYearMonth: '2026-06',
+                missingMonthlyRewardMonths: [],
+                averageMonthlyReward: 300000,
+                standardRemuneration: { health: 300000, pension: 300000 },
+                referenceDate: '2026-07-15',
+            });
+            expect(result.ok).toBeTrue();
         });
 
         it('allows submission during the submission period', () => {
@@ -293,6 +307,23 @@ describe('procedure-submit-validation.util', () => {
                 referenceDate: '2026-07-05',
             });
             expect(result.ok).toBeTrue();
+        });
+
+        it('blocks submission after the due date when reward months are missing', () => {
+            const result = validateRegularDecisionProcedureSubmit({
+                employee,
+                office,
+                company,
+                targetYearMonth: '2026-06',
+                missingMonthlyRewardMonths: ['2026-05'],
+                averageMonthlyReward: null,
+                standardRemuneration: null,
+                referenceDate: '2026-08-01',
+            });
+            expect(result.ok).toBeFalse();
+            if (!result.ok) {
+                expect(result.message).toBe('未入力の項目があります');
+            }
         });
     });
 

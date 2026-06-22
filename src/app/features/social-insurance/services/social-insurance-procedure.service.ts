@@ -40,13 +40,16 @@ import {
     ProcedureInput,
     QualificationProcedureData,
 } from '../models/procedures.model';
-import { hasSavedQualificationData } from '../utils/qualification-procedure-data.util';
 import {
+    buildQualificationProcedureRewardPreviewPatch,
     canAutoManageQualificationProcedure,
+    hasSavedQualificationData,
+    isQualificationProcedureRewardPreviewUnchanged,
     resolveEffectiveHealthInsuranceStartDateForSync,
     resolveQualificationProcedureDates,
     shouldSyncQualificationProcedureDates,
 } from '../utils/qualification-procedure-data.util';
+import { QualificationMonthlyReward } from '../utils/qualification-reward.util';
 import { Employee } from '../../employee/models/employee.models';
 import { EmployeeService } from '../../employee/services/employee.service';
 import { insuranceJoinStatus } from '../models/social-insurance-status.model';
@@ -390,6 +393,28 @@ export class SocialInsuranceProcedureService {
             dependentChanges: null,
             qualificationDate: dates.qualificationDate ?? '',
         });
+    }
+
+    /** 未完了の資格取得届に、入社時報酬のプレビューを反映する */
+    async syncQualificationProcedureRewardPreview(
+        procedure: Procedure,
+        monthlyReward: QualificationMonthlyReward | null,
+    ): Promise<Procedure> {
+        if (procedure.procedureType !== 'qualification' || procedure.status === 'completed') {
+            return procedure;
+        }
+
+        const patch = buildQualificationProcedureRewardPreviewPatch(monthlyReward);
+        if (isQualificationProcedureRewardPreviewUnchanged(procedure, patch)) {
+            return procedure;
+        }
+
+        const updated: Procedure = {
+            ...procedure,
+            ...patch,
+        };
+        await this.updateProcedure(updated);
+        return updated;
     }
 
     /** 退職日に合わせて資格喪失届を自動作成、または未完了手続きの対象日を更新する */

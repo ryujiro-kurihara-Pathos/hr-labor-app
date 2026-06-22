@@ -51,6 +51,13 @@ export class MainLayoutComponent {
                 return;
             }
 
+            const verified = await this.authService.isEmailVerified();
+            if (!verified) {
+                this.currentUser.set(null);
+                await this.router.navigate(['/verify-email']);
+                return;
+            }
+
             this.currentUser.set(appUser);
         });
     }

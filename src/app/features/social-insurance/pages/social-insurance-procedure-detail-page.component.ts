@@ -8,13 +8,19 @@ import { OfficeService } from '../../company/services/office.service';
 import { CompanyService } from '../../company/services/company.service';
 import { BonusRewardService } from '../../bonus/services/bonus-reward.service';
 import { StandardMonthlyRewardService } from '../../insurance/services/standard-monthly-reward.service';
+import { SalaryConditionService } from '../../insurance/services/salary-condition.service';
 import { yearMonthFromDateString } from '../../insurance/utils/reward-target-month.util';
 
 import { BonusReward } from '../../bonus/models/bonus-reward.model';
 import { Procedure } from '../models/procedures.model';
 import { hasSavedQualificationData } from '../utils/qualification-procedure-data.util';
+import {
+    resolveQualificationJoinMonthReward,
+    resolveQualificationMonthlyReward,
+} from '../utils/qualification-reward.util';
 import { SocialInsuranceStatus } from '../models/social-insurance-status.model';
 import { StandardMonthlyReward } from '../../insurance/models/standard-monthly-reward.model';
+import { SalaryCondition } from '../../insurance/models/salary-condition.model';
 import { Dependent, Employee } from '../../employee/models/employee.models';
 import { Office } from '../../company/models/office.model';
 import { Company } from '../../company/models/company.model';
@@ -40,12 +46,15 @@ export class SocialInsuranceProcedureDetailPageComponent {
     private readonly companyService = inject(CompanyService);
     private readonly rewardService = inject(StandardMonthlyRewardService);
     private readonly bonusRewardService = inject(BonusRewardService);
+    private readonly salaryConditionService = inject(SalaryConditionService);
 
     procedure = signal<Procedure | null>(null);
     socialInsuranceStatus = signal<SocialInsuranceStatus | null>(null);
     hasActiveDependents = signal(false);
     dependents = signal<Dependent[]>([]);
     joinMonthReward = signal<StandardMonthlyReward | null>(null);
+    joinMonthRewardFromExpected = signal(false);
+    salaryConditions = signal<SalaryCondition[]>([]);
     employeeBonuses = signal<BonusReward[]>([]);
     employee = signal<Employee | null>(null);
     office = signal<Office | null>(null);
@@ -86,9 +95,11 @@ export class SocialInsuranceProcedureDetailPageComponent {
         await this.loadSocialInsuranceStatus();
         await this.syncQualificationProcedureIfNeeded();
         await this.loadDependents();
-        await Promise.all([this.loadJoinMonthReward(), this.loadEmployeeBonuses()]);
-        await this.loadOffice();
         await this.loadCompany();
+        await this.loadSalaryConditions();
+        await Promise.all([this.loadJoinMonthReward(), this.loadEmployeeBonuses()]);
+        await this.syncQualificationProcedureRewardPreview();
+        await this.loadOffice();
 
         this.isLoading.set(false);
     }
@@ -159,8 +170,23 @@ export class SocialInsuranceProcedureDetailPageComponent {
         }
     }
 
+    private async loadSalaryConditions(): Promise<void> {
+        this.salaryConditions.set([]);
+
+        const employee = this.employee();
+        if (!employee || this.procedure()?.procedureType !== 'qualification') return;
+
+        try {
+            const conditions = await this.salaryConditionService.listByEmployee(employee.id);
+            this.salaryConditions.set(conditions);
+        } catch (error) {
+            console.error('給与条件の取得に失敗しました', error);
+        }
+    }
+
     private async loadJoinMonthReward(): Promise<void> {
         this.joinMonthReward.set(null);
+        this.joinMonthRewardFromExpected.set(false);
 
         const employee = this.employee();
         if (!employee || this.procedure()?.procedureType !== 'qualification') return;
@@ -169,10 +195,48 @@ export class SocialInsuranceProcedureDetailPageComponent {
         if (!joinYearMonth) return;
 
         try {
-            const reward = await this.rewardService.getByEmployeeAndMonth(employee.id, joinYearMonth);
+            const rewards = await this.rewardService.listByEmployee(employee.id);
+            const rewardsByYearMonth = Object.fromEntries(
+                rewards.map((reward) => [reward.targetYearMonth, reward]),
+            );
+            const { reward, fromExpectedSalaryCondition } = resolveQualificationJoinMonthReward({
+                joinedDate: employee.joinedDate,
+                companyId: employee.companyId,
+                employeeId: employee.id,
+                employmentType: employee.employmentType,
+                salaryConditions: this.salaryConditions(),
+                rewardsByYearMonth,
+                payrollPaymentMonthOffset: this.company()?.payrollPaymentMonthOffset ?? 1,
+            });
             this.joinMonthReward.set(reward);
+            this.joinMonthRewardFromExpected.set(fromExpectedSalaryCondition);
         } catch (error) {
             console.error('入社月の報酬月額の取得に失敗しました', error);
+        }
+    }
+
+    private async syncQualificationProcedureRewardPreview(): Promise<void> {
+        const procedure = this.procedure();
+        const employee = this.employee();
+        if (!procedure || !employee || procedure.procedureType !== 'qualification') return;
+        if (procedure.status === 'completed') return;
+
+        const monthlyReward = resolveQualificationMonthlyReward(
+            employee.joinedDate,
+            this.joinMonthReward(),
+            this.employeeBonuses(),
+            employee.employmentType,
+            this.joinMonthRewardFromExpected(),
+        );
+
+        try {
+            const updated = await this.procedureService.syncQualificationProcedureRewardPreview(
+                procedure,
+                monthlyReward,
+            );
+            this.procedure.set(updated);
+        } catch (error) {
+            console.error('資格取得届への報酬反映に失敗しました', error);
         }
     }
 

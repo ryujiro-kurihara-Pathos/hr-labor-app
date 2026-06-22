@@ -16,11 +16,12 @@ import {
     todayDateString,
 } from '../utils/procedure-display.util';
 import {
-    isRegularDecisionProcedureSubmissionAllowed,
+    canSubmitRegularDecisionProcedure,
     regularDecisionProcedureDueDate,
     regularDecisionProcedureSubmissionStartDate,
 } from '../utils/procedure-due-date.util';
 import { StandardMonthlyRewardService } from '../../insurance/services/standard-monthly-reward.service';
+import { SalaryConditionService } from '../../insurance/services/salary-condition.service';
 import {
     getFirstRegularDeterminationYearMonth,
     getPaymentBaseDaysForPayMonth,
@@ -29,6 +30,7 @@ import {
     getRegularCalculationMonths,
     getRegularDecisionProcedureBaseYear,
     getRegularDeterminationPaymentMonths,
+    getRegularDeterminationPreviousReferenceMonth,
     getRegularDeterminationRewardMonths,
 } from '../../insurance/utils/standard-remuneration-determination.util';
 import { StandardMonthlyRewardCalculatorService } from '../../insurance/services/standard-monthly-reward-calculator.service';
@@ -37,6 +39,8 @@ import { RouterLink } from '@angular/router';
 import { addMonthsToYearMonth, yearMonthFromDateString } from '../../insurance/utils/reward-target-month.util';
 import {
     formatPayYearMonthLabelFromWorkMonth,
+    isConfirmedExactRewardRegisteredForPayMonth,
+    lookupConfirmedExactRewardByPayMonth,
     resolvePayMonthFromWorkMonth,
     resolvePayMonthQueryFromWorkMonth,
 } from '../../insurance/utils/reward-pay-month.util';
@@ -48,6 +52,7 @@ import {
 import {
     calculateRevisionAverageMonthlyReward,
     formatRevisionApplyFromPayMonthLabel,
+    getRevisionApplyFromMonth,
     monthlyRewardTotal,
 } from '../../insurance/utils/revision-determination.util';
 import {
@@ -95,6 +100,7 @@ export type RemunerationProcedureVariant = 'regularDecision' | 'revision' | 'bon
 
 export class EmployeeProcedureSheetComponent {
     private readonly rewardService = inject(StandardMonthlyRewardService);
+    private readonly salaryConditionService = inject(SalaryConditionService);
     private readonly calculator = inject(StandardMonthlyRewardCalculatorService);
     private readonly determinationService = inject(StandardRemunerationDeterminationService);
     private readonly bonusRewardService = inject(BonusRewardService);
@@ -285,11 +291,11 @@ export class EmployeeProcedureSheetComponent {
         if (!targetYearMonth) return null;
 
         const baseYear = getRegularDecisionProcedureBaseYear(targetYearMonth);
-        if (isRegularDecisionProcedureSubmissionAllowed(baseYear, todayDateString())) return null;
+        if (canSubmitRegularDecisionProcedure(baseYear, todayDateString())) return null;
 
         const startDate = regularDecisionProcedureSubmissionStartDate(baseYear);
         const dueDate = regularDecisionProcedureDueDate(baseYear);
-        return `提出期間は${dateLabel(startDate)}〜${dateLabel(dueDate)}です。内容の確認・CSV出力はこの期間外でも可能です。`;
+        return `提出期間は${dateLabel(startDate)}〜${dateLabel(dueDate)}です。提出開始前は提出できません。内容の確認・CSV出力はこの期間外でも可能です。`;
     });
 
     constructor() {
@@ -419,6 +425,8 @@ export class EmployeeProcedureSheetComponent {
                 this.socialInsuranceStatusService.getInsuranceStatusByEmployeeId(employee.id),
             ]);
 
+            const salaryConditions = await this.salaryConditionService.listByEmployee(employee.id);
+
             const healthInsuranceStartDate = insuranceStatus?.healthInsuranceStartDate ?? null;
             const qualificationDate = getQualificationDate(employee, healthInsuranceStartDate);
             if (!qualificationDate) {
@@ -437,6 +445,7 @@ export class EmployeeProcedureSheetComponent {
             ) as Record<string, StandardMonthlyReward>;
 
             const firstRegularYm = getFirstRegularDeterminationYearMonth(qualificationDate);
+            const payrollPaymentMonthOffset = this.company().payrollPaymentMonthOffset ?? 1;
             const eligibility = evaluateRevisionAtOrigin(
                 originMonth,
                 qualificationYearMonth,
@@ -446,7 +455,8 @@ export class EmployeeProcedureSheetComponent {
                 rewardsByYearMonth,
                 (monthlyReward) => this.calculator.calculate(monthlyReward),
                 bonuses,
-                this.company().payrollPaymentMonthOffset ?? 1,
+                payrollPaymentMonthOffset,
+                salaryConditions,
             );
 
             const originReward = rewardsByYearMonth[originMonth] ?? null;
@@ -533,7 +543,7 @@ export class EmployeeProcedureSheetComponent {
 
         try {
 
-            const [rewards, bonuses, insuranceStatus] = await Promise.all([
+            const [rewards, bonuses, insuranceStatus, salaryConditions] = await Promise.all([
 
                 this.rewardService.listByEmployee(employee.id),
 
@@ -544,6 +554,8 @@ export class EmployeeProcedureSheetComponent {
                     : Promise.resolve([] as BonusReward[]),
 
                 this.socialInsuranceStatusService.getInsuranceStatusByEmployeeId(employee.id),
+
+                this.salaryConditionService.listByEmployee(employee.id),
 
             ]);
 
@@ -614,7 +626,9 @@ export class EmployeeProcedureSheetComponent {
             );
             const baseMonthSet = new Set(baseMonths);
 
-            const missingMonths = calculationMonths.filter((ym) => !rewardsByYearMonth[ym]);
+            const missingMonths = calculationMonths.filter(
+                (ym) => !isConfirmedExactRewardRegisteredForPayMonth(rewardsByYearMonth, ym),
+            );
             this.missingMonthlyRewardMonths.set(missingMonths);
 
             this.regularDecisionMonths.set(
@@ -624,7 +638,10 @@ export class EmployeeProcedureSheetComponent {
                         rewardMonths[index]!,
                         employee,
                         qualificationDate,
-                        rewardsByYearMonth[rewardMonths[index]!] ?? null,
+                        lookupConfirmedExactRewardByPayMonth(
+                            rewardsByYearMonth,
+                            rewardMonths[index]!,
+                        ),
                         bonuses,
                         baseMonthSet.has(rewardMonths[index]!),
                         payrollPaymentMonthOffset,
@@ -634,7 +651,7 @@ export class EmployeeProcedureSheetComponent {
 
 
 
-            const previousMonth = `${baseYear}-08`;
+            const previousMonth = getRegularDeterminationPreviousReferenceMonth(baseYear);
 
             const firstRegularYm = getFirstRegularDeterminationYearMonth(qualificationDate);
 
@@ -658,13 +675,15 @@ export class EmployeeProcedureSheetComponent {
 
                 payrollPaymentMonthOffset,
 
-                [],
+                salaryConditions,
 
                 regularMinPaymentBaseDays,
 
             );
 
-            this.previousRevisionMonth.set(previousWinner?.effectiveFrom ?? null);
+            this.previousRevisionMonth.set(
+                this.resolvePreviousRevisionDisplayMonth(previousWinner),
+            );
 
 
 
@@ -682,7 +701,7 @@ export class EmployeeProcedureSheetComponent {
 
                 payrollPaymentMonthOffset,
 
-                [],
+                salaryConditions,
 
                 joinJudgmentContext,
 
@@ -716,19 +735,25 @@ export class EmployeeProcedureSheetComponent {
 
             const total = calculationMonths.reduce(
 
-                (sum, yearMonth) =>
+                (sum, yearMonth) => {
 
-                    sum +
+                    const reward = lookupConfirmedExactRewardByPayMonth(
+                        rewardsByYearMonth,
+                        yearMonth,
+                    );
+                    if (!reward) return sum;
 
-                    effectiveMonthlyRewardTotal(
+                    return sum + effectiveMonthlyRewardTotal(
 
-                        rewardsByYearMonth[yearMonth],
+                        reward,
 
                         yearMonth,
 
                         bonuses,
 
-                    ),
+                    );
+
+                },
 
                 0,
 
@@ -768,6 +793,18 @@ export class EmployeeProcedureSheetComponent {
 
         }
 
+    }
+
+
+
+    private resolvePreviousRevisionDisplayMonth(
+        winner: ReturnType<typeof pickWinningDeterminationCandidate>,
+    ): string | null {
+        if (!winner) return null;
+        if (winner.kind === 'revision' && winner.revisionOriginMonth) {
+            return getRevisionApplyFromMonth(winner.revisionOriginMonth);
+        }
+        return winner.effectiveFrom;
     }
 
 

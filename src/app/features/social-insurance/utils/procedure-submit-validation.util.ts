@@ -7,7 +7,7 @@ import {
     LossReason,
     Procedure,
 } from '../models/procedures.model';
-import { QualificationMonthlyReward } from './qualification-reward.util';
+import { QualificationMonthlyReward, resolveQualificationRewardInputYearMonth } from './qualification-reward.util';
 import {
     resolveInsuredPeriodBounds,
     validateDateWithinInsuredPeriod,
@@ -18,7 +18,7 @@ import {
 } from './procedure-date-range.util';
 import { getQualificationDate, getRegularDecisionProcedureBaseYear } from '../../insurance/utils/standard-remuneration-determination.util';
 import {
-    isRegularDecisionProcedureSubmissionAllowed,
+    canSubmitRegularDecisionProcedure,
     regularDecisionProcedureDueDate,
     regularDecisionProcedureSubmissionStartDate,
 } from './procedure-due-date.util';
@@ -196,7 +196,10 @@ export function validateQualificationProcedureSubmit(params: {
 
     if (!params.monthlyReward || params.monthlyReward.totalAmount <= 0) {
         const yearMonth =
-            params.monthlyReward?.targetYearMonth ?? joinYearMonth(params.employee?.joinedDate) ?? '';
+            resolveQualificationRewardInputYearMonth(
+                params.employee!.joinedDate,
+                params.company?.payrollPaymentMonthOffset ?? 1,
+            ) ?? joinYearMonth(params.employee?.joinedDate) ?? '';
         if (!yearMonth) {
             return missingFieldsFailure([employeeLink(employeeId, '入社日')]);
         }
@@ -413,14 +416,14 @@ function validateRegularDecisionSubmissionPeriod(
     }
 
     const baseYear = getRegularDecisionProcedureBaseYear(trimmed);
-    if (isRegularDecisionProcedureSubmissionAllowed(baseYear, referenceDate)) {
+    if (canSubmitRegularDecisionProcedure(baseYear, referenceDate)) {
         return null;
     }
 
     const startDate = regularDecisionProcedureSubmissionStartDate(baseYear);
     const dueDate = regularDecisionProcedureDueDate(baseYear);
     return errorFailure(
-        `算定基礎届の提出期間は${startDate}〜${dueDate}です。内容の確認・CSV出力はこの期間外でも可能です。`,
+        `算定基礎届の提出期間は${startDate}〜${dueDate}です。提出開始前は提出できません。内容の確認・CSV出力はこの期間外でも可能です。`,
     );
 }
 

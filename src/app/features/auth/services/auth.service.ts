@@ -11,6 +11,8 @@ import {
     sendSignInLinkToEmail,
     isSignInWithEmailLink,
     signInWithEmailLink,
+    sendEmailVerification,
+    reload,
     ActionCodeSettings,
 } from 'firebase/auth';
 import { auth } from '../../../core/firebase';
@@ -91,6 +93,26 @@ export class AuthService {
 
     getCurrentAuthUser(): User | null {
         return auth.currentUser;
+    }
+
+    async sendVerificationEmail(): Promise<void> {
+        const user = auth.currentUser;
+        if (!user) {
+            throw new Error('NOT_AUTHENTICATED');
+        }
+
+        const actionCodeSettings: ActionCodeSettings = {
+            url: `${window.location.origin}/login`,
+            handleCodeInApp: false,
+        };
+        await sendEmailVerification(user, actionCodeSettings);
+    }
+
+    async isEmailVerified(): Promise<boolean> {
+        const user = auth.currentUser;
+        if (!user) return false;
+        await reload(user);
+        return auth.currentUser?.emailVerified ?? false;
     }
 
     watchAuthState(callback: (user: User | null) => void) {

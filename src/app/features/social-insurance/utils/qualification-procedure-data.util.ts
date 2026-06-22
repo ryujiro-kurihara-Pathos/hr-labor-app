@@ -262,6 +262,48 @@ export function buildQualificationProcedureData(params: {
     };
 }
 
+export function buildQualificationProcedureRewardPreviewPatch(
+    monthlyReward: QualificationMonthlyReward | null,
+): Pick<
+    Procedure,
+    | 'rewardTargetYearMonth'
+    | 'rewardCashAmount'
+    | 'rewardInKindAmount'
+    | 'rewardTotalAmount'
+    | 'rewardIsMidMonthJoin'
+> {
+    if (!monthlyReward) {
+        return {
+            rewardTargetYearMonth: null,
+            rewardCashAmount: null,
+            rewardInKindAmount: null,
+            rewardTotalAmount: null,
+            rewardIsMidMonthJoin: false,
+        };
+    }
+
+    return {
+        rewardTargetYearMonth: monthlyReward.targetYearMonth,
+        rewardCashAmount: monthlyReward.cashAmount,
+        rewardInKindAmount: monthlyReward.inKindAmount,
+        rewardTotalAmount: monthlyReward.totalAmount,
+        rewardIsMidMonthJoin: monthlyReward.isMidMonthJoin,
+    };
+}
+
+export function isQualificationProcedureRewardPreviewUnchanged(
+    procedure: Procedure,
+    patch: ReturnType<typeof buildQualificationProcedureRewardPreviewPatch>,
+): boolean {
+    return (
+        procedure.rewardTargetYearMonth === patch.rewardTargetYearMonth
+        && procedure.rewardCashAmount === patch.rewardCashAmount
+        && procedure.rewardInKindAmount === patch.rewardInKindAmount
+        && procedure.rewardTotalAmount === patch.rewardTotalAmount
+        && procedure.rewardIsMidMonthJoin === patch.rewardIsMidMonthJoin
+    );
+}
+
 export function hasSavedQualificationData(procedure: Procedure): boolean {
     return Boolean(
         procedure.employeeLastName.trim() ||

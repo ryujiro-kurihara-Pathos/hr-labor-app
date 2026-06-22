@@ -21,6 +21,7 @@ import {
     formatYen,
     QualificationMonthlyReward,
     resolveQualificationMonthlyReward,
+    resolveQualificationRewardInputYearMonth,
 } from '../utils/qualification-reward.util';
 import {
     buildQualificationProcedureData,
@@ -47,6 +48,7 @@ export class QualificationProcedureComponent {
     socialInsuranceStatus = input<SocialInsuranceStatus | null>(null);
     hasDependents = input(false);
     joinMonthReward = input<StandardMonthlyReward | null>(null);
+    joinMonthRewardFromExpected = input(false);
     employeeBonuses = input<BonusReward[]>([]);
 
     procedureUpdated = output<Procedure>();
@@ -80,6 +82,7 @@ export class QualificationProcedureComponent {
             this.joinMonthReward(),
             this.employeeBonuses(),
             employee.employmentType,
+            this.joinMonthRewardFromExpected(),
         );
     });
 
@@ -94,7 +97,18 @@ export class QualificationProcedureComponent {
         if (this.useSavedData()) {
             return monthlyRewardFromProcedure(this.procedure(), employee?.employmentType ?? null);
         }
-        return this.liveMonthlyReward();
+        const live = this.liveMonthlyReward();
+        if (live) return live;
+        return monthlyRewardFromProcedure(this.procedure(), employee?.employmentType ?? null);
+    });
+
+    rewardInputYearMonth = computed((): string | null => {
+        const employee = this.employee();
+        if (!employee) return null;
+        return resolveQualificationRewardInputYearMonth(
+            employee.joinedDate,
+            this.company()?.payrollPaymentMonthOffset ?? 1,
+        );
     });
 
     displayOfficeSymbol = computed((): string => {
@@ -245,6 +259,11 @@ export class QualificationProcedureComponent {
     convertJoinedDateToYearMonth(date: string): string {
         const [year, month] = date.split('-');
         return `${year}-${month}`;
+    }
+
+    rewardInputQueryParams(): { ym: string } | null {
+        const ym = this.rewardInputYearMonth();
+        return ym ? { ym } : null;
     }
 
     async submitProcedure(): Promise<void> {

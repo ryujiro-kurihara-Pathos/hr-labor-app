@@ -1,0 +1,135 @@
+<div class="verify-email-page">
+    <div class="verify-email-card">
+        <h1>メール認証</h1>
+        <p class="section-note">
+            登録ありがとうございます。<br />
+            @if (email()) {
+                <strong>{{ email() }}</strong> 宛に確認メールを送信しました。
+            } @else {
+                ご登録のメールアドレス宛に確認メールを送信しました。
+            }
+            メール内のリンクを開いて認証を完了してください。
+        </p>
+        <p class="section-note muted">
+            認証が完了するまで、アプリの機能は利用できません。
+        </p>
+
+        @if (message()) {
+            <p class="success-message">{{ message() }}</p>
+        }
+        @if (errorMessage()) {
+            <p class="error-message">{{ errorMessage() }}</p>
+        }
+
+        <button
+            type="button"
+            class="form-btn primary"
+            (click)="checkVerificationStatus()"
+            [disabled]="isProcessing()"
+        >
+            認証を完了した
+        </button>
+
+        <button
+            type="button"
+            class="form-btn secondary"
+            (click)="resendVerificationEmail()"
+            [disabled]="isProcessing()"
+        >
+            確認メールを再送
+        </button>
+
+        <button type="button" class="link-btn" (click)="logout()" [disabled]="isProcessing()">
+            別のアカウントでログイン
+        </button>
+    </div>
+</div>
+
+<style>
+    .verify-email-page {
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: #f5f6f8;
+        padding: 24px 16px;
+    }
+
+    .verify-email-card {
+        width: min(480px, 100%);
+        padding: 32px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    }
+
+    h1 {
+        margin: 0 0 8px;
+        font-size: 24px;
+    }
+
+    .section-note {
+        margin: 0 0 12px;
+        color: #374151;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    .section-note.muted {
+        margin-bottom: 20px;
+        color: #6b7280;
+        font-size: 13px;
+    }
+
+    .form-btn {
+        width: 100%;
+        height: 42px;
+        margin-top: 8px;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .form-btn.primary {
+        background: #2f6fed;
+        color: #fff;
+    }
+
+    .form-btn.secondary {
+        background: #fff;
+        color: #2f6fed;
+        border: 1px solid #c7d7fb;
+    }
+
+    .form-btn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    .link-btn {
+        display: block;
+        width: 100%;
+        margin-top: 16px;
+        padding: 0;
+        border: none;
+        background: none;
+        color: #6b7280;
+        font-size: 13px;
+        cursor: pointer;
+        text-decoration: underline;
+    }
+
+    .success-message {
+        color: #047857;
+        font-size: 14px;
+        margin: 0 0 12px;
+    }
+
+    .error-message {
+        color: #d93025;
+        font-size: 14px;
+        margin: 0 0 12px;
+    }
+</style>

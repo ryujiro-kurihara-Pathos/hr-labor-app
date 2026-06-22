@@ -6,6 +6,7 @@ import {
     isJoinPayMonthView,
     isPremiumBasisRewardConfirmed,
     isRewardConfirmedForPayMonth,
+    lookupConfirmedExactRewardByPayMonth,
     lookupQualificationInitialReward,
     lookupRewardByPayMonth,
     resolvePremiumBasisRewardPayYearMonth,
@@ -66,6 +67,18 @@ describe('reward-pay-month.util', () => {
 
         it('includes work month fallback for later pay months', () => {
             expect(rewardLookupKeysForPayMonth('2026-04', 1, '2026-02')).toEqual(['2026-04', '2026-03']);
+        });
+    });
+
+    describe('lookupConfirmedExactRewardByPayMonth', () => {
+        it('returns confirmed reward only for exact pay month key', () => {
+            const rewards = {
+                '2026-06': reward('2026-06'),
+            };
+            expect(lookupConfirmedExactRewardByPayMonth(rewards, '2026-06')?.targetYearMonth).toBe(
+                '2026-06',
+            );
+            expect(lookupConfirmedExactRewardByPayMonth(rewards, '2026-07')).toBeNull();
         });
     });
 
@@ -132,21 +145,38 @@ describe('reward-pay-month.util', () => {
 
     describe('resolvePremiumBasisRewardPayYearMonth', () => {
         it('uses deduction month for same_month collection', () => {
-            expect(resolvePremiumBasisRewardPayYearMonth('2026-10', 'same_month')).toBe('2026-10');
+            expect(resolvePremiumBasisRewardPayYearMonth('2026-10', 'same_month', 0)).toBe('2026-10');
+            expect(resolvePremiumBasisRewardPayYearMonth('2026-10', 'same_month', 1)).toBe('2026-10');
         });
 
-        it('uses previous month for next_month collection', () => {
-            expect(resolvePremiumBasisRewardPayYearMonth('2026-10', 'next_month')).toBe('2026-09');
+        it('uses previous month for next_month collection regardless of payroll offset', () => {
+            expect(resolvePremiumBasisRewardPayYearMonth('2026-10', 'next_month', 0)).toBe('2026-09');
+            expect(resolvePremiumBasisRewardPayYearMonth('2026-10', 'next_month', 1)).toBe('2026-09');
         });
     });
 
     describe('isPremiumBasisRewardConfirmed', () => {
-        it('checks liability month reward for next_month collection', () => {
+        it('checks reward on the displayed liability month key for next_month collection', () => {
             const rewards = {
                 '2026-09': reward('2026-09'),
             };
-            expect(isPremiumBasisRewardConfirmed(rewards, '2026-10', 'next_month')).toBe(true);
-            expect(isPremiumBasisRewardConfirmed(rewards, '2026-10', 'same_month')).toBe(false);
+            expect(isPremiumBasisRewardConfirmed(rewards, '2026-10', 'next_month', 0)).toBe(true);
+            expect(isPremiumBasisRewardConfirmed(rewards, '2026-10', 'next_month', 1)).toBe(true);
+            expect(isPremiumBasisRewardConfirmed(rewards, '2026-11', 'next_month', 1)).toBe(false);
+        });
+
+        it('does not use deduction month key when only that month is registered', () => {
+            const rewards = {
+                '2026-10': reward('2026-10'),
+            };
+            expect(isPremiumBasisRewardConfirmed(rewards, '2026-10', 'next_month', 1)).toBe(false);
+        });
+
+        it('ignores draft rewards on the liability month key', () => {
+            const rewards = {
+                '2026-09': reward('2026-09', 'draft'),
+            };
+            expect(isPremiumBasisRewardConfirmed(rewards, '2026-10', 'next_month', 1)).toBe(false);
         });
     });
 });

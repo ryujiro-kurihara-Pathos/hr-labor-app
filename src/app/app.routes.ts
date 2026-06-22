@@ -3,6 +3,7 @@ import { Routes } from '@angular/router';
 import { authGuard } from './guards/auth.guard';
 
 import { guestGuard } from './guards/guest.guard';
+import { verifyEmailGuard } from './guards/verify-email.guard';
 
 import { adminGuard, employeeGuard } from './guards/role.guard';
 
@@ -14,6 +15,7 @@ import { SignupPageComponent } from './features/auth/pages/signup-page.component
 
 import { LoginPageComponent } from './features/auth/pages/login-page.component';
 import { InviteAcceptPageComponent } from './features/auth/pages/invite-accept-page.component';
+import { VerifyEmailPageComponent } from './features/auth/pages/verify-email-page.component';
 
 import { MainLayoutComponent } from './layouts/main-layout/main-layout.component';
 
@@ -67,31 +69,51 @@ export const routes: Routes = [
 
         component: AuthLayoutComponent,
 
-        canActivate: [guestGuard],
-
         children: [
 
             {
 
-                path: 'signup',
+                path: 'verify-email',
 
-                component: SignupPageComponent,
+                component: VerifyEmailPageComponent,
 
-            },
-
-            {
-
-                path: 'login',
-
-                component: LoginPageComponent,
+                canActivate: [verifyEmailGuard],
 
             },
 
             {
 
-                path: 'invite/:invitationId',
+                path: '',
 
-                component: InviteAcceptPageComponent,
+                canActivate: [guestGuard],
+
+                children: [
+
+                    {
+
+                        path: 'signup',
+
+                        component: SignupPageComponent,
+
+                    },
+
+                    {
+
+                        path: 'login',
+
+                        component: LoginPageComponent,
+
+                    },
+
+                    {
+
+                        path: 'invite/:invitationId',
+
+                        component: InviteAcceptPageComponent,
+
+                    }
+
+                ]
 
             }
 

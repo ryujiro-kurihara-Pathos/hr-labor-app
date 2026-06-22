@@ -1,9 +1,6 @@
-import { Company, InsurancePremiumCollectionTiming } from '../../company/models/company.model';
+import { InsurancePremiumCollectionTiming } from '../../company/models/company.model';
 import { Employee } from '../../employee/models/employee.models';
-import {
-    resolvePayrollDateInYearMonth,
-    resolvePremiumLiabilityYearMonth,
-} from '../../company/utils/company-payroll-settings.util';
+import { resolvePremiumLiabilityYearMonth } from '../../company/utils/company-payroll-settings.util';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 import { isRewardConfirmed } from './reward-status.util';
 import {
@@ -46,12 +43,13 @@ export function rewardLookupKeysForPayMonth(
 }
 
 /**
- * 保険料算出の根拠となる報酬の支給年月。
- * 翌月徴収では給与控除月の前月（保険料対象月）の報酬を参照する。
+ * 保険料算出の根拠となる報酬レコードの年月キー。
+ * 画面に表示する保険料対象月（翌月徴収時は控除月の前月）と同じキーを使う。
  */
 export function resolvePremiumBasisRewardPayYearMonth(
     deductionPayYearMonth: string,
     collectionTiming: InsurancePremiumCollectionTiming,
+    _payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
 ): string {
     return resolvePremiumLiabilityYearMonth(deductionPayYearMonth, collectionTiming);
 }
@@ -61,12 +59,14 @@ export function isPremiumBasisRewardConfirmed(
     rewardsByYearMonth: Record<string, StandardMonthlyReward>,
     deductionPayYearMonth: string,
     collectionTiming: InsurancePremiumCollectionTiming,
+    _payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+    _joinYearMonth: string | null = null,
 ): boolean {
-    const basisPayYearMonth = resolvePremiumBasisRewardPayYearMonth(
+    const basisYearMonth = resolvePremiumBasisRewardPayYearMonth(
         deductionPayYearMonth,
         collectionTiming,
     );
-    return isRewardConfirmed(lookupExactRewardByPayMonth(rewardsByYearMonth, basisPayYearMonth));
+    return isConfirmedExactRewardRegisteredForPayMonth(rewardsByYearMonth, basisYearMonth);
 }
 
 /** 保険料算出の根拠となる報酬レコード */
@@ -74,12 +74,14 @@ export function lookupPremiumBasisReward(
     rewardsByYearMonth: Record<string, StandardMonthlyReward>,
     deductionPayYearMonth: string,
     collectionTiming: InsurancePremiumCollectionTiming,
+    _payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+    _joinYearMonth: string | null = null,
 ): StandardMonthlyReward | null {
-    const basisPayYearMonth = resolvePremiumBasisRewardPayYearMonth(
+    const basisYearMonth = resolvePremiumBasisRewardPayYearMonth(
         deductionPayYearMonth,
         collectionTiming,
     );
-    return lookupExactRewardByPayMonth(rewardsByYearMonth, basisPayYearMonth);
+    return lookupConfirmedExactRewardByPayMonth(rewardsByYearMonth, basisYearMonth);
 }
 
 /** 支給年月キーに一致する報酬のみ（確定状態の判定に使用） */
@@ -115,6 +117,22 @@ export function isRewardConfirmedForPayMonth(
     _payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
 ): boolean {
     return isRewardConfirmed(lookupExactRewardByPayMonth(rewardsByYearMonth, payYearMonth));
+}
+
+/** 随時改定の算定月など、支給年月キーが一致する確定済み報酬のみを参照 */
+export function lookupConfirmedExactRewardByPayMonth(
+    rewardsByYearMonth: Record<string, StandardMonthlyReward>,
+    payYearMonth: string,
+): StandardMonthlyReward | null {
+    const reward = lookupExactRewardByPayMonth(rewardsByYearMonth, payYearMonth);
+    return isRewardConfirmed(reward) ? reward : null;
+}
+
+export function isConfirmedExactRewardRegisteredForPayMonth(
+    rewardsByYearMonth: Record<string, StandardMonthlyReward>,
+    payYearMonth: string,
+): boolean {
+    return lookupConfirmedExactRewardByPayMonth(rewardsByYearMonth, payYearMonth) !== null;
 }
 
 /** 確定済み報酬のうち、最も新しい支給年月 */
@@ -338,16 +356,6 @@ export function clampSalaryPayYearMonth(
     if (minYm && ym < minYm) ym = minYm;
     if (ym > maxYm) ym = maxYm;
     return ym;
-}
-
-/** 会社設定に基づく支給日（YYYY-MM-DD）。未設定時は null */
-export function resolvePayrollPaymentDate(
-    company: Pick<Company, 'payrollPaymentDay'> | null | undefined,
-    payYearMonth: string,
-): string | null {
-    const day = company?.payrollPaymentDay;
-    if (day === null || day === undefined) return null;
-    return resolvePayrollDateInYearMonth(day, payYearMonth);
 }
 
 /** 報酬レコードキー（支給年月）のラベル */

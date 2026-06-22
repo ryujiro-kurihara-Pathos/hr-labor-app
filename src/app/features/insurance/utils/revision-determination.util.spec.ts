@@ -12,6 +12,7 @@ import {
 } from './revision-determination.util';
 import { createEmptyEmployeeInput, Employee } from '../../employee/models/employee.models';
 import { SalaryCondition } from '../models/salary-condition.model';
+import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 
 describe('revision-determination.util', () => {
     describe('hasRevisionGradeDifference', () => {
@@ -81,6 +82,20 @@ describe('revision-determination.util', () => {
         it('returns null when a calculation month is missing', () => {
             const rewards = {
                 '2026-04': makeReward('2026-04', 300000),
+            };
+
+            expect(
+                calculateRegularDeterminationAverageMonthlyReward(rewards, [
+                    '2026-04',
+                    '2026-05',
+                ]),
+            ).toBeNull();
+        });
+
+        it('returns null when a calculation month reward is not confirmed', () => {
+            const rewards = {
+                '2026-04': { ...makeReward('2026-04', 300000), status: 'draft' as const },
+                '2026-05': makeReward('2026-05', 360000),
             };
 
             expect(
@@ -209,6 +224,78 @@ describe('revision-determination.util', () => {
             ];
             expect(resolveFixedWageChangeDirection(rewards, '2026-06', conditions)).toBe('increase');
         });
+
+        it('uses confirmed reward fixed wages when salary condition is unchanged', () => {
+            const rewards: Record<string, StandardMonthlyReward> = {
+                '2025-03': {
+                    ...makeReward('2025-03', 220_000),
+                    basicSalary: 220_000,
+                    monthlyReward: 220_000,
+                    status: 'confirmed',
+                },
+                '2025-04': {
+                    ...makeReward('2025-04', 260_000),
+                    basicSalary: 260_000,
+                    monthlyReward: 260_000,
+                    fixedWageChanged: true,
+                    status: 'confirmed',
+                },
+            };
+            const conditions: SalaryCondition[] = [
+                {
+                    id: 'sc1',
+                    companyId: 'c1',
+                    employeeId: 'e1',
+                    effectiveStartMonth: '2025-02',
+                    basicSalary: 260_000,
+                    commutingAllowance: 0,
+                    positionAllowance: 0,
+                    housingAllowance: 0,
+                    fixedOvertimePay: 0,
+                    otherFixedAllowance: 0,
+                    fixedWageTotal: 260_000,
+                    note: '',
+                    changeReason: '',
+                    triggersRevision: false,
+                    createdAt: {} as never,
+                    updatedAt: {} as never,
+                },
+            ];
+            expect(resolveFixedWageChangeDirection(rewards, '2025-04', conditions)).toBe('increase');
+        });
+
+        it('前月報酬が未登録でも給与条件を基準に方向を判定する', () => {
+            const rewards: Record<string, StandardMonthlyReward> = {
+                '2025-05': {
+                    ...makeReward('2025-05', 270_000),
+                    basicSalary: 260_000,
+                    monthlyReward: 270_000,
+                    fixedWageChanged: true,
+                    status: 'confirmed',
+                },
+            };
+            const conditions: SalaryCondition[] = [
+                {
+                    id: 'sc1',
+                    companyId: 'c1',
+                    employeeId: 'e1',
+                    effectiveStartMonth: '2025-04',
+                    basicSalary: 220_000,
+                    commutingAllowance: 0,
+                    positionAllowance: 0,
+                    housingAllowance: 0,
+                    fixedOvertimePay: 0,
+                    otherFixedAllowance: 0,
+                    fixedWageTotal: 220_000,
+                    note: '',
+                    changeReason: '',
+                    triggersRevision: false,
+                    createdAt: {} as never,
+                    updatedAt: {} as never,
+                },
+            ];
+            expect(resolveFixedWageChangeDirection(rewards, '2025-05', conditions)).toBe('increase');
+        });
     });
 
     describe('hasRevisionGradeDirectionMatch', () => {
@@ -257,6 +344,7 @@ function makeReward(targetYearMonth: string, total: number) {
         pensionInsuranceStandardMonthlyAmount: 300000,
         fixedWageChanged: false,
         changedFixedWageFields: [],
+        status: 'confirmed' as const,
         createdAt: {} as never,
         updatedAt: {} as never,
     };

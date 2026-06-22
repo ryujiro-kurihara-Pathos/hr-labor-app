@@ -286,6 +286,8 @@ export class MyInsurancePremiumPageComponent implements OnInit {
                     rewardsByYearMonth,
                     payYearMonth,
                     timing,
+                    this.company()?.payrollPaymentMonthOffset ?? 1,
+                    yearMonthFromDateString(employee.joinedDate),
                 );
             },
         );
@@ -336,6 +338,8 @@ export class MyInsurancePremiumPageComponent implements OnInit {
             rewardsByYearMonth,
             payYearMonth,
             this.insurancePremiumCollectionTiming(),
+            this.company()?.payrollPaymentMonthOffset ?? 1,
+            yearMonthFromDateString(this.employee()?.joinedDate ?? ''),
         );
     });
 
@@ -496,14 +500,14 @@ export class MyInsurancePremiumPageComponent implements OnInit {
 
     effectiveStandardForPremium = computed(() => {
         const employee = this.employee();
-        const liabilityYearMonth = this.premiumLiabilityYearMonth();
-        if (!employee || !liabilityYearMonth) return null;
+        const payYearMonth = this.targetYearMonth();
+        if (!employee || !payYearMonth) return null;
 
         const rewardsByYearMonth = confirmedRewardsByYearMonth(
             Object.fromEntries(this.allRewards().map((item) => [item.targetYearMonth, item])),
         );
         const standardDeterminationYearMonth = resolvePremiumStandardDeterminationYearMonth(
-            liabilityYearMonth,
+            payYearMonth,
             this.insurancePremiumCollectionTiming(),
         );
 
@@ -895,7 +899,7 @@ export class MyInsurancePremiumPageComponent implements OnInit {
                     employee,
                     rewardsByYearMonth,
                     resolvePremiumStandardDeterminationYearMonth(
-                        liabilityYearMonth,
+                        targetYearMonth,
                         this.insurancePremiumCollectionTiming(),
                     ),
                     this.insuranceStatus()?.healthInsuranceStartDate ?? null,

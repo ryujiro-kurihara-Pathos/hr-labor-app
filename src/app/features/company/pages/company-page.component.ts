@@ -7,15 +7,10 @@ import { AuthService } from '../../auth/services/auth.service';
 import { UserService } from '../../users/services/user.service';
 import { CompanyService } from '../services/company.service';
 import {
-    formatPayrollClosingDayLabel,
-    formatConfiguredPayrollDayLabel,
-    formatPayrollPaymentDayLabel,
     insurancePremiumCollectionTimingLabel,
     isValidInsurancePremiumCollectionSetting,
     insurancePremiumCollectionSettingErrorMessage,
     allowedInsurancePremiumCollectionTimings,
-    isValidOptionalPayrollDay,
-    isValidRequiredPayrollDay,
 } from '../utils/company-payroll-settings.util';
 import { InsurancePremiumCollectionTiming } from '../models/company.model';
 
@@ -52,21 +47,10 @@ export class CompanyPageComponent {
     companyName = '';
     representativeName = '';
     companyAddress = '';
-    payrollClosingDay: number | '' = '';
-    payrollPaymentDay: number | '' = '';
     payrollPaymentMonthOffset: 0 | 1 = 1;
     insurancePremiumCollectionTiming: InsurancePremiumCollectionTiming = 'next_month';
 
-    readonly payrollDayOptions = Array.from({ length: 31 }, (_, index) => index + 1);
-    readonly formatPayrollClosingDayLabel = formatPayrollClosingDayLabel;
-    readonly formatConfiguredPayrollDayLabel = formatConfiguredPayrollDayLabel;
-    readonly formatPayrollPaymentDayLabel = formatPayrollPaymentDayLabel;
     readonly insurancePremiumCollectionTimingLabel = insurancePremiumCollectionTimingLabel;
-
-    readonly payrollClosingHelpLines = [
-        '毎月の給与計算の締め日です。未設定でも利用できます。',
-        '31日を選ぶと、各月の末日（28〜31日）として扱います。',
-    ];
 
     readonly payrollPaymentMonthHelpLines = [
         '給与を支払う月です。当月または翌月から選択します。',
@@ -76,11 +60,6 @@ export class CompanyPageComponent {
         '給与から控除する保険料の対象月（当月徴収 / 翌月徴収）です。',
         '保険料対象月は給与支払月以前である必要があります。',
         '給与支払が翌月の場合、当月徴収（支払月の保険料を先に控除）は選べません。',
-    ];
-
-    readonly payrollPaymentHelpLines = [
-        '給与を支払う日です。1〜31日、または末日を選択します。',
-        '31日を選ぶと、各月の末日（28〜31日）として扱います。',
     ];
 
     // 事業所一覧
@@ -153,21 +132,9 @@ export class CompanyPageComponent {
         const name = this.companyName.trim();
         const representativeName = this.representativeName.trim();
         const address = this.companyAddress.trim();
-        const payrollClosingDay = this.payrollClosingDay === '' ? null : this.payrollClosingDay;
-        const payrollPaymentDay = this.payrollPaymentDay === '' ? null : this.payrollPaymentDay;
 
         if (!name || !representativeName || !address) {
             this.errorMessage.set('会社名・代表者・所在地を入力してください');
-            return;
-        }
-
-        if (!isValidOptionalPayrollDay(payrollClosingDay)) {
-            this.errorMessage.set('給与締日は1〜31の範囲で選択してください');
-            return;
-        }
-
-        if (!isValidRequiredPayrollDay(payrollPaymentDay)) {
-            this.errorMessage.set('給与支払日を選択してください');
             return;
         }
 
@@ -188,8 +155,6 @@ export class CompanyPageComponent {
                 name,
                 representativeName,
                 address,
-                payrollClosingDay,
-                payrollPaymentDay,
                 payrollPaymentMonthOffset: this.payrollPaymentMonthOffset,
                 insurancePremiumCollectionTiming: this.insurancePremiumCollectionTiming,
             });
@@ -198,8 +163,6 @@ export class CompanyPageComponent {
                 name,
                 representativeName,
                 address,
-                payrollClosingDay,
-                payrollPaymentDay,
                 payrollPaymentMonthOffset: this.payrollPaymentMonthOffset,
                 insurancePremiumCollectionTiming: this.insurancePremiumCollectionTiming,
             });
@@ -216,8 +179,6 @@ export class CompanyPageComponent {
         this.companyName = company.name;
         this.representativeName = company.representativeName;
         this.companyAddress = company.address;
-        this.payrollClosingDay = company.payrollClosingDay ?? '';
-        this.payrollPaymentDay = company.payrollPaymentDay ?? '';
         this.payrollPaymentMonthOffset = company.payrollPaymentMonthOffset;
         this.insurancePremiumCollectionTiming = company.insurancePremiumCollectionTiming;
     }

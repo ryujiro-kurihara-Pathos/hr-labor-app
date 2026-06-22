@@ -133,8 +133,8 @@ export class SignupPageComponent {
             };
             await this.userService.createUser(appUserInput);
 
-            // ログイン画面に遷移
-            await this.router.navigate(['/login']);
+            await this.authService.sendVerificationEmail();
+            await this.router.navigate(['/verify-email']);
         } catch (error) {
             console.error('サインインに失敗しました。', error);
             this.errorMessage = '登録に失敗しました。入力内容を確認して再度お試しください';

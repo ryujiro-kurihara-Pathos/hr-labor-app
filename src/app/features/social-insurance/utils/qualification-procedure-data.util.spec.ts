@@ -1,7 +1,9 @@
 import {
+    buildQualificationProcedureRewardPreviewPatch,
     canAutoManageQualificationProcedure,
     hasJoinDateChanged,
     isQualificationDateDerivedFromJoinDate,
+    isQualificationProcedureRewardPreviewUnchanged,
     qualificationProcedureDueDate,
     resolveEffectiveHealthInsuranceStartDateForSync,
     resolveLiveQualificationDisplayDate,
@@ -215,5 +217,48 @@ describe('qualification-procedure-data.util sync helpers', () => {
         expect(
             isQualificationDateDerivedFromJoinDate('2026-04-15', '2026-04-01', procedure),
         ).toBe(false);
+    });
+
+    it('builds reward preview patch from monthly reward', () => {
+        expect(
+            buildQualificationProcedureRewardPreviewPatch({
+                targetYearMonth: '2026-04',
+                cashAmount: 300000,
+                inKindAmount: 0,
+                totalAmount: 300000,
+                isMidMonthJoin: false,
+                usesDirectMonthlyRewardEntry: false,
+            }),
+        ).toEqual({
+            rewardTargetYearMonth: '2026-04',
+            rewardCashAmount: 300000,
+            rewardInKindAmount: 0,
+            rewardTotalAmount: 300000,
+            rewardIsMidMonthJoin: false,
+        });
+    });
+
+    it('detects unchanged reward preview patch', () => {
+        const patch = buildQualificationProcedureRewardPreviewPatch({
+            targetYearMonth: '2026-04',
+            cashAmount: 300000,
+            inKindAmount: 0,
+            totalAmount: 300000,
+            isMidMonthJoin: false,
+            usesDirectMonthlyRewardEntry: false,
+        });
+        expect(
+            isQualificationProcedureRewardPreviewUnchanged(
+                {
+                    ...procedure,
+                    rewardTargetYearMonth: '2026-04',
+                    rewardCashAmount: 300000,
+                    rewardInKindAmount: 0,
+                    rewardTotalAmount: 300000,
+                    rewardIsMidMonthJoin: false,
+                },
+                patch,
+            ),
+        ).toBe(true);
     });
 });

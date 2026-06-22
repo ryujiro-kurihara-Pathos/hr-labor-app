@@ -1,4 +1,5 @@
 import {
+    canSubmitRegularDecisionProcedure,
     isRegularDecisionProcedureSubmissionAllowed,
     procedureDueDateFromOccurredDate,
     qualificationProcedureDueDate,
@@ -29,6 +30,18 @@ describe('procedure-due-date.util', () => {
         expect(isRegularDecisionProcedureSubmissionAllowed(2026, '2026-07-01')).toBeTrue();
         expect(isRegularDecisionProcedureSubmissionAllowed(2026, '2026-07-10')).toBeTrue();
         expect(isRegularDecisionProcedureSubmissionAllowed(2026, '2026-07-11')).toBeFalse();
+    });
+
+    it('allows late submission after the due date', () => {
+        expect(canSubmitRegularDecisionProcedure(2026, '2026-07-05')).toBeTrue();
+        expect(canSubmitRegularDecisionProcedure(2026, '2026-07-11')).toBeTrue();
+        expect(canSubmitRegularDecisionProcedure(2026, '2026-12-31')).toBeTrue();
+        expect(canSubmitRegularDecisionProcedure(2025, '2026-06-01')).toBeTrue();
+    });
+
+    it('blocks submission before the submission period starts', () => {
+        expect(canSubmitRegularDecisionProcedure(2026, '2026-06-30')).toBeFalse();
+        expect(canSubmitRegularDecisionProcedure(2026, '2026-04-01')).toBeFalse();
     });
 
     it('uses loss date for loss procedure deadline', () => {

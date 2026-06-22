@@ -21,9 +21,9 @@
                             }
                         </a>
                     }
-                    @if (pageMode() === 'input' && joinPayYearMonth(); as joinYm) {
+                    @if (joinPayYearMonth(); as joinYm) {
                         <a
-                            [routerLink]="rewardDetailLink()"
+                            [routerLink]="pageMode() === 'premium' ? premiumDetailLink() : rewardDetailLink()"
                             [queryParams]="{ ym: joinYm }"
                             class="context-link"
                             [class.context-link-current]="isJoinPayMonthView()"
@@ -103,11 +103,6 @@
                         </button>
                     }
                 </div>
-                @if (pageMode() === 'input' && payrollPaymentDateLabel()) {
-                    <p class="pay-period-meta">
-                        支給日: <strong>{{ payrollPaymentDateLabel() }}</strong>
-                    </p>
-                }
             </div>
             <button
                 type="button"
@@ -124,14 +119,8 @@
         }
 
         @if (pageMode() === 'input') {
-        @if (
-            monthRewardStatus() === 'confirmed' &&
-            standardReward()?.fixedWageChanged &&
-            changedFixedWageFieldLabels().length > 0
-        ) {
-            <p class="alert alert-warning">
-                前月から固定的賃金に変更があります（{{ changedFixedWageFieldLabels().join('・') }}）。月額変更の届出が必要な場合があります。
-            </p>
+        @if (revisionWarningMessage(); as warningMessage) {
+            <p class="alert alert-warning">{{ warningMessage }}</p>
         }
 
         @if (showQualificationProcedureSection() || showRevisionProcedureSection() || showRegularDecisionProcedureSection()) {
@@ -155,7 +144,7 @@
                             icon="改"
                             tone="orange"
                             label="月額変更届"
-                            [summary]="ctx.applyFromLabel + '（算定 ' + ctx.windowLabel + '）'"
+                            [summary]="revisionProcedureNudgeSummary(ctx.applyFromMonth, ctx.applyFromLabel, ctx.windowLabel)"
                             [exists]="revisionProcedureExistsFor(ctx.applyFromMonth)"
                             [creating]="isCreatingRevisionProcedureFor(ctx.applyFromMonth)"
                             (action)="openRevisionProcedure(ctx.applyFromMonth)"

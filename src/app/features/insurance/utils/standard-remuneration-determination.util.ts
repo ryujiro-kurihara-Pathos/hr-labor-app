@@ -192,6 +192,11 @@ export function getRegularCalculationMonths(
     );
 }
 
+/** 定時決定適用直前月（算定基礎届の従前標準報酬月額の参照月） */
+export function getRegularDeterminationPreviousReferenceMonth(baseYear: number): string {
+    return `${baseYear}-08`;
+}
+
 /** 勤務月の支払基礎日数（資格取得日〜退職日ベース） */
 export function getPaymentBaseDays(
     yearMonth: string,

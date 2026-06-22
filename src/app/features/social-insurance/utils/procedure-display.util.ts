@@ -69,6 +69,16 @@ export function isProcedureOverdue(
     );
 }
 
+/** 手続きナッジ用：未提出は提出期限、提出済は「提出済」を返す */
+export function formatProcedureNudgeDueOrSubmitted(
+    status: ProcedureStatus,
+    dueDate: string,
+): string {
+    if (status === 'completed') return '提出済';
+    if (!dueDate) return '';
+    return `提出期限 ${dateLabel(dueDate)}`;
+}
+
 /** 被扶養者異動届（扶養変更届）のみ、未提出なら削除可能 */
 export function canDeleteProcedure(
     procedure: Pick<Procedure, 'procedureType' | 'status'>,

@@ -109,10 +109,14 @@
                     <dt></dt>
                     <dd class="field-note">シフト制のため、入力した報酬月額をそのまま表示しています。</dd>
                 </div>
-            } @else if (reward.isMidMonthJoin) {
+            } @else if (reward.fromExpectedSalaryCondition || reward.isMidMonthJoin) {
                 <div class="meta-row note-row">
                     <dt></dt>
-                    <dd class="field-note">入社時の見込み報酬月額（途中入社のため）</dd>
+                    @if (reward.isMidMonthJoin) {
+                        <dd class="field-note">入社時の見込み報酬月額（途中入社のため）</dd>
+                    } @else {
+                        <dd class="field-note">入社時の見込み報酬月額を参照しています</dd>
+                    }
                 </div>
             }
             <div class="meta-row">
@@ -147,7 +151,7 @@
                     @if (employee(); as emp) {
                         <a
                             [routerLink]="['/rewards', emp.id]"
-                            [queryParams]="{ ym: convertJoinedDateToYearMonth(emp.joinedDate) }"
+                            [queryParams]="rewardInputQueryParams()"
                         >登録へ</a>
                     }
                 </div>

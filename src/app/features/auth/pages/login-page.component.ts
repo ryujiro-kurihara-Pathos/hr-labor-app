@@ -61,6 +61,12 @@ export class LoginPageComponent {
                 return;
             }
 
+            const verified = await this.authService.isEmailVerified();
+            if (!verified) {
+                await this.router.navigate(['/verify-email']);
+                return;
+            }
+
             await this.router.navigate([defaultRouteForRole(appUser.role)]);
         } catch (error) {
             console.error('ログインに失敗しました。', error);
