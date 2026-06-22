@@ -1,5 +1,6 @@
 import {
     getDaysInMonth,
+    resolveDaysInMonthForPayMonth,
     resolveMonthlyRewardWithEnrollmentProration,
     shouldProrateMonthlyRewardByPaymentBaseDays,
 } from './monthly-reward-proration.util';
@@ -36,6 +37,18 @@ describe('monthly-reward-proration.util', () => {
                 monthlyReward: 300_000,
                 paymentBaseDays: getDaysInMonth('2026-04'),
                 daysInMonth: getDaysInMonth('2026-04'),
+            }),
+        ).toBe(300_000);
+    });
+
+    it('uses work month days for next-month pay (March pay / February work)', () => {
+        expect(resolveDaysInMonthForPayMonth('2026-03', 1)).toBe(28);
+        expect(
+            resolveMonthlyRewardWithEnrollmentProration({
+                employmentType: 'full-time',
+                monthlyReward: 300_000,
+                paymentBaseDays: 28,
+                daysInMonth: resolveDaysInMonthForPayMonth('2026-03', 1),
             }),
         ).toBe(300_000);
     });

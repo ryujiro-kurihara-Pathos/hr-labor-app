@@ -381,15 +381,6 @@ export class EmployeeCreatePageComponent {
         if (this.employee.gender !== 'male' && this.employee.gender !== 'female') {
             return '性別を選択してください。';
         }
-        if (this.isFormEmpty(this.employee.prefecture)) {
-            return '都道府県を選択してください。';
-        }
-        if (this.isFormEmpty(this.employee.city)) {
-            return '市区町村を入力してください。';
-        }
-        if (this.isFormEmpty(this.employee.streetAddress)) {
-            return '丁目番地を入力してください。';
-        }
         return null;
     }
 

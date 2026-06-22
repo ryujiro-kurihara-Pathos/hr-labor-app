@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DecimalPipe } from '@angular/common';
 import { ActivatedRoute, NavigationEnd, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { filter } from 'rxjs';
+import { filter, map, skip, distinctUntilChanged } from 'rxjs';
 
 import {
     StandardMonthlyReward,
@@ -138,6 +138,7 @@ import {
 import { isPartTimeEmployment } from '../../social-insurance/utils/part-time-insurance-judgment.util';
 import {
     getDaysInMonth,
+    resolveDaysInMonthForPayMonth,
     resolveMonthlyRewardWithEnrollmentProration,
 } from '../utils/monthly-reward-proration.util';
 import {
@@ -269,6 +270,16 @@ export class InsurancePremiumDetailPageComponent {
                     void this.onTargetYearMonthChange(clamped);
                 }
             });
+
+        this.route.queryParamMap.pipe(
+            map((params) => params.get('ym')),
+            skip(1),
+            distinctUntilChanged(),
+            filter((ym): ym is string => Boolean(ym && /^\d{4}-\d{2}$/.test(ym))),
+            takeUntilDestroyed(),
+        ).subscribe((ym) => {
+            void this.onTargetYearMonthChange(ym);
+        });
     }
 
     readonly premiumStandardAmountHelpLines = [
@@ -1417,7 +1428,9 @@ export class InsurancePremiumDetailPageComponent {
         const paymentBaseDays = this.paymentBaseDays();
         if (paymentBaseDays === null) return null;
 
-        const daysInMonth = getDaysInMonth(workYearMonth);
+        const daysInMonth = this.pageMode() === 'input' && payYearMonth
+            ? resolveDaysInMonthForPayMonth(payYearMonth, this.payrollPaymentMonthOffset())
+            : getDaysInMonth(workYearMonth);
         const resolved = resolveMonthlyRewardWithEnrollmentProration({
             employmentType: this.employee()?.employmentType ?? null,
             monthlyReward,
