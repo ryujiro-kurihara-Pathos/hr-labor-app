@@ -329,37 +329,56 @@ export function validateDependentProcedureSubmit(
             const birthReason = validateDependentBirthDate({
                 birthDate: form.birthDate.trim(),
                 referenceDate,
-                eventDate:
-                    changeType === 'add'
-                        ? form.dependencyStartDate
-                        : form.changeDate,
             });
             if (birthReason) {
                 return errorFailure(birthReason);
             }
         }
 
-        const eventDate =
-            changeType === 'add'
-                ? form.dependencyStartDate.trim()
-                : changeType === 'delete'
-                  ? form.dependencyEndDate.trim()
-                  : form.changeDate.trim();
-        const occurredDateReason = validateDependentOccurredDate({
-            occurredDate: eventDate,
-            changeType,
-            bounds,
-            employee: options.employee,
-            referenceDate,
-            dependencyStartDate:
-                options.dependencyStartDate
-                ?? (changeType === 'add' ? form.dependencyStartDate : undefined),
-            dependencyEndDate:
-                options.dependencyEndDate
-                ?? (changeType === 'delete' ? form.dependencyEndDate : undefined),
-        });
-        if (occurredDateReason) {
-            return errorFailure(occurredDateReason);
+        if (changeType === 'add') {
+            const startDateReason = validateDependentOccurredDate({
+                occurredDate: form.dependencyStartDate.trim(),
+                changeType: 'add',
+                bounds,
+                employee: options.employee,
+                referenceDate,
+                birthDate: form.birthDate,
+            });
+            if (startDateReason) {
+                return errorFailure(startDateReason);
+            }
+        }
+
+        if (changeType === 'change') {
+            const birthReason = validateDependentBirthDate({
+                birthDate: form.birthDate.trim(),
+                referenceDate,
+                eventDate: form.changeDate,
+            });
+            if (birthReason) {
+                return errorFailure(birthReason);
+            }
+        }
+
+        if (changeType === 'change' || changeType === 'delete') {
+            const eventDate =
+                changeType === 'delete'
+                    ? form.dependencyEndDate.trim()
+                    : form.changeDate.trim();
+            const occurredDateReason = validateDependentOccurredDate({
+                occurredDate: eventDate,
+                changeType,
+                bounds,
+                employee: options.employee,
+                referenceDate,
+                dependencyStartDate: options.dependencyStartDate ?? undefined,
+                dependencyEndDate:
+                    options.dependencyEndDate
+                    ?? (changeType === 'delete' ? form.dependencyEndDate : undefined),
+            });
+            if (occurredDateReason) {
+                return errorFailure(occurredDateReason);
+            }
         }
     }
 

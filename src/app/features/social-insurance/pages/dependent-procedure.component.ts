@@ -46,6 +46,7 @@ import {
     validateDependentProcedureSubmit,
 } from '../utils/procedure-submit-validation.util';
 import {
+    resolveDependencyStartDateBounds,
     resolveDependentOccurredDateBounds,
     resolveInsuredPeriodBounds,
 } from '../utils/procedure-date-range.util';
@@ -143,14 +144,18 @@ export class DependentProcedureComponent {
         }),
     );
 
-    startDateBounds = computed(() =>
-        resolveDependentOccurredDateBounds({
-            changeType: 'add',
+    startDateBounds = computed(() => {
+        const employee = this.employee();
+        if (!employee) {
+            return { min: null, max: todayDateString() };
+        }
+        return resolveDependencyStartDateBounds({
             bounds: this.insuredPeriodBounds(),
-            dependent: null,
+            employee,
+            birthDate: this.form().birthDate,
             referenceDate: todayDateString(),
-        }),
-    );
+        });
+    });
 
     endDateBounds = computed(() =>
         resolveDependentOccurredDateBounds({

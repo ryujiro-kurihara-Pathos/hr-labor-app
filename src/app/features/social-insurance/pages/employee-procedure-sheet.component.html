@@ -165,18 +165,45 @@
                 </div>
             }
             @case ('bonusPayment') {
-                <div class="meta-row">
-                    <dt>賞与支給日</dt>
-                    <dd>{{ dateLabel(item.occurredDate) }}</dd>
-                </div>
-                <div class="meta-row">
-                    <dt>賞与額</dt>
-                    <dd>{{ formatYen(bonusPaymentAmount()) }}</dd>
-                </div>
-                <div class="meta-row">
-                    <dt>対象年月</dt>
-                    <dd>{{ yearMonthLabel(item.targetYearMonth) }}</dd>
-                </div>
+                @if (aggregatedBonusPayment(); as bonusPayment) {
+                    <div class="meta-row">
+                        <dt>賞与支給日</dt>
+                        <dd>{{ dateLabel(bonusPayment.paymentDate) }}</dd>
+                    </div>
+                    @if (bonusPayment.isAggregated) {
+                        <div class="meta-row">
+                            <dt>初回支払日</dt>
+                            <dd>{{ dateLabel(bonusPayment.firstPaymentDate) }}</dd>
+                        </div>
+                    }
+                    <div class="meta-row">
+                        <dt>賞与支給額</dt>
+                        <dd>{{ formatYen(bonusPayment.bonusAmountTotal) }}</dd>
+                    </div>
+                    <div class="meta-row">
+                        <dt>標準賞与額</dt>
+                        <dd>{{ formatYen(bonusPayment.standardBonusAmount) }}</dd>
+                    </div>
+                    @if (bonusPayment.remark) {
+                        <div class="meta-row">
+                            <dt>備考</dt>
+                            <dd>{{ bonusPayment.remark }}</dd>
+                        </div>
+                    }
+                    <div class="meta-row">
+                        <dt>対象年月</dt>
+                        <dd>{{ yearMonthLabel(item.targetYearMonth) }}</dd>
+                    </div>
+                } @else {
+                    <div class="meta-row">
+                        <dt>賞与支給日</dt>
+                        <dd>{{ dateLabel(item.occurredDate) }}</dd>
+                    </div>
+                    <div class="meta-row">
+                        <dt>対象年月</dt>
+                        <dd>{{ yearMonthLabel(item.targetYearMonth) }}</dd>
+                    </div>
+                }
             }
         }
     </dl>

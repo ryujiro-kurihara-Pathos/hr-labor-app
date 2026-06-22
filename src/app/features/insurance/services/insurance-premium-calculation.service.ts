@@ -19,14 +19,18 @@ import { StandardRemunerationDeterminationService } from './standard-remuneratio
 import { bonusesForStandardBonusPremium } from '../utils/effective-monthly-reward.util';
 import { resolveBonusPremiumableStandardAmounts } from '../utils/bonus-standard-amount-cap.util';
 import { resolveInsurancePremiumRates } from '../utils/insurance-premium-rate-resolution.util';
-import { roundInsurancePremium } from '../utils/insurance-premium-rounding.util';
+import { calculateInsurancePremiumShares } from '../utils/insurance-premium-rounding.util';
+import { resolveMonthlyPremiumStandardAmounts } from '../utils/insurance-premium-standard-amount.util';
 import { isPremiumBasisRewardConfirmed } from '../utils/reward-pay-month.util';
 import { savedRewardsForPremiumCalculation } from '../utils/reward-status.util';
 import { addMonthsToYearMonth } from '../utils/reward-target-month.util';
 import { getQualificationDate, PayrollPaymentMonthOffset } from '../utils/standard-remuneration-determination.util';
 
 export type CalculatedInsurancePremium = {
+    /** 健康保険・介護保険の算定基礎（協会けんぽ表） */
     standardMonthlyAmount: number | null;
+    /** 厚生年金の算定基礎（年金表・上限650,000円） */
+    pensionStandardMonthlyAmount: number | null;
     healthInsuranceEmployeePremium: number;
     healthInsuranceEmployerPremium: number;
     pensionInsuranceEmployeePremium: number;
@@ -128,7 +132,7 @@ export class InsurancePremiumCalculationService {
         );
         if (!effective?.isComplete || !effective.calculation?.health) return null;
 
-        const standardMonthlyAmount = effective.calculation.health.standardMonthlyAmount;
+        const standardAmounts = resolveMonthlyPremiumStandardAmounts(effective.calculation);
         const qualificationDate = getQualificationDate(employee, healthInsuranceStartDate);
         const rates = resolveInsurancePremiumRates({
             liabilityYearMonth,
@@ -158,24 +162,22 @@ export class InsurancePremiumCalculationService {
             employee.birthDate,
         );
 
-        const healthInsuranceEmployeePremium = isHealthMonth
-            ? this.premium(standardMonthlyAmount, rates.healthEmployeeRate)
-            : 0;
-        const healthInsuranceEmployerPremium = isHealthMonth
-            ? this.premium(standardMonthlyAmount, rates.healthEmployerRate)
-            : 0;
-        const pensionInsuranceEmployeePremium = isPensionMonth
-            ? this.premium(standardMonthlyAmount, rates.pensionEmployeeRate)
-            : 0;
-        const pensionInsuranceEmployerPremium = isPensionMonth
-            ? this.premium(standardMonthlyAmount, rates.pensionEmployerRate)
-            : 0;
-        const careInsuranceEmployeePremium = isCareMonth
-            ? this.premium(standardMonthlyAmount, rates.careEmployeeRate)
-            : 0;
-        const careInsuranceEmployerPremium = isCareMonth
-            ? this.premium(standardMonthlyAmount, rates.careEmployerRate)
-            : 0;
+        const healthShares = isHealthMonth && rates.healthTotalRate !== null && standardAmounts.health !== null
+            ? calculateInsurancePremiumShares(standardAmounts.health, rates.healthTotalRate)
+            : null;
+        const pensionShares = isPensionMonth && rates.pensionTotalRate !== null && standardAmounts.pension !== null
+            ? calculateInsurancePremiumShares(standardAmounts.pension, rates.pensionTotalRate)
+            : null;
+        const careShares = isCareMonth && rates.careTotalRate !== null && standardAmounts.care !== null
+            ? calculateInsurancePremiumShares(standardAmounts.care, rates.careTotalRate)
+            : null;
+
+        const healthInsuranceEmployeePremium = healthShares?.employeePremium ?? 0;
+        const healthInsuranceEmployerPremium = healthShares?.employerPremium ?? 0;
+        const pensionInsuranceEmployeePremium = pensionShares?.employeePremium ?? 0;
+        const pensionInsuranceEmployerPremium = pensionShares?.employerPremium ?? 0;
+        const careInsuranceEmployeePremium = careShares?.employeePremium ?? 0;
+        const careInsuranceEmployerPremium = careShares?.employerPremium ?? 0;
 
         const monthlyEmployeePremiumTotal =
             healthInsuranceEmployeePremium + pensionInsuranceEmployeePremium + careInsuranceEmployeePremium;
@@ -203,24 +205,22 @@ export class InsurancePremiumCalculationService {
                 allBonuses: confirmedBonuses,
             });
 
-            bonusHealthInsuranceEmployeePremium = isHealthMonth
-                ? this.premium(premiumableAmounts.healthAndCare, rates.healthEmployeeRate)
-                : 0;
-            bonusHealthInsuranceEmployerPremium = isHealthMonth
-                ? this.premium(premiumableAmounts.healthAndCare, rates.healthEmployerRate)
-                : 0;
-            bonusPensionInsuranceEmployeePremium = isPensionMonth
-                ? this.premium(premiumableAmounts.pension, rates.pensionEmployeeRate)
-                : 0;
-            bonusPensionInsuranceEmployerPremium = isPensionMonth
-                ? this.premium(premiumableAmounts.pension, rates.pensionEmployerRate)
-                : 0;
-            bonusCareInsuranceEmployeePremium = isCareMonth
-                ? this.premium(premiumableAmounts.healthAndCare, rates.careEmployeeRate)
-                : 0;
-            bonusCareInsuranceEmployerPremium = isCareMonth
-                ? this.premium(premiumableAmounts.healthAndCare, rates.careEmployerRate)
-                : 0;
+            const bonusHealthShares = isHealthMonth && rates.healthTotalRate !== null
+                ? calculateInsurancePremiumShares(premiumableAmounts.healthAndCare, rates.healthTotalRate)
+                : null;
+            const bonusPensionShares = isPensionMonth && rates.pensionTotalRate !== null
+                ? calculateInsurancePremiumShares(premiumableAmounts.pension, rates.pensionTotalRate)
+                : null;
+            const bonusCareShares = isCareMonth && rates.careTotalRate !== null
+                ? calculateInsurancePremiumShares(premiumableAmounts.healthAndCare, rates.careTotalRate)
+                : null;
+
+            bonusHealthInsuranceEmployeePremium = bonusHealthShares?.employeePremium ?? 0;
+            bonusHealthInsuranceEmployerPremium = bonusHealthShares?.employerPremium ?? 0;
+            bonusPensionInsuranceEmployeePremium = bonusPensionShares?.employeePremium ?? 0;
+            bonusPensionInsuranceEmployerPremium = bonusPensionShares?.employerPremium ?? 0;
+            bonusCareInsuranceEmployeePremium = bonusCareShares?.employeePremium ?? 0;
+            bonusCareInsuranceEmployerPremium = bonusCareShares?.employerPremium ?? 0;
         }
 
         const bonusEmployeePremiumTotal =
@@ -233,7 +233,8 @@ export class InsurancePremiumCalculationService {
             + bonusCareInsuranceEmployerPremium;
 
         return {
-            standardMonthlyAmount,
+            standardMonthlyAmount: standardAmounts.health,
+            pensionStandardMonthlyAmount: standardAmounts.pension,
             healthInsuranceEmployeePremium,
             healthInsuranceEmployerPremium,
             pensionInsuranceEmployeePremium,
@@ -253,10 +254,5 @@ export class InsurancePremiumCalculationService {
             totalEmployeePremium: monthlyEmployeePremiumTotal + bonusEmployeePremiumTotal,
             totalEmployerPremium: monthlyEmployerPremiumTotal + bonusEmployerPremiumTotal,
         };
-    }
-
-    private premium(amount: number, rate: number | null): number {
-        if (rate === null) return 0;
-        return roundInsurancePremium(amount * rate);
     }
 }

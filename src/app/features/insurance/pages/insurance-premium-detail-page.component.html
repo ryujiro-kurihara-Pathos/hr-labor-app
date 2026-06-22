@@ -117,6 +117,9 @@
         @if (isLoadingMonth()) {
             <p class="month-loading">報酬情報を読み込み中...</p>
         }
+        @if (pageMode() === 'premium') {
+            <p class="collection-timing-note">{{ insurancePremiumCollectionTimingAppNote }}</p>
+        }
 
         @if (pageMode() === 'input') {
         @if (revisionWarningMessage(); as warningMessage) {
@@ -959,8 +962,22 @@
                             </p>
                             <dl class="premium-display-meta">
                                 <div class="premium-display-meta-row">
+                                    <dt>保険料全体</dt>
+                                    <dd>
+                                        @if (healthInsuranceTotalPremium() !== null) {
+                                            {{ healthInsuranceTotalPremium() | number }}円
+                                        } @else {
+                                            —
+                                        }
+                                    </dd>
+                                </div>
+                                <div class="premium-display-meta-row">
                                     <dt>等級</dt>
                                     <dd>{{ healthGrade() ?? '—' }}</dd>
+                                </div>
+                                <div class="premium-display-meta-row">
+                                    <dt>料率（全体）</dt>
+                                    <dd>{{ insuranceRatePercentLabel(healthInsuranceTotalRate()) ?? '—' }}%</dd>
                                 </div>
                                 <div class="premium-display-meta-row">
                                     <dt>料率（本人）</dt>
@@ -1002,8 +1019,22 @@
                             </p>
                             <dl class="premium-display-meta">
                                 <div class="premium-display-meta-row">
+                                    <dt>保険料全体</dt>
+                                    <dd>
+                                        @if (pensionInsuranceTotalPremium() !== null) {
+                                            {{ pensionInsuranceTotalPremium() | number }}円
+                                        } @else {
+                                            —
+                                        }
+                                    </dd>
+                                </div>
+                                <div class="premium-display-meta-row">
                                     <dt>等級</dt>
                                     <dd>{{ pensionGrade() ?? '—' }}</dd>
+                                </div>
+                                <div class="premium-display-meta-row">
+                                    <dt>料率（全体）</dt>
+                                    <dd>{{ insuranceRatePercentLabel(pensionInsuranceTotalRate()) ?? '—' }}%</dd>
                                 </div>
                                 <div class="premium-display-meta-row">
                                     <dt>料率（本人）</dt>
@@ -1045,8 +1076,22 @@
                             </p>
                             <dl class="premium-display-meta">
                                 <div class="premium-display-meta-row">
+                                    <dt>保険料全体</dt>
+                                    <dd>
+                                        @if (careInsuranceTotalPremium() !== null) {
+                                            {{ careInsuranceTotalPremium() | number }}円
+                                        } @else {
+                                            —
+                                        }
+                                    </dd>
+                                </div>
+                                <div class="premium-display-meta-row">
                                     <dt>対象</dt>
                                     <dd>{{ careTargetLabel() }}（{{ careStatusLabel() }}）</dd>
+                                </div>
+                                <div class="premium-display-meta-row">
+                                    <dt>料率（全体）</dt>
+                                    <dd>{{ insuranceRatePercentLabel(careInsuranceTotalRate()) ?? '—' }}%</dd>
                                 </div>
                                 <div class="premium-display-meta-row">
                                     <dt>料率（本人）</dt>
@@ -1089,6 +1134,16 @@
                                     </p>
                                     <dl class="premium-display-meta">
                                         <div class="premium-display-meta-row">
+                                            <dt>保険料全体</dt>
+                                            <dd>
+                                                @if (bonusHealthInsuranceTotalPremium() !== null) {
+                                                    {{ bonusHealthInsuranceTotalPremium() | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </dd>
+                                        </div>
+                                        <div class="premium-display-meta-row">
                                             <dt class="premium-display-meta-label-row">
                                                 <span>標準賞与額</span>
                                                 <app-field-help-tooltip
@@ -1104,6 +1159,10 @@
                                                     —
                                                 }
                                             </dd>
+                                        </div>
+                                        <div class="premium-display-meta-row">
+                                            <dt>料率（全体）</dt>
+                                            <dd>{{ insuranceRatePercentLabel(healthInsuranceTotalRate()) ?? '—' }}%</dd>
                                         </div>
                                         <div class="premium-display-meta-row">
                                             <dt>料率（本人）</dt>
@@ -1141,6 +1200,16 @@
                                     </p>
                                     <dl class="premium-display-meta">
                                         <div class="premium-display-meta-row">
+                                            <dt>保険料全体</dt>
+                                            <dd>
+                                                @if (bonusPensionInsuranceTotalPremium() !== null) {
+                                                    {{ bonusPensionInsuranceTotalPremium() | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </dd>
+                                        </div>
+                                        <div class="premium-display-meta-row">
                                             <dt class="premium-display-meta-label-row">
                                                 <span>標準賞与額</span>
                                                 <app-field-help-tooltip
@@ -1156,6 +1225,10 @@
                                                     —
                                                 }
                                             </dd>
+                                        </div>
+                                        <div class="premium-display-meta-row">
+                                            <dt>料率（全体）</dt>
+                                            <dd>{{ insuranceRatePercentLabel(pensionInsuranceTotalRate()) ?? '—' }}%</dd>
                                         </div>
                                         <div class="premium-display-meta-row">
                                             <dt>料率（本人）</dt>
@@ -1193,6 +1266,16 @@
                                     </p>
                                     <dl class="premium-display-meta">
                                         <div class="premium-display-meta-row">
+                                            <dt>保険料全体</dt>
+                                            <dd>
+                                                @if (bonusCareInsuranceTotalPremium() !== null) {
+                                                    {{ bonusCareInsuranceTotalPremium() | number }}円
+                                                } @else {
+                                                    —
+                                                }
+                                            </dd>
+                                        </div>
+                                        <div class="premium-display-meta-row">
                                             <dt class="premium-display-meta-label-row">
                                                 <span>標準賞与額</span>
                                                 <app-field-help-tooltip
@@ -1208,6 +1291,10 @@
                                                     —
                                                 }
                                             </dd>
+                                        </div>
+                                        <div class="premium-display-meta-row">
+                                            <dt>料率（全体）</dt>
+                                            <dd>{{ insuranceRatePercentLabel(careInsuranceTotalRate()) ?? '—' }}%</dd>
                                         </div>
                                         <div class="premium-display-meta-row">
                                             <dt>料率（本人）</dt>
@@ -1825,6 +1912,13 @@
         margin: 0 0 16px;
         font-size: 13px;
         color: #6b7280;
+    }
+
+    .collection-timing-note {
+        margin: -8px 0 16px;
+        font-size: 13px;
+        color: #6b7280;
+        line-height: 1.5;
     }
 
     .page-tabs {

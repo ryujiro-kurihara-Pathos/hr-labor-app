@@ -5,6 +5,7 @@ import {
     insurancePremiumCollectionTimingLabel,
     isValidInsurancePremiumCollectionSetting,
     allowedInsurancePremiumCollectionTimings,
+    normalizeCompanyPayrollSettings,
     resolveInsurancePremiumCollectionTiming,
     resolvePayrollDeductionYearMonth,
     resolvePremiumLiabilityYearMonth,
@@ -13,6 +14,17 @@ import {
 } from './company-payroll-settings.util';
 
 describe('company-payroll-settings.util', () => {
+    describe('normalizeCompanyPayrollSettings', () => {
+        it('always forces next_month collection timing regardless of stored value', () => {
+            expect(
+                normalizeCompanyPayrollSettings({
+                    payrollPaymentMonthOffset: 0,
+                    insurancePremiumCollectionTiming: 'same_month',
+                }).insurancePremiumCollectionTiming,
+            ).toBe('next_month');
+        });
+    });
+
     describe('resolvePremiumLiabilityYearMonth', () => {
         it('returns same month for same_month timing', () => {
             expect(resolvePremiumLiabilityYearMonth('2026-04', 'same_month')).toBe('2026-04');

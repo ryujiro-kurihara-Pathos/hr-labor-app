@@ -9,6 +9,7 @@ import {
 import { StandardMonthlyReward, StandardMonthlyRewardStatus } from '../models/standard-monthly-reward.model';
 import {
     FIXED_WAGE_FIELD_KEYS,
+    FixedWageFieldKey,
     sumFixedWageFields,
 } from './fixed-wage-change.util';
 import { addMonthsToYearMonth, yearMonthFromDateString } from './reward-target-month.util';
@@ -100,6 +101,99 @@ export function resolvePreviousSalaryCondition(
         .sort((a, b) => (a.effectiveStartMonth < b.effectiveStartMonth ? 1 : -1))[0] ?? null;
 }
 
+/** 給与条件の適用終了月（次の条件の直前月。継続中は null） */
+export function resolveSalaryConditionPeriodEndMonth(
+    effectiveStartMonth: string,
+    conditions: SalaryCondition[],
+): string | null {
+    const nextStart = conditions
+        .map((condition) => condition.effectiveStartMonth)
+        .filter((yearMonth) => yearMonth > effectiveStartMonth)
+        .sort()[0];
+    return nextStart ? addMonthsToYearMonth(nextStart, -1) : null;
+}
+
+export function isYearMonthWithinSalaryConditionPeriod(
+    yearMonth: string,
+    periodStartMonth: string,
+    periodEndMonth: string | null,
+): boolean {
+    if (yearMonth < periodStartMonth) return false;
+    if (periodEndMonth && yearMonth > periodEndMonth) return false;
+    return true;
+}
+
+/** 変更対象期間に給与確定済み月（確定済み報酬の勤務月）が含まれるか */
+export function salaryConditionPeriodIncludesConfirmedMonth(params: {
+    effectiveStartMonth: string;
+    conditions: SalaryCondition[];
+    confirmedRewardMonths: string[];
+}): boolean {
+    const periodEndMonth = resolveSalaryConditionPeriodEndMonth(
+        params.effectiveStartMonth,
+        params.conditions,
+    );
+    return params.confirmedRewardMonths.some((yearMonth) =>
+        isYearMonthWithinSalaryConditionPeriod(
+            yearMonth,
+            params.effectiveStartMonth,
+            periodEndMonth,
+        ),
+    );
+}
+
+/** 変更対象期間に入社月が含まれるか */
+export function salaryConditionPeriodIncludesJoinMonth(params: {
+    effectiveStartMonth: string;
+    conditions: SalaryCondition[];
+    joinedDate: string | null | undefined;
+}): boolean {
+    const joinYearMonth = yearMonthFromDateString(params.joinedDate);
+    if (!joinYearMonth) return false;
+    const periodEndMonth = resolveSalaryConditionPeriodEndMonth(
+        params.effectiveStartMonth,
+        params.conditions,
+    );
+    return isYearMonthWithinSalaryConditionPeriod(
+        joinYearMonth,
+        params.effectiveStartMonth,
+        periodEndMonth,
+    );
+}
+
+export function resolveSalaryConditionChangeBlockReason(params: {
+    effectiveStartMonth: string;
+    conditions: SalaryCondition[];
+    confirmedRewardMonths: string[];
+    joinedDate?: string | null;
+    isEdit: boolean;
+}): string | null {
+    if (
+        params.isEdit
+        && salaryConditionPeriodIncludesJoinMonth({
+            effectiveStartMonth: params.effectiveStartMonth,
+            conditions: params.conditions,
+            joinedDate: params.joinedDate,
+        })
+    ) {
+        return '入社月を含む給与条件は変更できません。';
+    }
+
+    if (
+        salaryConditionPeriodIncludesConfirmedMonth({
+            effectiveStartMonth: params.effectiveStartMonth,
+            conditions: params.conditions,
+            confirmedRewardMonths: params.confirmedRewardMonths,
+        })
+    ) {
+        return params.isEdit
+            ? '変更対象期間に給与確定済みの月が含まれているため、この給与条件は変更できません。'
+            : '変更対象期間に給与確定済みの月が含まれているため、この適用開始月では登録できません。';
+    }
+
+    return null;
+}
+
 export function buildSalaryConditionPeriods(conditions: SalaryCondition[]): SalaryConditionPeriod[] {
     const sorted = [...conditions].sort(
         (a, b) => (a.effectiveStartMonth < b.effectiveStartMonth ? -1 : 1),
@@ -133,6 +227,24 @@ export function resolveEarliestSalaryConditionMonth(params: {
         return joinYm > qualificationYm ? joinYm : qualificationYm;
     }
     return joinYm ?? qualificationYm ?? null;
+}
+
+function fixedWageFieldValue(
+    source: SalaryConditionFormValue | SalaryConditionFixedWageFields,
+    key: FixedWageFieldKey,
+): number {
+    const value = source[key];
+    if (typeof value === 'number') return value;
+    return toNonNegativeNumber(value);
+}
+
+export function areSalaryConditionFixedWageFieldsEqual(
+    a: SalaryConditionFormValue | SalaryConditionFixedWageFields,
+    b: SalaryConditionFormValue | SalaryConditionFixedWageFields,
+): boolean {
+    return FIXED_WAGE_FIELD_KEYS.every(
+        (key) => fixedWageFieldValue(a, key) === fixedWageFieldValue(b, key),
+    );
 }
 
 export function validateSalaryConditionForm(params: {
@@ -179,10 +291,28 @@ export function validateSalaryConditionForm(params: {
         return `${formatYearMonthLabel(effectiveStartMonth)}開始の給与条件は既に登録されています。`;
     }
 
-    const latestConfirmed = maxYearMonth(params.confirmedRewardMonths);
-    const isEdit = params.editingEffectiveStartMonth === effectiveStartMonth;
-    if (latestConfirmed && effectiveStartMonth <= latestConfirmed && !isEdit) {
-        return `${formatYearMonthLabel(latestConfirmed)}まで確定済みの報酬があるため、この適用開始月では新規登録できません。`;
+    const editingMonth = params.editingEffectiveStartMonth?.trim();
+    const isEdit = Boolean(editingMonth);
+    const changeTargetMonth = isEdit ? editingMonth! : effectiveStartMonth;
+
+    const changeBlockReason = resolveSalaryConditionChangeBlockReason({
+        effectiveStartMonth: changeTargetMonth,
+        conditions: params.conditions,
+        confirmedRewardMonths: params.confirmedRewardMonths,
+        joinedDate: params.employee.joinedDate,
+        isEdit,
+    });
+    if (changeBlockReason) {
+        return changeBlockReason;
+    }
+
+    if (editingMonth && editingMonth === effectiveStartMonth) {
+        const existing = params.conditions.find(
+            (condition) => condition.effectiveStartMonth === editingMonth,
+        );
+        if (existing && areSalaryConditionFixedWageFieldsEqual(params.form, existing)) {
+            return '給与条件に変更がありません。金額を変更してから保存してください。';
+        }
     }
 
     return null;
@@ -272,7 +402,3 @@ function toNonNegativeNumber(value: number | ''): number {
     return Number.isFinite(num) && num >= 0 ? num : 0;
 }
 
-function maxYearMonth(yearMonths: string[]): string | null {
-    if (yearMonths.length === 0) return null;
-    return yearMonths.reduce((max, ym) => (ym > max ? ym : max), yearMonths[0]!);
-}

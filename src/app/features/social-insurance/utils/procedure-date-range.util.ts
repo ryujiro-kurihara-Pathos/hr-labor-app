@@ -136,6 +136,7 @@ export function validateDependentOccurredDate(params: {
     bounds: InsuredPeriodBounds;
     employee?: Employee | null;
     referenceDate?: string | null;
+    birthDate?: string | null;
     dependencyStartDate?: string | null;
     dependencyEndDate?: string | null;
 }): string | null {
@@ -145,11 +146,25 @@ export function validateDependentOccurredDate(params: {
 
     const reference = params.referenceDate?.trim();
     if (reference && isValidDateString(reference) && params.occurredDate > reference) {
-        return '異動日に未来の日付は指定できません。';
+        return params.changeType === 'add'
+            ? '被扶養者になった日に未来の日付は指定できません。'
+            : '異動日に未来の日付は指定できません。';
     }
 
-    if (params.changeType === 'add' && params.employee) {
-        const joinedDate = params.employee.joinedDate?.trim();
+    if (params.changeType === 'add') {
+        const birthDate = params.birthDate?.trim();
+        if (
+            birthDate
+            && isValidDateString(birthDate)
+            && reference
+            && isValidDateString(reference)
+            && birthDate <= reference
+            && params.occurredDate <= birthDate
+        ) {
+            return `被扶養者になった日は生年月日（${formatDateLabel(birthDate)}）より後の日付を指定してください。`;
+        }
+
+        const joinedDate = params.employee?.joinedDate?.trim();
         if (joinedDate && params.occurredDate < joinedDate) {
             return `被扶養者になった日は入社日（${formatDateLabel(joinedDate)}）以降の日付を指定してください。`;
         }
@@ -173,6 +188,29 @@ export function validateDependentOccurredDate(params: {
     }
 
     return null;
+}
+
+/** 扶養追加時の被扶養者になった日の入力範囲 */
+export function resolveDependencyStartDateBounds(params: {
+    bounds: InsuredPeriodBounds;
+    employee: Employee;
+    birthDate?: string | null;
+    referenceDate?: string | null;
+}): { min: string | null; max: string | null } {
+    const base = resolveDependentOccurredDateBounds({
+        changeType: 'add',
+        bounds: params.bounds,
+        dependent: null,
+        referenceDate: params.referenceDate,
+    });
+
+    const birthDate = params.birthDate?.trim();
+    const minAfterBirth = birthDate && isValidDateString(birthDate) ? addOneDay(birthDate) : null;
+
+    return {
+        min: maxDateString(base.min, params.employee.joinedDate, minAfterBirth),
+        max: base.max,
+    };
 }
 
 export function resolveDependentOccurredDateBounds(params: {
@@ -246,15 +284,33 @@ export function resolveBonusPaymentDateBounds(params: {
 }
 
 function subtractOneDay(date: string): string | null {
+    return shiftDate(date, -1);
+}
+
+function addOneDay(date: string): string | null {
+    return shiftDate(date, 1);
+}
+
+function shiftDate(date: string, days: number): string | null {
     if (!isValidDateString(date)) return null;
     const [y, m, d] = date.split('-').map(Number);
     const next = new Date(y, m - 1, d);
     if (Number.isNaN(next.getTime())) return null;
-    next.setDate(next.getDate() - 1);
+    next.setDate(next.getDate() + days);
     const year = next.getFullYear();
     const month = String(next.getMonth() + 1).padStart(2, '0');
     const day = String(next.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+}
+
+function maxDateString(...dates: Array<string | null | undefined>): string | null {
+    let max: string | null = null;
+    for (const date of dates) {
+        const trimmed = date?.trim();
+        if (!trimmed || !isValidDateString(trimmed)) continue;
+        if (!max || trimmed > max) max = trimmed;
+    }
+    return max;
 }
 
 export function retiredDateStringFromTimestamp(retiredDate: Timestamp | null | undefined): string | null {

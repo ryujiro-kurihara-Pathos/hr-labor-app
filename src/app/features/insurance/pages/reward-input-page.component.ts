@@ -79,6 +79,16 @@ export class RewardInputPageComponent {
         this.buildRows().filter((row) => !row.isTargetMonth).length,
     );
 
+    targetRowCount = computed(() =>
+        this.buildRows().filter((row) => row.isTargetMonth).length,
+    );
+
+    registrationRate = computed(() => {
+        const target = this.targetRowCount();
+        if (target === 0) return 0;
+        return Math.round((this.registeredRows().length / target) * 100);
+    });
+
     async ngOnInit() {
         await this.loadPage();
     }

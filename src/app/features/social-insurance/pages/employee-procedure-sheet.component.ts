@@ -64,6 +64,7 @@ import { BonusRewardService } from '../../bonus/services/bonus-reward.service';
 import { SocialInsuranceStatusService } from '../services/social-insurance-status.service';
 import { StandardMonthlyReward } from '../../insurance/models/standard-monthly-reward.model';
 import { BonusReward } from '../../bonus/models/bonus-reward.model';
+import { aggregateConfirmedMonthlyBonusPayment, AggregatedMonthlyBonusPayment } from '../../bonus/utils/aggregate-monthly-bonus-payment.util';
 import { SocialInsuranceStatus } from '../models/social-insurance-status.model';
 import { ProcedureCsvExportContext } from '../utils/procedure-csv-export.util';
 import {
@@ -153,12 +154,10 @@ export class EmployeeProcedureSheetComponent {
     revisionReason = signal<string | null>(null);
 
     // 賞与支払
-    bonusPaymentAmount = signal<number | null>(null);
-    bonusReward = signal<BonusReward | null>(null);
+    aggregatedBonusPayment = signal<AggregatedMonthlyBonusPayment | null>(null);
 
     async loadBonusPaymentAmount(): Promise<void> {
-        this.bonusPaymentAmount.set(null);
-        this.bonusReward.set(null);
+        this.aggregatedBonusPayment.set(null);
 
         const employee = this.employee();
         if (!employee) return;
@@ -167,11 +166,13 @@ export class EmployeeProcedureSheetComponent {
         if (!targetYearMonth) return;
 
         try {
-            const bonuses = await this.bonusRewardService.getBonusRewardsByEmployee(employee.companyId, employee.id);
-            const bonus =
-                bonuses.find((item) => item.targetYearMonth === targetYearMonth) ?? bonuses[0] ?? null;
-            this.bonusReward.set(bonus);
-            this.bonusPaymentAmount.set(bonus?.bonusAmount ?? null);
+            const bonuses = await this.bonusRewardService.getBonusRewardsByEmployee(
+                employee.companyId,
+                employee.id,
+            );
+            this.aggregatedBonusPayment.set(
+                aggregateConfirmedMonthlyBonusPayment(bonuses, targetYearMonth),
+            );
         } catch (error) {
             console.error('賞与額の取得に失敗しました', error);
         }
@@ -234,9 +235,9 @@ export class EmployeeProcedureSheetComponent {
         }
 
         if (variant === 'bonusPayment') {
-            const bonus = this.bonusReward();
-            if (!bonus) return {};
-            return { bonusReward: bonus };
+            const bonusPayment = this.aggregatedBonusPayment();
+            if (!bonusPayment) return {};
+            return { bonusPayment };
         }
 
         return {};
@@ -274,8 +275,8 @@ export class EmployeeProcedureSheetComponent {
             office: this.office(),
             company: this.company(),
             targetYearMonth: procedure.targetYearMonth,
-            bonusAmount: this.bonusPaymentAmount(),
-            paymentDate: procedure.occurredDate,
+            bonusAmount: this.aggregatedBonusPayment()?.bonusAmountTotal,
+            paymentDate: this.aggregatedBonusPayment()?.paymentDate ?? procedure.occurredDate,
             healthInsuranceStartDate: this.socialInsuranceStatus()?.healthInsuranceStartDate,
             healthInsuranceEndDate: this.socialInsuranceStatus()?.healthInsuranceEndDate,
         });

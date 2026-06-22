@@ -18,6 +18,18 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 export { formatDateFromLocalDate };
 
+/** N歳の誕生日（YYYY-MM-DD） */
+export function nthBirthday(birthDate: string, age: number): string | null {
+    const trimmed = birthDate?.trim() ?? '';
+    if (!DATE_PATTERN.test(trimmed)) return null;
+
+    const [y, m, d] = trimmed.split('-').map(Number);
+    const birthday = new Date(y + age, m - 1, d);
+    if (Number.isNaN(birthday.getTime())) return null;
+
+    return formatDateFromLocalDate(birthday);
+}
+
 /** N歳の誕生日の前日（YYYY-MM-DD） */
 export function dayBeforeNthBirthday(birthDate: string, age: number): string | null {
     const trimmed = birthDate?.trim() ?? '';

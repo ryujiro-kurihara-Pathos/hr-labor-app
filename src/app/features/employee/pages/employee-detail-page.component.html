@@ -28,7 +28,7 @@
                                 <div class="profile-meta">
                                     <span class="meta-chip">社員番号 {{ employee()!.employeeNumber || '—' }}</span>
                     <span
-                        class="status-badge"
+                        class="status-badge employment-badge"
                                         [class.before-join]="isBeforeJoin(employee()!)"
                                         [class.retired]="isFullyRetired(employee()!)"
                                         [class.pending-retirement]="isPendingRetirement(employee()!)"
@@ -204,10 +204,10 @@
                     <div class="summary-card">
                         <span class="summary-card-label">健康保険</span>
                         <span
-                            class="summary-card-value"
-                            [class.ok]="healthInsuranceJoinStatus() === 'active'"
-                            [class.ng]="healthInsuranceJoinStatus() === 'inactive'"
-                            [class.pending]="healthInsuranceJoinStatus() === 'unknown'"
+                            class="insurance-badge summary-insurance-badge"
+                            [class.insurance-active]="healthInsuranceJoinStatus() === 'active'"
+                            [class.insurance-inactive]="healthInsuranceJoinStatus() === 'inactive'"
+                            [class.insurance-unknown]="healthInsuranceJoinStatus() === 'unknown'"
                         >
                             {{ displayInsuranceStatus(healthInsuranceJoinStatus()) }}
                         </span>
@@ -215,10 +215,10 @@
                     <div class="summary-card">
                         <span class="summary-card-label">厚生年金</span>
                         <span
-                            class="summary-card-value"
-                            [class.ok]="pensionInsuranceJoinStatus() === 'active'"
-                            [class.ng]="pensionInsuranceJoinStatus() === 'inactive'"
-                            [class.pending]="pensionInsuranceJoinStatus() === 'unknown'"
+                            class="insurance-badge summary-insurance-badge"
+                            [class.insurance-active]="pensionInsuranceJoinStatus() === 'active'"
+                            [class.insurance-inactive]="pensionInsuranceJoinStatus() === 'inactive'"
+                            [class.insurance-unknown]="pensionInsuranceJoinStatus() === 'unknown'"
                         >
                             {{ displayInsuranceStatus(pensionInsuranceJoinStatus()) }}
                         </span>
@@ -226,10 +226,10 @@
                     <div class="summary-card">
                         <span class="summary-card-label">介護保険</span>
                         <span
-                            class="summary-card-value"
-                            [class.ok]="careInsuranceJoinStatus() === 'active'"
-                            [class.ng]="careInsuranceJoinStatus() === 'inactive'"
-                            [class.pending]="careInsuranceJoinStatus() === 'unknown'"
+                            class="insurance-badge summary-insurance-badge"
+                            [class.insurance-active]="careInsuranceJoinStatus() === 'active'"
+                            [class.insurance-inactive]="careInsuranceJoinStatus() === 'inactive'"
+                            [class.insurance-unknown]="careInsuranceJoinStatus() === 'unknown'"
                         >
                             {{ displayInsuranceStatus(careInsuranceJoinStatus()) }}
                         </span>
@@ -351,7 +351,7 @@
                             [showEffectiveMonth]="true"
                         />
                     } @else {
-                        <p class="section-note">給与条件が未登録です。報酬入力画面から登録してください。</p>
+                        <p class="section-note">給与条件が未登録です。「給与条件を変更する」から登録できます。</p>
                     }
                 </section>
 
@@ -643,10 +643,10 @@
                 <div class="result-row">
                     <span class="result-label">健康保険</span>
                     <span
-                        class="result-badge"
-                        [class.ok]="healthInsuranceJoinStatus() === 'active'"
-                        [class.ng]="healthInsuranceJoinStatus() === 'inactive'"
-                        [class.pending]="healthInsuranceJoinStatus() === 'unknown'"
+                        class="insurance-badge"
+                        [class.insurance-active]="healthInsuranceJoinStatus() === 'active'"
+                        [class.insurance-inactive]="healthInsuranceJoinStatus() === 'inactive'"
+                        [class.insurance-unknown]="healthInsuranceJoinStatus() === 'unknown'"
                     >
                         {{ displayInsuranceStatus(healthInsuranceJoinStatus()) }}
                     </span>
@@ -654,10 +654,10 @@
                 <div class="result-row">
                     <span class="result-label">厚生年金</span>
                     <span
-                        class="result-badge"
-                        [class.ok]="pensionInsuranceJoinStatus() === 'active'"
-                        [class.ng]="pensionInsuranceJoinStatus() === 'inactive'"
-                        [class.pending]="pensionInsuranceJoinStatus() === 'unknown'"
+                        class="insurance-badge"
+                        [class.insurance-active]="pensionInsuranceJoinStatus() === 'active'"
+                        [class.insurance-inactive]="pensionInsuranceJoinStatus() === 'inactive'"
+                        [class.insurance-unknown]="pensionInsuranceJoinStatus() === 'unknown'"
                     >
                         {{ displayInsuranceStatus(pensionInsuranceJoinStatus()) }}
                     </span>
@@ -665,10 +665,10 @@
                 <div class="result-row">
                     <span class="result-label">介護保険</span>
                     <span
-                        class="result-badge"
-                        [class.ok]="careInsuranceJoinStatus() === 'active'"
-                        [class.ng]="careInsuranceJoinStatus() === 'inactive'"
-                        [class.pending]="careInsuranceJoinStatus() === 'unknown'"
+                        class="insurance-badge"
+                        [class.insurance-active]="careInsuranceJoinStatus() === 'active'"
+                        [class.insurance-inactive]="careInsuranceJoinStatus() === 'inactive'"
+                        [class.insurance-unknown]="careInsuranceJoinStatus() === 'unknown'"
                     >
                         {{ displayInsuranceStatus(careInsuranceJoinStatus()) }}
                     </span>
@@ -933,7 +933,7 @@
                         <span class="info-tile-label">在籍状況</span>
                         <span class="info-tile-value">
                                 <span
-                                class="status-badge status-badge-inline"
+                                class="status-badge employment-badge status-badge-inline"
                                 [class.before-join]="isBeforeJoin(employee()!)"
                                 [class.retired]="isFullyRetired(employee()!)"
                                 [class.pending-retirement]="isPendingRetirement(employee()!)"
@@ -1063,7 +1063,7 @@
 
 @if (showSalaryConditionModal()) {
     <app-salary-condition-modal
-        title="給与条件を変更"
+        [title]="salaryConditionEditingMonth() ? '給与条件を編集' : currentSalaryCondition() ? '給与条件を変更' : '給与条件を登録'"
         [initialValue]="salaryConditionModalInitial()"
         [minEffectiveStartMonth]="salaryConditionMinEffectiveMonth()"
         [isLoading]="isSavingSalaryCondition()"
@@ -1186,6 +1186,38 @@
     .summary-card-value.pending { color: #92400e; }
     .summary-card-value.neutral { color: #374151; }
     .summary-card-value.attention-text { color: #b45309; }
+
+    .summary-insurance-badge {
+        margin-top: 2px;
+    }
+
+    .insurance-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 72px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 700;
+        background: #e2e8f0;
+        color: #475569;
+    }
+
+    .insurance-badge.insurance-active {
+        background: #ccfbf1;
+        color: #0f766e;
+    }
+
+    .insurance-badge.insurance-inactive {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .insurance-badge.insurance-unknown {
+        background: #e2e8f0;
+        color: #475569;
+    }
 
     .summary-card-sub {
         font-size: 12px;
@@ -1666,6 +1698,11 @@
         grid-column: 1 / -1;
     }
 
+    .status-badge.employment-badge {
+        background: #dcfce7;
+        color: #166534;
+    }
+
     .status-badge {
         display: inline-flex;
         align-items: center;
@@ -1673,8 +1710,6 @@
         border-radius: 999px;
         font-size: 12px;
         font-weight: 700;
-        background: #dcfce7;
-        color: #166534;
     }
 
     .status-badge.retired {
@@ -2000,34 +2035,6 @@
         font-size: 14px;
         font-weight: 600;
         color: #111827;
-    }
-
-    .result-badge {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 72px;
-        padding: 4px 10px;
-        border-radius: 999px;
-        font-size: 13px;
-        font-weight: 700;
-        background: #e5e7eb;
-        color: #374151;
-    }
-
-    .result-badge.ok {
-        background: #dcfce7;
-        color: #166534;
-    }
-
-    .result-badge.ng {
-        background: #fee2e2;
-        color: #991b1b;
-    }
-
-    .result-badge.pending {
-        background: #fef3c7;
-        color: #92400e;
     }
 
     .checkbox-field label {

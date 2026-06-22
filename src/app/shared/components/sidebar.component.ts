@@ -29,7 +29,6 @@ export class SidebarComponent {
         { label: 'ホーム', route: '/home', icon: 'ホ', exact: true },
         { label: '会社・事業所', route: '/company', icon: '社' },
         { label: '従業員管理', route: '/employees', icon: '員' },
-        { label: '社会保険加入状況', route: '/social-insurance-status', icon: '保' },
         { label: '報酬入力', route: '/rewards', icon: '酬' },
         { label: '保険料', route: '/premium', icon: '算' },
         { label: '手続き', route: '/procedures', icon: '届' },

@@ -1,6 +1,7 @@
 import {
     AUTOMATIC_INSURANCE_RATE_AVAILABLE_FROM,
     DEFAULT_PENSION_INSURANCE_RATE,
+    DEFAULT_PENSION_INSURANCE_TOTAL_RATE,
     lookupAutomaticCareInsuranceRate,
     lookupAutomaticHealthInsuranceRate,
     lookupAutomaticPensionInsuranceRate,
@@ -27,6 +28,7 @@ describe('insurance-premium-rate-resolution.util', () => {
             });
             expect(result).not.toBeNull();
             expect(result!.employeeRate).toBeGreaterThan(0);
+            expect(result!.totalRate).toBeGreaterThan(result!.employeeRate);
         });
 
         it('returns null before data coverage', () => {
@@ -41,7 +43,9 @@ describe('insurance-premium-rate-resolution.util', () => {
 
     describe('lookupAutomaticPensionInsuranceRate', () => {
         it('returns default rate for covered months', () => {
-            expect(lookupAutomaticPensionInsuranceRate('2024-06')).toBe(DEFAULT_PENSION_INSURANCE_RATE);
+            const result = lookupAutomaticPensionInsuranceRate('2024-06');
+            expect(result?.employeeRate).toBe(DEFAULT_PENSION_INSURANCE_RATE);
+            expect(result?.totalRate).toBe(DEFAULT_PENSION_INSURANCE_TOTAL_RATE);
         });
 
         it('returns null before data coverage', () => {
@@ -59,7 +63,9 @@ describe('insurance-premium-rate-resolution.util', () => {
             });
             expect(resolved.needsManualHealthRate).toBeFalse();
             expect(resolved.healthEmployeeRate).not.toBeNull();
+            expect(resolved.healthTotalRate).not.toBeNull();
             expect(resolved.pensionEmployeeRate).toBe(DEFAULT_PENSION_INSURANCE_RATE);
+            expect(resolved.pensionTotalRate).toBe(DEFAULT_PENSION_INSURANCE_TOTAL_RATE);
         });
 
         it('uses manual rates when automatic data is missing', () => {

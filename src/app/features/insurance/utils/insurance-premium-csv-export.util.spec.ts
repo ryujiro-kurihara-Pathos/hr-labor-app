@@ -37,6 +37,7 @@ const baseEmployee = {
 
 const basePremium: CalculatedInsurancePremium = {
     standardMonthlyAmount: 300000,
+    pensionStandardMonthlyAmount: 300000,
     healthInsuranceEmployeePremium: 15000,
     healthInsuranceEmployerPremium: 15000,
     pensionInsuranceEmployeePremium: 27450,
@@ -72,6 +73,8 @@ describe('insurance-premium-csv-export.util', () => {
         expect(row.給与控除月).toBe('2025-05');
         expect(row.保険料対象月).toBe('2025-04');
         expect(row.氏名).toBe('山田 太郎');
+        expect(row.標準報酬月額_健康保険).toBe(300000);
+        expect(row.標準報酬月額_厚生年金).toBe(300000);
         expect(row['月次報酬_健康保険料_本人']).toBe(15000);
         expect(row['賞与_厚生年金保険料_会社']).toBe(9150);
         expect(row.本人負担合計).toBe(56600);

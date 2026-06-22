@@ -3,6 +3,13 @@ import { Timestamp } from 'firebase/firestore';
 /** 保険料を給与から控除するタイミング（対象月の保険料をいつ控除するか） */
 export type InsurancePremiumCollectionTiming = 'same_month' | 'next_month';
 
+/** 本アプリで固定する保険料徴収タイミング */
+export const APP_INSURANCE_PREMIUM_COLLECTION_TIMING: InsurancePremiumCollectionTiming = 'next_month';
+
+/** 保険料徴収に関するアプリ注釈（UIに表示） */
+export const INSURANCE_PREMIUM_COLLECTION_TIMING_APP_NOTE =
+    '※本アプリでは翌月徴収のみに対応しています。';
+
 export const DEFAULT_COMPANY_PAYROLL_SETTINGS = {
     payrollPaymentMonthOffset: 1 as const,
     insurancePremiumCollectionTiming: 'next_month' as InsurancePremiumCollectionTiming,

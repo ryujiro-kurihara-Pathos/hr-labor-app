@@ -1417,19 +1417,30 @@ export class EmployeeDetailPageComponent {
     }
 
     openSalaryConditionChangeModal(): void {
-        const current = this.currentSalaryCondition();
-        this.salaryConditionEditingMonth.set(null);
-        this.salaryConditionModalInitial.set({
-            effectiveStartMonth: currentYearMonth(),
-            basicSalary: current?.basicSalary ?? '',
-            commutingAllowance: current?.commutingAllowance ?? 0,
-            positionAllowance: current?.positionAllowance ?? 0,
-            housingAllowance: current?.housingAllowance ?? 0,
-            fixedOvertimePay: current?.fixedOvertimePay ?? 0,
-            otherFixedAllowance: current?.otherFixedAllowance ?? 0,
-            note: '',
-            changeReason: '',
-        });
+        const targetYearMonth = currentYearMonth();
+        const existing = this.salaryConditions().find(
+            (condition) => condition.effectiveStartMonth === targetYearMonth,
+        );
+
+        if (existing) {
+            this.salaryConditionEditingMonth.set(existing.effectiveStartMonth);
+            this.salaryConditionModalInitial.set(formValueFromSalaryCondition(existing));
+        } else {
+            this.salaryConditionEditingMonth.set(null);
+            const current = this.currentSalaryCondition();
+            this.salaryConditionModalInitial.set({
+                effectiveStartMonth: targetYearMonth,
+                basicSalary: current?.basicSalary ?? '',
+                commutingAllowance: current?.commutingAllowance ?? 0,
+                positionAllowance: current?.positionAllowance ?? 0,
+                housingAllowance: current?.housingAllowance ?? 0,
+                fixedOvertimePay: current?.fixedOvertimePay ?? 0,
+                otherFixedAllowance: current?.otherFixedAllowance ?? 0,
+                note: '',
+                changeReason: '',
+            });
+        }
+
         this.salaryConditionSaveError.set('');
         this.showSalaryConditionModal.set(true);
     }

@@ -2,97 +2,245 @@
     <header class="page-header">
         <div class="page-header-main">
             <h1>従業員管理</h1>
-            <p class="page-note">従業員の一覧・検索・詳細確認ができます。行をクリックして詳細へ進めます。</p>
+            <p class="page-note">
+                従業員の一覧・検索・社会保険加入状況の確認ができます。行をクリックして詳細へ進めます。
+            </p>
         </div>
         <a routerLink="/employees/new" class="btn primary-btn">従業員を追加</a>
     </header>
 
-    <section class="filter-section">
-        <div class="filter-grid">
-            <div class="form-field">
-                <label for="office-filter">事業所</label>
-                <select
-                    id="office-filter"
-                    [ngModel]="selectedOfficeId()"
-                    (ngModelChange)="selectedOfficeId.set($event)"
+    @if (!isLoading() && employees().length > 0) {
+        <section class="summary-strip">
+            <button type="button" class="stat-card stat-card-btn" (click)="applyQuickFilter('all')">
+                <span class="stat-card-label">登録人数</span>
+                <span class="stat-card-value">{{ employees().length }}<span class="stat-card-unit">名</span></span>
+            </button>
+            <button
+                type="button"
+                class="stat-card stat-card-btn ok"
+                [class.is-active]="isQuickFilterActive('active')"
+                (click)="applyQuickFilter('active')"
+            >
+                <span class="stat-card-label">在籍中</span>
+                <span class="stat-card-value">{{ activeEmployeeCount() }}<span class="stat-card-unit">名</span></span>
+            </button>
+            <button
+                type="button"
+                class="stat-card stat-card-btn"
+                [class.attention]="unsetCount() > 0"
+                [class.is-active]="isQuickFilterActive('unset')"
+                (click)="applyQuickFilter('unset')"
+            >
+                <span class="stat-card-label">社会保険未設定</span>
+                <span class="stat-card-value" [class.warn]="unsetCount() > 0">
+                    {{ unsetCount() }}<span class="stat-card-unit">名</span>
+                </span>
+            </button>
+            <button
+                type="button"
+                class="stat-card stat-card-btn"
+                [class.attention]="pendingProcedureEmployeeCount() > 0"
+                [class.is-active]="isQuickFilterActive('pending')"
+                (click)="applyQuickFilter('pending')"
+            >
+                <span class="stat-card-label">手続き要対応</span>
+                <span class="stat-card-value" [class.warn]="pendingProcedureEmployeeCount() > 0">
+                    {{ pendingProcedureEmployeeCount() }}<span class="stat-card-unit">名</span>
+                </span>
+            </button>
+        </section>
+
+        <div class="quick-filter-bar">
+            <span class="quick-filter-label">クイック絞り込み</span>
+            <div class="quick-filter-chips">
+                <button
+                    type="button"
+                    class="quick-chip"
+                    [class.active]="isQuickFilterActive('all')"
+                    (click)="applyQuickFilter('all')"
                 >
-                    <option value="">すべての事業所</option>
-                    @for (office of officeOptions(); track office.id) {
-                        <option [value]="office.id">{{ office.name }}</option>
-                    }
-                </select>
-            </div>
-            <div class="form-field">
-                <label for="status-filter">在籍状況</label>
-                <select
-                    id="status-filter"
-                    [ngModel]="selectedStatus()"
-                    (ngModelChange)="selectedStatus.set($event)"
+                    すべて
+                </button>
+                <button
+                    type="button"
+                    class="quick-chip"
+                    [class.active]="isQuickFilterActive('active')"
+                    (click)="applyQuickFilter('active')"
                 >
-                    <option value="">すべて</option>
-                    <option value="before-join">入社前</option>
-                    <option value="active">在籍</option>
-                    <option value="pending-retirement">退職予定</option>
-                    <option value="retired">退職済</option>
-                </select>
-            </div>
-            <div class="form-field form-field-search">
-                <label for="keyword-filter">検索</label>
-                <input
-                    id="keyword-filter"
-                    type="text"
-                    [ngModel]="keyword()"
-                    (ngModelChange)="keyword.set($event)"
-                    placeholder="氏名・社員番号"
-                />
+                    在籍中のみ
+                </button>
+                <button
+                    type="button"
+                    class="quick-chip"
+                    [class.active]="isQuickFilterActive('unset')"
+                    (click)="applyQuickFilter('unset')"
+                >
+                    社会保険未設定
+                </button>
+                <button
+                    type="button"
+                    class="quick-chip warn"
+                    [class.active]="isQuickFilterActive('pending')"
+                    (click)="applyQuickFilter('pending')"
+                >
+                    手続き要対応
+                </button>
             </div>
         </div>
+    }
+
+    <section class="filter-section">
+        <div class="filter-section-header">
+            <div class="filter-search-wrap">
+                <label for="keyword-filter" class="sr-only">検索</label>
+                <input
+                    id="keyword-filter"
+                    type="search"
+                    class="filter-search-input"
+                    [ngModel]="keyword()"
+                    (ngModelChange)="keyword.set($event)"
+                    placeholder="氏名・社員番号で検索"
+                />
+            </div>
+            <button
+                type="button"
+                class="filter-toggle-btn"
+                (click)="toggleFiltersExpanded()"
+                [attr.aria-expanded]="filtersExpanded()"
+            >
+                詳細条件
+                @if (hasActiveFilters()) {
+                    <span class="filter-active-dot" aria-hidden="true"></span>
+                }
+            </button>
+            @if (hasActiveFilters()) {
+                <button type="button" class="filter-clear-btn" (click)="clearFilters()">クリア</button>
+            }
+        </div>
+
+        @if (filtersExpanded()) {
+            <div class="filter-panel">
+                <div class="filter-grid">
+                    <div class="form-field">
+                        <label for="office-filter">事業所</label>
+                        <select
+                            id="office-filter"
+                            [ngModel]="selectedOfficeId()"
+                            (ngModelChange)="selectedOfficeId.set($event)"
+                        >
+                            <option value="">すべての事業所</option>
+                            @for (office of officeOptions(); track office.id) {
+                                <option [value]="office.id">{{ office.name }}</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label for="status-filter">在籍状況</label>
+                        <select
+                            id="status-filter"
+                            [ngModel]="selectedStatus()"
+                            (ngModelChange)="selectedStatus.set($event)"
+                        >
+                            <option value="">すべて</option>
+                            <option value="before-join">入社前</option>
+                            <option value="active">在籍</option>
+                            <option value="pending-retirement">退職予定</option>
+                            <option value="retired">退職済</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label for="health-filter">健康保険</label>
+                        <select
+                            id="health-filter"
+                            [ngModel]="healthFilter()"
+                            (ngModelChange)="healthFilter.set($event)"
+                        >
+                            <option value="">すべて</option>
+                            <option value="active">対象</option>
+                            <option value="inactive">対象外</option>
+                            <option value="unknown">未設定</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label for="pension-filter">厚生年金</label>
+                        <select
+                            id="pension-filter"
+                            [ngModel]="pensionFilter()"
+                            (ngModelChange)="pensionFilter.set($event)"
+                        >
+                            <option value="">すべて</option>
+                            <option value="active">対象</option>
+                            <option value="inactive">対象外</option>
+                            <option value="unknown">未設定</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label for="care-filter">介護保険</label>
+                        <select
+                            id="care-filter"
+                            [ngModel]="careFilter()"
+                            (ngModelChange)="careFilter.set($event)"
+                        >
+                            <option value="">すべて</option>
+                            <option value="active">対象</option>
+                            <option value="inactive">対象外</option>
+                            <option value="unknown">未設定</option>
+                        </select>
+                    </div>
+                </div>
+                <label class="unset-toggle">
+                    <input
+                        type="checkbox"
+                        [ngModel]="unsetOnly()"
+                        (ngModelChange)="unsetOnly.set($event)"
+                    />
+                    社会保険未設定のみ表示
+                </label>
+            </div>
+        }
     </section>
 
     <section class="list-section">
         <div class="list-header">
-            <h2 class="section-title">従業員一覧</h2>
-            <p class="section-note">
-                @if (isLoading()) {
-                    読み込み中...
-                } @else {
-                    {{ employeeRows().length }}件
-                    @if (pendingProcedureEmployeeCount() > 0) {
-                        <span class="procedure-hint">· 手続き要対応 {{ pendingProcedureEmployeeCount() }}名</span>
-                    }
+            <div class="list-header-main">
+                <h2 class="section-title">従業員一覧</h2>
+                @if (!isLoading()) {
+                    <span class="section-badge">{{ employeeRows().length }}件</span>
                     @if (hasActiveFilters()) {
-                        <span class="filter-hint">（絞り込み中）</span>
+                        <span class="section-badge muted">絞り込み中</span>
                     }
                 }
-            </p>
+            </div>
         </div>
 
         @if (isLoading()) {
-            <p class="loading">従業員を読み込み中...</p>
+            <p class="state-message loading">従業員を読み込み中...</p>
         } @else if (errorMessage()) {
-            <p class="error">{{ errorMessage() }}</p>
+            <p class="state-message error">{{ errorMessage() }}</p>
         } @else if (employees().length === 0) {
             <div class="empty-state">
                 <p class="empty-title">従業員がまだ登録されていません</p>
                 <p class="empty-note">「従業員を追加」から最初の従業員を登録してください。</p>
+                <a routerLink="/employees/new" class="btn primary-btn">従業員を追加</a>
             </div>
         } @else if (employeeRows().length === 0) {
             <div class="empty-state">
                 <p class="empty-title">条件に一致する従業員がいません</p>
                 <p class="empty-note">検索キーワードや絞り込み条件を変更してください。</p>
+                <button type="button" class="btn sub-btn" (click)="clearFilters()">条件をクリア</button>
             </div>
         } @else {
             <div class="table-wrap">
                 <table class="employee-table">
                     <thead>
                         <tr>
-                            <th>従業員</th>
-                            <th>在籍状況</th>
+                            <th class="sticky-col">従業員</th>
+                            <th>在籍</th>
                             <th>事業所</th>
+                            <th class="col-insurance-head">社会保険</th>
                             <th>入社日</th>
-                            <th>雇用区分</th>
-                            <th>所属</th>
                             <th>手続き</th>
+                            <th>備考</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -100,22 +248,37 @@
                             <tr
                                 class="clickable-row"
                                 [class.has-pending]="hasPendingProcedures(row.procedures)"
-                                [routerLink]="['/employees', row.employee.id]"
+                                [class.has-overdue]="hasOverdueProcedures(row.procedures)"
+                                [routerLink]="employeeDetailLink(row.employee.id)"
                             >
-                                <td class="name-cell">
-                                    <span class="employee-name">
-                                        {{ row.employee.lastName }} {{ row.employee.firstName }}
-                                    </span>
-                                    @if (row.employee.lastNameKana || row.employee.firstNameKana) {
-                                        <span class="employee-kana">
-                                            {{ row.employee.lastNameKana }} {{ row.employee.firstNameKana }}
+                                <td class="sticky-col name-cell">
+                                    <span class="employee-link">
+                                        <span class="employee-avatar" aria-hidden="true">
+                                            {{ employeeInitial(row.employee) }}
                                         </span>
-                                    }
-                                    <span class="employee-number">{{ row.employee.employeeNumber || '—' }}</span>
+                                        <span class="employee-link-body">
+                                            <span class="employee-link-name">
+                                                {{ row.employee.lastName }} {{ row.employee.firstName }}
+                                            </span>
+                                            @if (row.employee.lastNameKana || row.employee.firstNameKana) {
+                                                <span class="employee-link-kana">
+                                                    {{ row.employee.lastNameKana }} {{ row.employee.firstNameKana }}
+                                                </span>
+                                            }
+                                            <span class="employee-link-meta">
+                                                {{ row.employee.employeeNumber || '社員番号未設定' }}
+                                                · {{ employmentTypeLabel(row.employee.employmentType) }}
+                                            </span>
+                                            @if (needsLaborConditionWarning(row)) {
+                                                <span class="labor-warning-tag">労働条件未入力</span>
+                                            }
+                                        </span>
+                                        <span class="employee-link-arrow" aria-hidden="true">›</span>
+                                    </span>
                                 </td>
-                                <td>
+                                <td class="badge-cell">
                                     <span
-                                        class="status-badge"
+                                        class="employment-badge"
                                         [class.before-join]="isBeforeJoin(row.employee)"
                                         [class.retired]="isRetiredBadge(row.employee)"
                                         [class.retiring-soon]="isPendingRetirement(row.employee)"
@@ -123,19 +286,48 @@
                                         {{ statusBadgeLabel(row.employee) }}
                                     </span>
                                 </td>
-                                <td>{{ officeNameById()[row.employee.officeId] || '—' }}</td>
-                                <td class="nowrap">{{ formatDate(row.employee.joinedDate) }}</td>
-                                <td>{{ employmentTypeLabel(row.employee.employmentType) }}</td>
-                                <td class="department-cell">
-                                    @if (row.employee.department || row.employee.position) {
-                                        {{ row.employee.department || '—' }}
-                                        @if (row.employee.position) {
-                                            <span class="position">／ {{ row.employee.position }}</span>
-                                        }
-                                    } @else {
-                                        —
-                                    }
+                                <td class="office-cell">{{ officeNameById()[row.employee.officeId] || '—' }}</td>
+                                <td class="col-insurance">
+                                    <div class="insurance-stack" aria-label="社会保険加入状況">
+                                        <div class="insurance-item" title="健康保険">
+                                            <span class="insurance-kind">健</span>
+                                            <span
+                                                class="insurance-badge insurance-badge-compact"
+                                                [class.insurance-enrolled]="isInsuranceEnrolledForRow(row, 'health')"
+                                                [class.insurance-active]="insuranceStatusForRow(row, 'health') === 'active' && !isInsuranceEnrolledForRow(row, 'health')"
+                                                [class.insurance-inactive]="insuranceStatusForRow(row, 'health') === 'inactive'"
+                                                [class.insurance-unknown]="insuranceStatusForRow(row, 'health') === 'unknown'"
+                                            >
+                                                {{ insuranceJoinStatusLabelForRow(row, 'health') }}
+                                            </span>
+                                        </div>
+                                        <div class="insurance-item" title="厚生年金">
+                                            <span class="insurance-kind">年</span>
+                                            <span
+                                                class="insurance-badge insurance-badge-compact"
+                                                [class.insurance-enrolled]="isInsuranceEnrolledForRow(row, 'pension')"
+                                                [class.insurance-active]="insuranceStatusForRow(row, 'pension') === 'active' && !isInsuranceEnrolledForRow(row, 'pension')"
+                                                [class.insurance-inactive]="insuranceStatusForRow(row, 'pension') === 'inactive'"
+                                                [class.insurance-unknown]="insuranceStatusForRow(row, 'pension') === 'unknown'"
+                                            >
+                                                {{ insuranceJoinStatusLabelForRow(row, 'pension') }}
+                                            </span>
+                                        </div>
+                                        <div class="insurance-item" title="介護保険">
+                                            <span class="insurance-kind">介</span>
+                                            <span
+                                                class="insurance-badge insurance-badge-compact"
+                                                [class.insurance-enrolled]="isInsuranceEnrolledForRow(row, 'care')"
+                                                [class.insurance-active]="insuranceStatusForRow(row, 'care') === 'active' && !isInsuranceEnrolledForRow(row, 'care')"
+                                                [class.insurance-inactive]="insuranceStatusForRow(row, 'care') === 'inactive'"
+                                                [class.insurance-unknown]="insuranceStatusForRow(row, 'care') === 'unknown'"
+                                            >
+                                                {{ insuranceJoinStatusLabelForRow(row, 'care') }}
+                                            </span>
+                                        </div>
+                                    </div>
                                 </td>
+                                <td class="nowrap date-cell">{{ formatJoinedDate(row.employee.joinedDate) }}</td>
                                 <td class="procedure-cell" (click)="$event.stopPropagation()">
                                     @if (row.procedures.length === 0) {
                                         <span class="procedure-none">—</span>
@@ -164,6 +356,7 @@
                                         }
                                     }
                                 </td>
+                                <td class="memo-cell">{{ memoPreview(row.insuranceStatus?.memo) }}</td>
                             </tr>
                         }
                     </tbody>
@@ -175,9 +368,10 @@
 
 <style>
     .employees-page {
-        max-width: 1200px;
+        max-width: 1280px;
         margin: 0 auto;
-        padding: 24px 16px 40px;
+        padding: 24px 16px 48px;
+        background: #fff;
     }
 
     .page-header {
@@ -185,44 +379,264 @@
         justify-content: space-between;
         align-items: flex-start;
         gap: 16px;
+        margin-bottom: 4px;
     }
 
-    .page-header h1 {
+    .page-header-main h1 {
         margin: 0 0 8px;
         font-size: 22px;
+        font-weight: 700;
+        color: #111827;
     }
 
     .page-note {
         margin: 0;
+        max-width: 560px;
         color: #6b7280;
         font-size: 14px;
-        line-height: 1.5;
+        line-height: 1.6;
+    }
+
+    .summary-strip {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin: 20px 0 0;
+    }
+
+    .stat-card {
+        padding: 14px 16px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        text-align: left;
+    }
+
+    .stat-card-btn {
+        cursor: pointer;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+    }
+
+    .stat-card-btn:hover {
+        border-color: #93c5fd;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
+        transform: translateY(-1px);
+    }
+
+    .stat-card-btn.is-active {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    .stat-card.ok.is-active {
+        border-color: #059669;
+        box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
+    }
+
+    .quick-filter-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 14px;
+        margin-top: 14px;
+    }
+
+    .quick-filter-label {
+        font-size: 12px;
+        font-weight: 700;
+        color: #9ca3af;
+    }
+
+    .quick-filter-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .quick-chip {
+        padding: 6px 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 999px;
+        background: #fff;
+        color: #374151;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .quick-chip:hover {
+        border-color: #93c5fd;
+        color: #2563eb;
+        background: #eff6ff;
+    }
+
+    .quick-chip.active {
+        border-color: #2563eb;
+        background: #2563eb;
+        color: #fff;
+    }
+
+    .quick-chip.warn.active {
+        border-color: #c2410c;
+        background: #c2410c;
     }
 
     .filter-section {
-        margin-top: 24px;
-        padding: 16px;
-        background: #f9fafb;
+        margin-top: 16px;
+        padding: 14px 16px;
+        background: #fff;
         border: 1px solid #e5e7eb;
-        border-radius: 8px;
+        border-radius: 14px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+    }
+
+    .filter-section-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .filter-search-wrap {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .filter-search-input {
+        width: 100%;
+        height: 42px;
+        padding: 0 14px 0 36px;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        font-size: 14px;
+        background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 0 0-15 7.5 7.5 0 0 0 0 15Z'/%3E%3C/svg%3E") 12px center no-repeat;
+        box-sizing: border-box;
+    }
+
+    .filter-search-input:focus {
+        outline: none;
+        border-color: #2563eb;
+        background-color: #fff;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    .filter-toggle-btn {
+        position: relative;
+        flex-shrink: 0;
+        height: 42px;
+        padding: 0 14px;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        background: #fff;
+        color: #374151;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .filter-toggle-btn:hover {
+        border-color: #93c5fd;
+        color: #2563eb;
+    }
+
+    .filter-active-dot {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: #2563eb;
+    }
+
+    .filter-panel {
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px solid #f3f4f6;
+    }
+
+    .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    .stat-card.ok {
+        border-color: #a7f3d0;
+        background: #fff;
+    }
+
+    .stat-card.attention {
+        border-color: #fed7aa;
+        background: #fff;
+    }
+
+    .stat-card-label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        color: #6b7280;
+        letter-spacing: 0.02em;
+    }
+
+    .stat-card-value {
+        font-size: 22px;
+        font-weight: 800;
+        color: #111827;
+        line-height: 1.2;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .stat-card.ok .stat-card-value {
+        color: #047857;
+    }
+
+    .stat-card-value.warn {
+        color: #c2410c;
+    }
+
+    .stat-card-unit {
+        margin-left: 2px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #6b7280;
+    }
+
+    .filter-clear-btn {
+        flex-shrink: 0;
+        height: 42px;
+        padding: 0 12px;
+        border: none;
+        border-radius: 10px;
+        background: #eff6ff;
+        color: #2563eb;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .filter-clear-btn:hover {
+        background: #dbeafe;
     }
 
     .filter-grid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 12px 16px;
-    }
-
-    .form-field {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 12px 14px;
     }
 
     .form-field label {
-        font-size: 13px;
-        font-weight: 600;
-        color: #374151;
+        font-size: 12px;
+        font-weight: 700;
+        color: #6b7280;
+        letter-spacing: 0.01em;
     }
 
     .form-field input,
@@ -236,7 +650,24 @@
         box-sizing: border-box;
     }
 
+    .form-field input:focus,
+    .form-field select:focus {
+        outline: none;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
     .form-field select {
+        cursor: pointer;
+    }
+
+    .unset-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 14px;
+        font-size: 14px;
+        color: #374151;
         cursor: pointer;
     }
 
@@ -246,70 +677,105 @@
 
     .list-header {
         display: flex;
-        align-items: baseline;
+        flex-wrap: wrap;
+        align-items: center;
         justify-content: space-between;
         gap: 12px;
-        margin-bottom: 12px;
+        margin-bottom: 14px;
+    }
+
+    .list-header-main {
+        display: flex;
+        align-items: center;
+        gap: 10px;
     }
 
     .section-title {
         margin: 0;
         font-size: 17px;
+        font-weight: 700;
+        color: #111827;
     }
 
-    .section-note {
+    .section-badge {
+        padding: 2px 9px;
+        border-radius: 999px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .form-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
+    }
+
+    .section-badge.muted {
+        background: #f3f4f6;
+        color: #6b7280;
+    }
+
+    .list-hint {
         margin: 0;
-        color: #6b7280;
-        font-size: 13px;
+        font-size: 12px;
+        color: #9ca3af;
     }
 
-    .filter-hint,
-    .procedure-hint {
-        color: #2563eb;
-    }
-
-    .loading,
-    .empty-note {
-        color: #6b7280;
+    .state-message {
+        margin: 0;
+        padding: 16px;
         font-size: 14px;
+        border-radius: 10px;
     }
 
-    .error {
+    .state-message.loading {
+        color: #6b7280;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+    }
+
+    .state-message.error {
         color: #b91c1c;
-        font-size: 14px;
-        font-weight: 600;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
     }
 
     .empty-state {
-        padding: 32px 20px;
+        padding: 40px 24px;
         text-align: center;
-        background: #f9fafb;
+        background: #fff;
         border: 1px dashed #d1d5db;
-        border-radius: 8px;
+        border-radius: 14px;
     }
 
     .empty-title {
-        margin: 0 0 6px;
-        font-size: 15px;
-        font-weight: 600;
-        color: #374151;
+        margin: 0 0 8px;
+        font-size: 16px;
+        font-weight: 700;
+        color: #111827;
     }
 
     .empty-note {
-        margin: 0;
+        margin: 0 0 20px;
+        color: #6b7280;
+        font-size: 14px;
     }
 
     .table-wrap {
         overflow-x: auto;
         border: 1px solid #e5e7eb;
-        border-radius: 8px;
+        border-radius: 12px;
         background: #fff;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
     }
 
     .employee-table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 14px;
+        font-size: 13px;
     }
 
     .employee-table th,
@@ -321,100 +787,293 @@
     }
 
     .employee-table th {
-        background: #f9fafb;
-        font-size: 12px;
-        font-weight: 600;
+        background: #fff;
+        font-size: 11px;
+        font-weight: 700;
         color: #6b7280;
         white-space: nowrap;
+        letter-spacing: 0.01em;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .col-insurance-head {
+        min-width: 140px;
     }
 
     .employee-table tbody tr:last-child td {
         border-bottom: none;
     }
 
+    .sticky-col {
+        position: sticky;
+        left: 0;
+        z-index: 1;
+        background: #fff;
+        box-shadow: 1px 0 0 #f3f4f6;
+    }
+
+    .employee-table thead .sticky-col {
+        background: #fff;
+        z-index: 2;
+    }
+
+    .col-insurance {
+        background: #fff;
+    }
+
     .clickable-row {
         cursor: pointer;
+        background: #fff;
+        transition: background 0.12s ease;
     }
 
     .clickable-row:hover {
-        background: #f8fafc;
+        background: #fff;
+    }
+
+    .clickable-row:hover .sticky-col {
+        background: #fff;
+    }
+
+    .clickable-row:hover .col-insurance {
+        background: #fff;
+    }
+
+    .clickable-row:hover .employee-link-name {
+        color: #2563eb;
+    }
+
+    .clickable-row:hover .employee-link-arrow {
+        opacity: 1;
+        transform: translateX(2px);
+        color: #2563eb;
     }
 
     .clickable-row.has-pending {
-        background: #fffefb;
+        background: #fff;
+        box-shadow: inset 3px 0 0 #fbbf24;
     }
 
     .clickable-row.has-pending:hover {
-        background: #fffbeb;
+        background: #fff;
+    }
+
+    .clickable-row.has-pending .sticky-col {
+        background: #fff;
+    }
+
+    .clickable-row.has-overdue {
+        background: #fff;
+        box-shadow: inset 3px 0 0 #f87171;
+    }
+
+    .clickable-row.has-overdue:hover {
+        background: #fff;
+    }
+
+    .clickable-row.has-overdue .sticky-col {
+        background: #fff;
+    }
+
+    .clickable-row.has-overdue:hover .sticky-col {
+        background: #fff;
     }
 
     .name-cell {
-        min-width: 160px;
+        min-width: 220px;
     }
 
-    .employee-name {
-        display: block;
-        font-weight: 600;
+    .employee-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        max-width: 100%;
+    }
+
+    .employee-avatar {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+        color: #1d4ed8;
+        font-size: 13px;
+        font-weight: 800;
+    }
+
+    .employee-link-body {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    .employee-link-name {
+        font-size: 14px;
+        font-weight: 700;
         color: #111827;
+        line-height: 1.3;
+        white-space: nowrap;
+        transition: color 0.15s ease;
+    }
+
+    .employee-link-kana,
+    .employee-link-meta {
+        font-size: 11px;
+        color: #9ca3af;
+        line-height: 1.3;
         white-space: nowrap;
     }
 
-    .employee-kana,
-    .employee-number {
-        display: block;
+    .employee-link-arrow {
+        flex-shrink: 0;
+        margin-left: auto;
+        font-size: 18px;
+        line-height: 1;
+        color: #9ca3af;
+        opacity: 0;
+        transform: translateX(0);
+        transition: opacity 0.15s ease, transform 0.15s ease, color 0.15s ease;
+    }
+
+    .labor-warning-tag {
+        display: inline-block;
         margin-top: 2px;
-        font-size: 12px;
-        font-weight: 400;
-        color: #6b7280;
+        padding: 2px 7px;
+        border-radius: 999px;
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        color: #92400e;
+        font-size: 10px;
+        font-weight: 700;
+        width: fit-content;
+    }
+
+    .badge-cell {
+        white-space: nowrap;
+    }
+
+    .office-cell {
+        color: #4b5563;
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .nowrap {
         white-space: nowrap;
     }
 
-    .department-cell {
-        min-width: 120px;
-        max-width: 180px;
-        color: #374151;
-    }
-
-    .position {
+    .memo-cell {
+        max-width: 120px;
         color: #6b7280;
+        font-size: 12px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
-    .status-badge {
+    /* 在籍状況バッジ（緑系） */
+    .employment-badge {
         display: inline-block;
-        padding: 2px 8px;
+        padding: 3px 9px;
         border-radius: 999px;
-        font-size: 12px;
-        font-weight: 600;
+        font-size: 11px;
+        font-weight: 700;
         white-space: nowrap;
         background: #dcfce7;
         color: #166534;
     }
 
-    .status-badge.retired {
+    .employment-badge.retired {
         background: #f3f4f6;
         color: #4b5563;
     }
 
-    .status-badge.retiring-soon {
+    .employment-badge.retiring-soon {
         background: #fef3c7;
         color: #92400e;
     }
 
-    .status-badge.before-join {
+    .employment-badge.before-join {
         background: #dbeafe;
         color: #1d4ed8;
     }
 
+    /* 保険バッジ（ティール / 紫 / 赤 / 灰）— 在籍と色を分離 */
+    .insurance-badge {
+        display: inline-block;
+        padding: 3px 9px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+        background: #e2e8f0;
+        color: #475569;
+    }
+
+    .insurance-badge.insurance-active {
+        background: #ccfbf1;
+        color: #0f766e;
+    }
+
+    .insurance-badge.insurance-enrolled {
+        background: #ede9fe;
+        color: #6d28d9;
+    }
+
+    .insurance-badge.insurance-inactive {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .insurance-badge.insurance-unknown {
+        background: #e2e8f0;
+        color: #475569;
+    }
+
+    .insurance-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .insurance-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .insurance-kind {
+        flex-shrink: 0;
+        width: 16px;
+        font-size: 10px;
+        font-weight: 800;
+        color: #9ca3af;
+        text-align: center;
+    }
+
+    .insurance-badge-compact {
+        padding: 2px 7px;
+        font-size: 10px;
+    }
+
+    .date-cell {
+        color: #4b5563;
+        font-variant-numeric: tabular-nums;
+    }
+
     .procedure-cell {
-        min-width: 220px;
-        max-width: 320px;
+        min-width: 180px;
+        max-width: 260px;
     }
 
     .procedure-none {
-        color: #9ca3af;
+        color: #d1d5db;
     }
 
     .procedure-list {
@@ -437,7 +1096,7 @@
         background: #fff;
         text-decoration: none;
         color: inherit;
-        font-size: 12px;
+        font-size: 11px;
         line-height: 1.4;
         transition: border-color 0.15s, box-shadow 0.15s;
     }
@@ -490,15 +1149,10 @@
         color: #166534;
     }
 
-    .procedure-chip.completed .procedure-chip-due {
-        color: #6b7280;
-        font-weight: 500;
-    }
-
     .procedure-more-hint {
         margin: 4px 0 0;
-        font-size: 12px;
-        color: #6b7280;
+        font-size: 11px;
+        color: #9ca3af;
     }
 
     .tone-blue .procedure-chip-label { color: #1d4ed8; }
@@ -516,22 +1170,46 @@
         justify-content: center;
         height: 40px;
         padding: 0 16px;
-        border: none;
         border-radius: 8px;
         font-size: 14px;
         font-weight: 600;
         text-decoration: none;
         cursor: pointer;
         white-space: nowrap;
+        transition: background 0.15s ease, border-color 0.15s ease;
     }
 
     .primary-btn {
+        border: 1px solid #2563eb;
         background: #2563eb;
         color: #fff;
     }
 
     .primary-btn:hover {
         background: #1d4ed8;
+        border-color: #1d4ed8;
+    }
+
+    .sub-btn {
+        border: 1px solid #d1d5db;
+        background: #fff;
+        color: #374151;
+    }
+
+    .sub-btn:hover {
+        border-color: #2563eb;
+        color: #2563eb;
+        background: #eff6ff;
+    }
+
+    @media (max-width: 1100px) {
+        .filter-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .summary-strip {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
     }
 
     @media (max-width: 768px) {
@@ -540,19 +1218,45 @@
             align-items: stretch;
         }
 
+        .filter-section-header {
+            flex-wrap: wrap;
+        }
+
+        .filter-search-wrap {
+            flex: 1 1 100%;
+        }
+
         .filter-grid {
             grid-template-columns: 1fr;
         }
 
-        .primary-btn {
+        .summary-strip {
+            grid-template-columns: 1fr;
+        }
+
+        .quick-filter-bar {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .primary-btn,
+        .sub-btn {
             width: 100%;
         }
 
+        /* 事業所・入社日・備考を非表示 */
+        .employee-table th:nth-child(3),
+        .employee-table td:nth-child(3),
         .employee-table th:nth-child(5),
         .employee-table td:nth-child(5),
-        .employee-table th:nth-child(6),
-        .employee-table td:nth-child(6) {
+        .employee-table th:nth-child(7),
+        .employee-table td:nth-child(7) {
             display: none;
+        }
+
+        .procedure-cell {
+            min-width: 140px;
+            max-width: 180px;
         }
     }
 </style>

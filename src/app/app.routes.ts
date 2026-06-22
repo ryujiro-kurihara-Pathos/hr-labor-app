@@ -41,8 +41,6 @@ import { SocialInsuranceProceduresPageComponent } from './features/social-insura
 
 import { SocialInsuranceProcedureDetailPageComponent } from './features/social-insurance/pages/social-insurance-procedure-detail-page.component';
 
-import { SocialInsuranceStatusPageComponent } from './features/social-insurance/pages/social-insurance-status-page.component';
-
 import { ProfilePageComponent } from './features/users/pages/profile-page.component';
 
 import { MyPageComponent } from './features/users/pages/my-page.component';
@@ -197,9 +195,9 @@ export const routes: Routes = [
 
                 path: 'social-insurance-status',
 
-                component: SocialInsuranceStatusPageComponent,
+                redirectTo: 'employees',
 
-                canActivate: [adminGuard],
+                pathMatch: 'full',
 
             },
 

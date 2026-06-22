@@ -4,17 +4,22 @@ import { KYOKAI_HEALTH_INSURANCE_RATE_FILES } from '../../insurance-rate/data/in
 import { findCareInsuranceRate, findHealthInsuranceRate } from '../../insurance-rate/utils/insurance-rate-lookup.util';
 import { resolveOfficePrefecture } from '../../company/utils/office-prefecture.util';
 import { ManualInsurancePremiumRates } from '../models/manual-insurance-premium-rate.model';
+import { insuranceTotalRateFromEmployeeRate } from './insurance-premium-rounding.util';
 
 /** 組み込み料率データの適用開始月（これより前は自動料率なし） */
 export const AUTOMATIC_INSURANCE_RATE_AVAILABLE_FROM = '2024-03';
 
 export const DEFAULT_PENSION_INSURANCE_RATE = 0.0915;
+export const DEFAULT_PENSION_INSURANCE_TOTAL_RATE = DEFAULT_PENSION_INSURANCE_RATE * 2;
 
 export type ResolvedInsurancePremiumRates = {
+    healthTotalRate: number | null;
     healthEmployeeRate: number | null;
     healthEmployerRate: number | null;
+    careTotalRate: number | null;
     careEmployeeRate: number | null;
     careEmployerRate: number | null;
+    pensionTotalRate: number | null;
     pensionEmployeeRate: number | null;
     pensionEmployerRate: number | null;
     needsManualHealthRate: boolean;
@@ -31,7 +36,7 @@ export function lookupAutomaticHealthInsuranceRate(params: {
     liabilityYearMonth: string;
     office: Office | null;
     employee: Employee;
-}): { employeeRate: number; employerRate: number } | null {
+}): { employeeRate: number; employerRate: number; totalRate: number } | null {
     const fiscalYear = healthInsuranceFiscalYear(params.liabilityYearMonth);
     const fileName = `kyokai-health-insurance-rates-${fiscalYear}-03.ts`;
     const rates =
@@ -45,20 +50,25 @@ export function lookupAutomaticHealthInsuranceRate(params: {
     });
 
     if (!row) return null;
-    return { employeeRate: row.employeeRate, employerRate: row.employerRate };
+    return { employeeRate: row.employeeRate, employerRate: row.employerRate, totalRate: row.totalRate };
 }
 
 export function lookupAutomaticCareInsuranceRate(
     liabilityYearMonth: string,
-): { employeeRate: number; employerRate: number } | null {
+): { employeeRate: number; employerRate: number; totalRate: number } | null {
     const row = findCareInsuranceRate(liabilityYearMonth);
     if (!row) return null;
-    return { employeeRate: row.employeeRate, employerRate: row.employerRate };
+    return { employeeRate: row.employeeRate, employerRate: row.employerRate, totalRate: row.totalRate };
 }
 
-export function lookupAutomaticPensionInsuranceRate(liabilityYearMonth: string): number | null {
+export function lookupAutomaticPensionInsuranceRate(
+    liabilityYearMonth: string,
+): { employeeRate: number; totalRate: number } | null {
     if (liabilityYearMonth < AUTOMATIC_INSURANCE_RATE_AVAILABLE_FROM) return null;
-    return DEFAULT_PENSION_INSURANCE_RATE;
+    return {
+        employeeRate: DEFAULT_PENSION_INSURANCE_RATE,
+        totalRate: DEFAULT_PENSION_INSURANCE_TOTAL_RATE,
+    };
 }
 
 export function resolveInsurancePremiumRates(params: {
@@ -81,13 +91,20 @@ export function resolveInsurancePremiumRates(params: {
 
     const manual = params.manualRates;
 
+    const healthEmployeeRate = autoHealth?.employeeRate ?? manual?.healthEmployeeRate ?? null;
+    const careEmployeeRate = autoCare?.employeeRate ?? manual?.careEmployeeRate ?? null;
+    const pensionEmployeeRate = autoPension?.employeeRate ?? manual?.pensionEmployeeRate ?? null;
+
     return {
-        healthEmployeeRate: autoHealth?.employeeRate ?? manual?.healthEmployeeRate ?? null,
+        healthTotalRate: autoHealth?.totalRate ?? insuranceTotalRateFromEmployeeRate(healthEmployeeRate),
+        healthEmployeeRate,
         healthEmployerRate: autoHealth?.employerRate ?? manual?.healthEmployerRate ?? null,
-        careEmployeeRate: autoCare?.employeeRate ?? manual?.careEmployeeRate ?? null,
+        careTotalRate: autoCare?.totalRate ?? insuranceTotalRateFromEmployeeRate(careEmployeeRate),
+        careEmployeeRate,
         careEmployerRate: autoCare?.employerRate ?? manual?.careEmployerRate ?? null,
-        pensionEmployeeRate: autoPension ?? manual?.pensionEmployeeRate ?? null,
-        pensionEmployerRate: autoPension ?? manual?.pensionEmployerRate ?? null,
+        pensionTotalRate: autoPension?.totalRate ?? insuranceTotalRateFromEmployeeRate(pensionEmployeeRate),
+        pensionEmployeeRate,
+        pensionEmployerRate: autoPension?.employeeRate ?? manual?.pensionEmployerRate ?? null,
         needsManualHealthRate,
         needsManualCareRate,
         needsManualPensionRate,

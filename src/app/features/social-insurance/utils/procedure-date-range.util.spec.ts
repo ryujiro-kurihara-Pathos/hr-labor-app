@@ -1,5 +1,6 @@
 import { Employee } from '../../employee/models/employee.models';
 import {
+    resolveDependencyStartDateBounds,
     resolveInsuredPeriodBounds,
     validateDateWithinInsuredPeriod,
     validateDependentBirthDate,
@@ -91,11 +92,39 @@ describe('procedure-date-range.util', () => {
                 bounds,
                 employee,
                 referenceDate: '2026-06-01',
+                birthDate: '2020-01-01',
             }),
         ).toContain('入社日');
     });
 
-    it('rejects future dependency occurred date', () => {
+    it('rejects dependency start date on or before birth date for add', () => {
+        const bounds = resolveInsuredPeriodBounds({
+            employee,
+            healthInsuranceStartDate: '2026-04-01',
+        });
+        expect(
+            validateDependentOccurredDate({
+                occurredDate: '2020-01-01',
+                changeType: 'add',
+                bounds,
+                employee,
+                referenceDate: '2026-06-01',
+                birthDate: '2020-01-01',
+            }),
+        ).toContain('生年月日');
+        expect(
+            validateDependentOccurredDate({
+                occurredDate: '2020-06-01',
+                changeType: 'add',
+                bounds,
+                employee,
+                referenceDate: '2026-06-01',
+                birthDate: '2020-06-01',
+            }),
+        ).toContain('生年月日');
+    });
+
+    it('rejects future dependency start date for add', () => {
         const bounds = resolveInsuredPeriodBounds({
             employee,
             healthInsuranceStartDate: '2026-04-01',
@@ -107,7 +136,43 @@ describe('procedure-date-range.util', () => {
                 bounds,
                 employee,
                 referenceDate: '2026-06-01',
+                birthDate: '2020-01-01',
             }),
-        ).toContain('未来');
+        ).toContain('被扶養者になった日');
+    });
+
+    it('resolves dependency start date bounds from join date and birth date', () => {
+        const bounds = resolveInsuredPeriodBounds({
+            employee,
+            healthInsuranceStartDate: '2026-04-01',
+        });
+        expect(
+            resolveDependencyStartDateBounds({
+                bounds,
+                employee,
+                birthDate: '2020-01-01',
+                referenceDate: '2026-06-01',
+            }),
+        ).toEqual({
+            min: '2026-04-01',
+            max: '2026-06-01',
+        });
+    });
+
+    it('rejects future dependency occurred date for change', () => {
+        const bounds = resolveInsuredPeriodBounds({
+            employee,
+            healthInsuranceStartDate: '2026-04-01',
+        });
+        expect(
+            validateDependentOccurredDate({
+                occurredDate: '2026-07-01',
+                changeType: 'change',
+                bounds,
+                employee,
+                referenceDate: '2026-06-01',
+                dependencyStartDate: '2026-04-10',
+            }),
+        ).toContain('異動日');
     });
 });

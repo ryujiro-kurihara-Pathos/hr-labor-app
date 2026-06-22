@@ -535,6 +535,19 @@ export class SocialInsuranceProcedureService {
         companyId: string,
         targetYearMonth: string,
     ): Promise<Procedure | null> {
+        const procedures = await this.listBonusPaymentProceduresByEmployeeIdAndTargetYearMonth(
+            employeeId,
+            companyId,
+            targetYearMonth,
+        );
+        return procedures[0] ?? null;
+    }
+
+    async listBonusPaymentProceduresByEmployeeIdAndTargetYearMonth(
+        employeeId: string,
+        companyId: string,
+        targetYearMonth: string,
+    ): Promise<Procedure[]> {
         const docRef = collection(db, this.collectionName);
         const q = query(
             docRef,
@@ -544,9 +557,10 @@ export class SocialInsuranceProcedureService {
             where('targetYearMonth', '==', targetYearMonth),
         );
         const snapshot = await getDocs(q);
-        if (snapshot.empty) return null;
 
-        return this.toProcedure(snapshot.docs[0].id, snapshot.docs[0].data() as Record<string, unknown>);
+        return snapshot.docs
+            .map((docSnap) => this.toProcedure(docSnap.id, docSnap.data() as Record<string, unknown>))
+            .sort((a, b) => a.occurredDate.localeCompare(b.occurredDate));
     }
 
     /** 被扶養者異動届（未提出のみ）を削除 */

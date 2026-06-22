@@ -2,8 +2,11 @@ import { createEmptyEmployeeInput, Employee } from '../../employee/models/employ
 import { SalaryCondition } from '../models/salary-condition.model';
 import {
     buildSalaryConditionPeriods,
-    resolveSalaryConditionForMonth,
     resolvePreviousSalaryCondition,
+    resolveSalaryConditionChangeBlockReason,
+    salaryConditionPeriodIncludesConfirmedMonth,
+    salaryConditionPeriodIncludesJoinMonth,
+    resolveSalaryConditionForMonth,
     shouldTriggerRevisionFromSalaryCondition,
     validateSalaryConditionForm,
 } from './salary-condition.util';
@@ -128,7 +131,155 @@ describe('salary-condition.util', () => {
                 confirmedRewardMonths: ['2026-06'],
             });
 
-            expect(reason).toContain('確定済み');
+            expect(reason).toContain('給与確定済み');
+        });
+
+        it('blocks edit when change target period includes confirmed months', () => {
+            const existing = condition({ effectiveStartMonth: '2026-07', id: 'e1_2026-07' });
+            const reason = validateSalaryConditionForm({
+                form: {
+                    effectiveStartMonth: '2026-07',
+                    basicSalary: 260_000,
+                    commutingAllowance: 10_000,
+                    positionAllowance: 20_000,
+                    housingAllowance: 0,
+                    fixedOvertimePay: 30_000,
+                    otherFixedAllowance: 0,
+                    note: '',
+                    changeReason: '',
+                },
+                employee: employee(),
+                conditions: [condition(), existing],
+                confirmedRewardMonths: ['2026-08'],
+                editingEffectiveStartMonth: '2026-07',
+            });
+
+            expect(reason).toContain('給与確定済み');
+        });
+
+        it('blocks edit when change target period includes join month', () => {
+            const existing = condition();
+            const reason = validateSalaryConditionForm({
+                form: {
+                    effectiveStartMonth: '2026-04',
+                    basicSalary: 260_000,
+                    commutingAllowance: 10_000,
+                    positionAllowance: 20_000,
+                    housingAllowance: 0,
+                    fixedOvertimePay: 30_000,
+                    otherFixedAllowance: 0,
+                    note: '',
+                    changeReason: '',
+                },
+                employee: employee(),
+                conditions: [existing],
+                confirmedRewardMonths: [],
+                editingEffectiveStartMonth: '2026-04',
+            });
+
+            expect(reason).toContain('入社月');
+        });
+
+        it('allows edit when later condition period has no confirmed or join months', () => {
+            const existing = condition({ effectiveStartMonth: '2026-07', id: 'e1_2026-07' });
+            const reason = validateSalaryConditionForm({
+                form: {
+                    effectiveStartMonth: '2026-07',
+                    basicSalary: 260_000,
+                    commutingAllowance: 10_000,
+                    positionAllowance: 20_000,
+                    housingAllowance: 0,
+                    fixedOvertimePay: 30_000,
+                    otherFixedAllowance: 0,
+                    note: '',
+                    changeReason: '',
+                },
+                employee: employee(),
+                conditions: [condition(), existing],
+                confirmedRewardMonths: ['2026-04', '2026-05', '2026-06'],
+                editingEffectiveStartMonth: '2026-07',
+            });
+
+            expect(reason).toBeNull();
+        });
+
+        it('blocks edit when all fixed wage fields are unchanged', () => {
+            const existing = condition({ effectiveStartMonth: '2026-07', id: 'e1_2026-07' });
+            const reason = validateSalaryConditionForm({
+                form: {
+                    effectiveStartMonth: '2026-07',
+                    basicSalary: 250_000,
+                    commutingAllowance: 10_000,
+                    positionAllowance: 20_000,
+                    housingAllowance: 0,
+                    fixedOvertimePay: 30_000,
+                    otherFixedAllowance: 0,
+                    note: '備考だけ変更',
+                    changeReason: '理由だけ変更',
+                },
+                employee: employee(),
+                conditions: [condition(), existing],
+                confirmedRewardMonths: [],
+                editingEffectiveStartMonth: '2026-07',
+            });
+
+            expect(reason).toContain('変更がありません');
+        });
+
+        it('allows edit when total is same but field breakdown differs', () => {
+            const existing = condition({ effectiveStartMonth: '2026-07', id: 'e1_2026-07' });
+            const reason = validateSalaryConditionForm({
+                form: {
+                    effectiveStartMonth: '2026-07',
+                    basicSalary: 240_000,
+                    commutingAllowance: 10_000,
+                    positionAllowance: 30_000,
+                    housingAllowance: 0,
+                    fixedOvertimePay: 30_000,
+                    otherFixedAllowance: 0,
+                    note: '',
+                    changeReason: '',
+                },
+                employee: employee(),
+                conditions: [condition(), existing],
+                confirmedRewardMonths: [],
+                editingEffectiveStartMonth: '2026-07',
+            });
+
+            expect(reason).toBeNull();
+        });
+    });
+
+    describe('resolveSalaryConditionChangeBlockReason', () => {
+        it('detects confirmed months within a bounded period', () => {
+            const conditions = [
+                condition({ effectiveStartMonth: '2026-04' }),
+                condition({ id: 'e1_2026-07', effectiveStartMonth: '2026-07' }),
+            ];
+
+            expect(
+                salaryConditionPeriodIncludesConfirmedMonth({
+                    effectiveStartMonth: '2026-04',
+                    conditions,
+                    confirmedRewardMonths: ['2026-06'],
+                }),
+            ).toBeTrue();
+            expect(
+                salaryConditionPeriodIncludesJoinMonth({
+                    effectiveStartMonth: '2026-07',
+                    conditions,
+                    joinedDate: '2026-04-15',
+                }),
+            ).toBeFalse();
+            expect(
+                resolveSalaryConditionChangeBlockReason({
+                    effectiveStartMonth: '2026-04',
+                    conditions,
+                    confirmedRewardMonths: [],
+                    joinedDate: '2026-04-15',
+                    isEdit: true,
+                }),
+            ).toContain('入社月');
         });
     });
 

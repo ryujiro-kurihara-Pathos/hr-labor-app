@@ -1,5 +1,5 @@
 import { insuranceJoinStatus } from '../models/social-insurance-status.model';
-import { dayBeforeNthBirthday, formatDateFromLocalDate, minDate } from './care-insurance-period.util';
+import { dayBeforeNthBirthday, formatDateFromLocalDate, minDate, nthBirthday } from './care-insurance-period.util';
 import { isInsurancePremiumTargetMonth } from './insurance-premium-period.util';
 
 export const HEALTH_INSURANCE_AGE_LIMIT = 75;
@@ -10,7 +10,7 @@ export function computeHealthInsurancePremiumEndDate(
     birthDate: string | null | undefined,
 ): string | null {
     const ageLimitEnd = birthDate?.trim()
-        ? dayBeforeNthBirthday(birthDate.trim(), HEALTH_INSURANCE_AGE_LIMIT)
+        ? nthBirthday(birthDate.trim(), HEALTH_INSURANCE_AGE_LIMIT)
         : null;
     return minDate(healthInsuranceEndDate, ageLimitEnd);
 }

@@ -9,7 +9,12 @@ import { AuthService } from '../../auth/services/auth.service';
 import { UserService } from '../../users/services/user.service';
 import { OfficeService } from '../../company/services/office.service';
 import { CompanyService } from '../../company/services/company.service';
-import { Company, InsurancePremiumCollectionTiming } from '../../company/models/company.model';
+import {
+    APP_INSURANCE_PREMIUM_COLLECTION_TIMING,
+    Company,
+    INSURANCE_PREMIUM_COLLECTION_TIMING_APP_NOTE,
+    InsurancePremiumCollectionTiming,
+} from '../../company/models/company.model';
 import { Office } from '../../company/models/office.model';
 import { SocialInsuranceStatus } from '../../social-insurance/models/social-insurance-status.model';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
@@ -74,8 +79,12 @@ export class InsurancePremiumPageComponent {
     bonusesByEmployeeId = signal<Record<string, BonusReward[]>>({});
     socialInsuranceByEmployeeId = signal<Record<string, SocialInsuranceStatus | null>>({});
     manualRatesByEmployeeId = signal<Record<string, ManualInsurancePremiumRates>>({});
-    insurancePremiumCollectionTiming = signal<InsurancePremiumCollectionTiming>('next_month');
+    insurancePremiumCollectionTiming = signal<InsurancePremiumCollectionTiming>(
+        APP_INSURANCE_PREMIUM_COLLECTION_TIMING,
+    );
     payrollPaymentMonthOffset = signal<0 | 1>(1);
+
+    readonly insurancePremiumCollectionTimingAppNote = INSURANCE_PREMIUM_COLLECTION_TIMING_APP_NOTE;
 
     targetYearMonth = signal(this.currentYearMonth());
 
@@ -116,6 +125,35 @@ export class InsurancePremiumPageComponent {
     /** 会社負担合計に含めた従業員数 */
     calculableEmployerPremiumRowCount = computed(() => this.calculablePremiumRows().length);
 
+    totalEmployeePremium = computed(() =>
+        this.calculablePremiumRows().reduce(
+            (sum, row) => sum + (row.calculatedPremium?.totalEmployeePremium ?? 0),
+            0,
+        ),
+    );
+
+    targetRowCount = computed(() =>
+        this.buildRows().filter((row) => row.isTargetMonth).length,
+    );
+
+    calculableFailedRows = computed(() =>
+        this.buildRows().filter(
+            (row) => row.isTargetMonth && row.isRegistered && row.calculatedPremium === null,
+        ),
+    );
+
+    premiumLiabilityYearMonthLabel = computed(() => {
+        const ym = resolvePremiumLiabilityYearMonth(
+            this.targetYearMonth(),
+            this.insurancePremiumCollectionTiming(),
+        );
+        return ym ? this.formatYearMonth(ym) : '—';
+    });
+
+    rewardInputYearMonthLabel = computed(() =>
+        this.formatYearMonth(this.rewardInputYearMonthForPremiumBasis()),
+    );
+
     uncalculableTargetRowCount = computed(() =>
         this.buildRows().filter((row) => row.isTargetMonth && row.calculatedPremium === null).length,
     );
@@ -151,9 +189,7 @@ export class InsurancePremiumPageComponent {
                 this.companyService.getCompanyById(appUser.companyId),
             ]);
             this.employees.set(employees);
-            this.insurancePremiumCollectionTiming.set(
-                company?.insurancePremiumCollectionTiming ?? 'next_month',
-            );
+            this.insurancePremiumCollectionTiming.set(APP_INSURANCE_PREMIUM_COLLECTION_TIMING);
             this.payrollPaymentMonthOffset.set(company?.payrollPaymentMonthOffset ?? 1);
 
             const officeMap: Record<string, Office> = {};

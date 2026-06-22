@@ -6,7 +6,9 @@
             }
             @if (showActions()) {
                 <div class="salary-panel-actions">
-                    <button type="button" class="action-link" (click)="changeClick.emit()">給与条件を変更する</button>
+                    <button type="button" class="action-link" (click)="changeClick.emit()">
+                        給与条件を変更する
+                    </button>
                     <button type="button" class="action-link" (click)="historyClick.emit()">給与条件履歴を見る</button>
                 </div>
             }
@@ -171,13 +173,6 @@
         font-size: 13px;
         line-height: 1.5;
         color: #4b5563;
-    }
-
-    .salary-hint {
-        margin: 0;
-        font-size: 12px;
-        line-height: 1.5;
-        color: #6b7280;
     }
 
     @media (max-width: 640px) {

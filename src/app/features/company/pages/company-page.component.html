@@ -60,7 +60,6 @@
                                 id="payroll-payment-month-offset"
                                 name="payrollPaymentMonthOffset"
                                 [(ngModel)]="payrollPaymentMonthOffset"
-                                (ngModelChange)="onPayrollPaymentMonthOffsetChange()"
                                 required
                             >
                                 <option [ngValue]="0">当月</option>
@@ -69,25 +68,14 @@
                         </div>
                         <div class="form-field">
                             <div class="label-row">
-                                <label for="insurance-premium-collection-timing">
-                                    保険料の給与控除 <span class="field-badge required">必須</span>
-                                </label>
+                                <label>保険料の給与控除</label>
                                 <app-field-help-tooltip
                                     title="保険料の給与控除"
                                     [lines]="insurancePremiumCollectionHelpLines"
                                 />
                             </div>
-                            <select
-                                id="insurance-premium-collection-timing"
-                                name="insurancePremiumCollectionTiming"
-                                [(ngModel)]="insurancePremiumCollectionTiming"
-                                required
-                            >
-                                @if (isInsurancePremiumCollectionTimingAllowed('same_month')) {
-                                    <option ngValue="same_month">当月徴収（支払月分を控除）</option>
-                                }
-                                <option ngValue="next_month">翌月徴収（前月分を控除）</option>
-                            </select>
+                            <p class="field-value">翌月徴収（前月分を控除）</p>
+                            <p class="field-note">{{ insurancePremiumCollectionTimingAppNote }}</p>
                         </div>
                     </div>
 
@@ -133,7 +121,10 @@
                             </div>
                             <div class="meta-row">
                                 <dt>保険料の給与控除</dt>
-                                <dd>{{ insurancePremiumCollectionTimingLabel(c.insurancePremiumCollectionTiming) }}</dd>
+                                <dd>
+                                    {{ insurancePremiumCollectionTimingLabel(c.insurancePremiumCollectionTiming) }}
+                                    <span class="field-note inline">{{ insurancePremiumCollectionTimingAppNote }}</span>
+                                </dd>
                             </div>
                         </dl>
                     </div>
@@ -272,6 +263,24 @@
         font-size: 13px;
         font-weight: 600;
         color: #374151;
+    }
+
+    .field-value {
+        margin: 0;
+        font-size: 14px;
+        color: #111827;
+    }
+
+    .field-note {
+        margin: 6px 0 0;
+        color: #6b7280;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .field-note.inline {
+        display: block;
+        margin-top: 4px;
     }
 
     .form-field input,

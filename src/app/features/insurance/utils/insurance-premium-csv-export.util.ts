@@ -10,7 +10,8 @@ export type InsurancePremiumCsvExportRow = {
     社員番号: string;
     氏名: string;
     事業所: string;
-    標準報酬月額: number | '';
+    標準報酬月額_健康保険: number | '';
+    標準報酬月額_厚生年金: number | '';
     '月次報酬_健康保険料_本人': number;
     '月次報酬_健康保険料_会社': number;
     '月次報酬_厚生年金保険料_本人': number;
@@ -51,7 +52,8 @@ export function createInsurancePremiumCsvRow(
         社員番号: employee.employeeNumber ?? '',
         氏名: `${employee.lastName} ${employee.firstName}`,
         事業所: officeName,
-        標準報酬月額: premium.standardMonthlyAmount ?? '',
+        標準報酬月額_健康保険: premium.standardMonthlyAmount ?? '',
+        標準報酬月額_厚生年金: premium.pensionStandardMonthlyAmount ?? '',
         '月次報酬_健康保険料_本人': premium.healthInsuranceEmployeePremium,
         '月次報酬_健康保険料_会社': premium.healthInsuranceEmployerPremium,
         '月次報酬_厚生年金保険料_本人': premium.pensionInsuranceEmployeePremium,

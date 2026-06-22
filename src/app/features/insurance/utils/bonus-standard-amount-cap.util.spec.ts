@@ -72,6 +72,106 @@ describe('bonus-standard-amount-cap.util', () => {
         expect(result.healthAndCarePerBonus.get('current')).toBe(1_730_000);
     });
 
+    it('翌月徴収でも前月賞与分を年度累計に含める（300万×2回）', () => {
+        const april = bonus({
+            id: 'april',
+            targetYearMonth: '2026-04',
+            standardBonusAmount: 3_000_000,
+            paymentDate: '2026-04-25',
+        });
+        const may = bonus({
+            id: 'may',
+            targetYearMonth: '2026-05',
+            standardBonusAmount: 3_000_000,
+            paymentDate: '2026-05-25',
+        });
+        const allBonuses = [april, may];
+
+        const aprilResult = resolveBonusPremiumableStandardAmounts({
+            liabilityYearMonth: '2026-03',
+            monthBonuses: [april],
+            allBonuses,
+        });
+        const mayResult = resolveBonusPremiumableStandardAmounts({
+            liabilityYearMonth: '2026-04',
+            monthBonuses: [may],
+            allBonuses,
+        });
+
+        expect(aprilResult.healthAndCare).toBe(3_000_000);
+        expect(mayResult.healthAndCare).toBe(2_730_000);
+        expect(aprilResult.healthAndCare + mayResult.healthAndCare).toBe(
+            HEALTH_CARE_BONUS_STANDARD_AMOUNT_ANNUAL_CAP,
+        );
+    });
+
+    it('600万×1回と300万×2回の健康保険対象額合計は同じ', () => {
+        const single = bonus({
+            id: 'single',
+            targetYearMonth: '2026-04',
+            standardBonusAmount: 6_000_000,
+            paymentDate: '2026-04-25',
+        });
+        const april = bonus({
+            id: 'april',
+            targetYearMonth: '2026-04',
+            standardBonusAmount: 3_000_000,
+            paymentDate: '2026-04-10',
+        });
+        const may = bonus({
+            id: 'may',
+            targetYearMonth: '2026-05',
+            standardBonusAmount: 3_000_000,
+            paymentDate: '2026-05-25',
+        });
+
+        const singleResult = resolveBonusPremiumableStandardAmounts({
+            liabilityYearMonth: '2026-03',
+            monthBonuses: [single],
+            allBonuses: [single],
+        });
+        const splitApril = resolveBonusPremiumableStandardAmounts({
+            liabilityYearMonth: '2026-03',
+            monthBonuses: [april],
+            allBonuses: [april, may],
+        });
+        const splitMay = resolveBonusPremiumableStandardAmounts({
+            liabilityYearMonth: '2026-04',
+            monthBonuses: [may],
+            allBonuses: [april, may],
+        });
+
+        expect(singleResult.healthAndCare).toBe(HEALTH_CARE_BONUS_STANDARD_AMOUNT_ANNUAL_CAP);
+        expect(splitApril.healthAndCare + splitMay.healthAndCare).toBe(
+            HEALTH_CARE_BONUS_STANDARD_AMOUNT_ANNUAL_CAP,
+        );
+    });
+
+    it('同月複数回の健康保険は支給日順で上限を配分', () => {
+        const first = bonus({
+            id: 'first',
+            targetYearMonth: '2026-06',
+            standardBonusAmount: 4_000_000,
+            paymentDate: '2026-06-10',
+        });
+        const second = bonus({
+            id: 'second',
+            targetYearMonth: '2026-06',
+            standardBonusAmount: 2_000_000,
+            paymentDate: '2026-06-25',
+        });
+        const allBonuses = [first, second];
+        const result = resolveBonusPremiumableStandardAmounts({
+            liabilityYearMonth: '2026-05',
+            monthBonuses: [first, second],
+            allBonuses,
+        });
+
+        expect(result.healthAndCare).toBe(HEALTH_CARE_BONUS_STANDARD_AMOUNT_ANNUAL_CAP);
+        expect(result.healthAndCarePerBonus.get('first')).toBe(4_000_000);
+        expect(result.healthAndCarePerBonus.get('second')).toBe(1_730_000);
+    });
+
     it('年度は4月始まり', () => {
         expect(healthInsuranceFiscalYearStartYear('2026-03')).toBe(2025);
         expect(healthInsuranceFiscalYearStartYear('2026-04')).toBe(2026);

@@ -1,11 +1,14 @@
 <div class="reward-input-page">
     <header class="page-header">
-        <div>
+        <div class="page-header-main">
             <h1>報酬入力</h1>
             <p class="page-note">
                 対象年月の月次報酬・賞与の入力状況を確認できます。標準報酬月額は資格取得時決定・定時決定に基づき表示します。
             </p>
         </div>
+        <a routerLink="/premium" [queryParams]="{ ym: targetYearMonth() }" class="btn sub-btn">
+            保険料を見る
+        </a>
     </header>
 
     <div class="month-toolbar">
@@ -13,14 +16,25 @@
             ←
         </button>
         <div class="month-picker">
-            <label for="target-year-month" class="month-label">支給年月</label>
-            <input
-                id="target-year-month"
-                type="month"
-                [ngModel]="targetYearMonth()"
-                (ngModelChange)="targetYearMonth.set($event); onTargetYearMonthChange()"
-            />
-            <span class="month-display">{{ targetYearMonthLabel() }}</span>
+            <span class="month-label">支給年月</span>
+            <div class="month-picker-main">
+                <input
+                    id="target-year-month"
+                    type="month"
+                    class="month-input"
+                    [ngModel]="targetYearMonth()"
+                    (ngModelChange)="targetYearMonth.set($event); onTargetYearMonthChange()"
+                />
+                <span class="month-display">{{ targetYearMonthLabel() }}</span>
+            </div>
+            @if (targetRowCount() > 0) {
+                <div class="progress-wrap">
+                    <div class="progress-bar" role="progressbar" [attr.aria-valuenow]="registrationRate()" aria-valuemin="0" aria-valuemax="100">
+                        <span class="progress-fill" [style.width.%]="registrationRate()"></span>
+                    </div>
+                    <span class="progress-label">入力率 {{ registrationRate() }}%（{{ registeredRows().length }}/{{ targetRowCount() }}名）</span>
+                </div>
+            }
         </div>
         <button type="button" class="month-nav-btn" (click)="shiftMonth(1)" [disabled]="isLoading()" aria-label="翌月">
             →
@@ -28,42 +42,59 @@
     </div>
 
     @if (isLoading()) {
-        <p class="loading">読み込み中...</p>
+        <p class="state-message loading">読み込み中...</p>
     } @else if (errorMessage()) {
-        <p class="error">{{ errorMessage() }}</p>
+        <p class="state-message error">{{ errorMessage() }}</p>
     } @else if (employees().length === 0) {
-        <p class="empty">従業員が登録されていません。</p>
-        <a routerLink="/employees/new" class="link">従業員を追加</a>
+        <div class="empty-state">
+            <p class="empty-state-title">従業員が登録されていません</p>
+            <p class="empty-state-desc">報酬を入力するには、先に従業員を登録してください。</p>
+            <a routerLink="/employees/new" class="btn primary-btn">従業員を追加</a>
+        </div>
     } @else {
-        <section class="summary-section">
-            <p class="summary">
-                登録済み <strong>{{ registeredRows().length }}</strong> 名 /
-                未入力 <strong>{{ unregisteredRows().length }}</strong> 名
-                @if (excludedRowCount() > 0) {
-                    <span class="summary-excluded">
-                        · 対象外 <strong>{{ excludedRowCount() }}</strong> 名（入社前・退職後）
-                    </span>
-                }
-            </p>
+        <section class="summary-strip">
+            <div class="stat-card ok">
+                <span class="stat-card-label">登録済み</span>
+                <span class="stat-card-value">{{ registeredRows().length }}<span class="stat-card-unit">名</span></span>
+            </div>
+            <div class="stat-card" [class.attention]="unregisteredRows().length > 0">
+                <span class="stat-card-label">未入力</span>
+                <span class="stat-card-value" [class.warn]="unregisteredRows().length > 0">
+                    {{ unregisteredRows().length }}<span class="stat-card-unit">名</span>
+                </span>
+            </div>
+            <div class="stat-card muted">
+                <span class="stat-card-label">対象外</span>
+                <span class="stat-card-value">{{ excludedRowCount() }}<span class="stat-card-unit">名</span></span>
+                <span class="stat-card-sub">入社前・退職後</span>
+            </div>
         </section>
 
         <section class="list-section">
-            <h2 class="section-title">登録済み（{{ targetYearMonthLabel() }}）</h2>
+            <div class="list-header">
+                <h2 class="section-title">登録済み</h2>
+                <span class="section-badge">{{ registeredRows().length }}名</span>
+            </div>
+            <p class="section-desc">{{ targetYearMonthLabel() }}の報酬入力済み従業員</p>
+
             @if (registeredRows().length === 0) {
-                <p class="section-empty">この月の登録データはありません。</p>
+                <div class="section-empty-card">
+                    <p class="section-empty-title">この月の登録データはありません</p>
+                    <p class="section-empty-desc">下の未入力一覧から報酬を登録できます。</p>
+                </div>
             } @else {
                 <div class="table-wrap">
-                    <table class="reward-table">
+                    <table class="data-table">
                         <thead>
                             <tr>
-                                <th>従業員</th>
+                                <th class="sticky-col">従業員</th>
                                 <th>事業所</th>
                                 <th>決定方法</th>
-                                <th>報酬月額（基礎）</th>
-                                <th>健康保険（等級）</th>
-                                <th>健康保険（標準報酬月額）</th>
-                                <th>厚生年金（等級）</th>
-                                <th>厚生年金（標準報酬月額）</th>
+                                <th class="num">報酬月額</th>
+                                <th class="num">健保等級</th>
+                                <th class="num">健保標準</th>
+                                <th class="num">年金等級</th>
+                                <th class="num">年金標準</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -73,7 +104,7 @@
                                     [routerLink]="detailLink(row.employee.id)"
                                     [queryParams]="detailQueryParams()"
                                 >
-                                    <td class="name-cell">
+                                    <td class="sticky-col name-cell">
                                         <span class="employee-link">
                                             <span class="employee-avatar" aria-hidden="true">
                                                 {{ employeeInitial(row.employee) }}
@@ -89,7 +120,7 @@
                                             <span class="employee-link-arrow" aria-hidden="true">›</span>
                                         </span>
                                     </td>
-                                    <td>{{ officeNameById()[row.employee.officeId] || '—' }}</td>
+                                    <td class="office-cell">{{ officeNameById()[row.employee.officeId] || '—' }}</td>
                                     <td>
                                         <span
                                             class="determination-badge"
@@ -101,11 +132,11 @@
                                         </span>
                                     </td>
                                     @if (row.effective.isComplete && row.effective.calculation) {
-                                        <td class="num">{{ row.effective.averageMonthlyReward ?? 0 | number }} 円</td>
-                                        <td class="num">{{ row.effective.calculation.health!.grade }}</td>
-                                        <td class="num">{{ row.effective.calculation.health!.standardMonthlyAmount | number }} 円</td>
-                                        <td class="num">{{ row.effective.calculation.pension!.grade }}</td>
-                                        <td class="num">{{ row.effective.calculation.pension!.standardMonthlyAmount | number }} 円</td>
+                                        <td class="num reward-amount">{{ row.effective.averageMonthlyReward ?? 0 | number }}<span class="cell-unit">円</span></td>
+                                        <td class="num grade-cell">{{ row.effective.calculation.health!.grade }}</td>
+                                        <td class="num">{{ row.effective.calculation.health!.standardMonthlyAmount | number }}<span class="cell-unit">円</span></td>
+                                        <td class="num grade-cell">{{ row.effective.calculation.pension!.grade }}</td>
+                                        <td class="num">{{ row.effective.calculation.pension!.standardMonthlyAmount | number }}<span class="cell-unit">円</span></td>
                                     } @else {
                                         <td colspan="5" class="incomplete-cell">{{ row.effective.description }}</td>
                                     }
@@ -117,36 +148,43 @@
             }
         </section>
 
-        <section class="list-section">
-            <h2 class="section-title">未入力（{{ targetYearMonthLabel() }}）</h2>
+        <section class="list-section" [class.attention-section]="unregisteredRows().length > 0">
+            <div class="list-header">
+                <h2 class="section-title">未入力</h2>
+                <span class="section-badge" [class.warn]="unregisteredRows().length > 0">{{ unregisteredRows().length }}名</span>
+            </div>
+            <p class="section-desc">{{ targetYearMonthLabel() }}の報酬が未登録の従業員</p>
+
             @if (unregisteredRows().length === 0) {
-                <p class="section-empty">未入力の従業員はいません。</p>
+                <div class="section-empty-card success">
+                    <p class="section-empty-title">未入力の従業員はいません</p>
+                    <p class="section-empty-desc">この月の報酬入力は完了しています。</p>
+                </div>
             } @else {
-                <ul class="unregistered-list">
+                <ul class="card-list">
                     @for (row of unregisteredRows(); track row.employee.id) {
                         <li>
                             <a
                                 [routerLink]="detailLink(row.employee.id)"
                                 [queryParams]="detailQueryParams()"
-                                class="unregistered-card"
+                                class="list-card"
                             >
                                 <span class="employee-avatar" aria-hidden="true">
                                     {{ employeeInitial(row.employee) }}
                                 </span>
-                                <span class="unregistered-card-body">
-                                    <div class="unregistered-header">
-                                        <span class="employee-name">
-                                            {{ employeeDisplayName(row.employee) }}
-                                        </span>
-                                        <span class="status-badge">未入力</span>
-                                    </div>
-                                    <p class="employee-meta">
+                                <span class="list-card-body">
+                                    <span class="list-card-header">
+                                        <span class="list-card-name">{{ employeeDisplayName(row.employee) }}</span>
+                                        <span class="status-pill warn">未入力</span>
+                                    </span>
+                                    <span class="list-card-meta">
                                         {{ officeNameById()[row.employee.officeId] || '—' }}
                                         · 社員番号 {{ row.employee.employeeNumber || '—' }}
-                                    </p>
-                                    <p class="unregistered-note">{{ row.effective.description }}</p>
+                                    </span>
+                                    <span class="list-card-note">{{ row.effective.description }}</span>
                                 </span>
-                                <span class="employee-link-arrow" aria-hidden="true">›</span>
+                                <span class="list-card-action">入力する</span>
+                                <span class="list-card-arrow" aria-hidden="true">›</span>
                             </a>
                         </li>
                     }
@@ -158,166 +196,465 @@
 
 <style>
     .reward-input-page {
-        max-width: 1100px;
+        max-width: 1200px;
         margin: 0 auto;
-        padding: 24px 16px 40px;
+        padding: 24px 16px 48px;
     }
-    .page-header h1 {
-        margin: 0 0 8px;
-        font-size: 22px;
-    }
+
     .page-header {
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
         gap: 16px;
+        margin-bottom: 4px;
     }
+
+    .page-header-main h1 {
+        margin: 0 0 8px;
+        font-size: 22px;
+        font-weight: 700;
+        color: #111827;
+    }
+
     .page-note {
         margin: 0;
+        max-width: 640px;
         color: #6b7280;
         font-size: 14px;
+        line-height: 1.6;
     }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 40px;
+        padding: 0 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .primary-btn {
+        border: 1px solid #2563eb;
+        background: #2563eb;
+        color: #fff;
+    }
+
+    .primary-btn:hover {
+        background: #1d4ed8;
+        border-color: #1d4ed8;
+    }
+
+    .sub-btn {
+        flex-shrink: 0;
+        border: 1px solid #d1d5db;
+        background: #fff;
+        color: #374151;
+    }
+
+    .sub-btn:hover {
+        border-color: #2563eb;
+        color: #2563eb;
+        background: #eff6ff;
+    }
+
     .month-toolbar {
         display: flex;
-        align-items: center;
+        align-items: stretch;
         gap: 12px;
         margin: 20px 0 24px;
-        padding: 16px;
-        background: #f9fafb;
+        padding: 18px 20px;
+        background: #fff;
         border: 1px solid #e5e7eb;
-        border-radius: 12px;
+        border-radius: 14px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
     }
+
     .month-nav-btn {
         flex-shrink: 0;
+        align-self: center;
         width: 40px;
         height: 40px;
         border: 1px solid #d1d5db;
-        border-radius: 8px;
-        background: #fff;
+        border-radius: 10px;
+        background: #f9fafb;
         font-size: 18px;
+        color: #374151;
         cursor: pointer;
+        transition: background 0.15s ease, border-color 0.15s ease;
     }
+
+    .month-nav-btn:hover:not(:disabled) {
+        background: #eff6ff;
+        border-color: #93c5fd;
+        color: #2563eb;
+    }
+
     .month-nav-btn:disabled {
-        opacity: 0.5;
+        opacity: 0.45;
         cursor: not-allowed;
     }
+
     .month-picker {
         flex: 1;
+        min-width: 0;
+    }
+
+    .month-label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #6b7280;
+        letter-spacing: 0.02em;
+    }
+
+    .month-picker-main {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        gap: 10px 16px;
+        gap: 10px 14px;
     }
-    .month-label {
-        font-size: 14px;
-        font-weight: 600;
-    }
-    .month-picker input[type='month'] {
+
+    .month-input {
         padding: 8px 10px;
         border: 1px solid #d1d5db;
         border-radius: 8px;
         font-size: 14px;
+        background: #fff;
     }
+
     .month-display {
-        font-size: 16px;
+        font-size: 22px;
+        font-weight: 700;
+        color: #111827;
+        letter-spacing: -0.01em;
+    }
+
+    .progress-wrap {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 10px;
+    }
+
+    .progress-bar {
+        flex: 1;
+        max-width: 200px;
+        height: 6px;
+        background: #e5e7eb;
+        border-radius: 999px;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        display: block;
+        height: 100%;
+        background: linear-gradient(90deg, #34d399 0%, #059669 100%);
+        border-radius: 999px;
+        transition: width 0.3s ease;
+    }
+
+    .progress-label {
+        font-size: 12px;
         font-weight: 600;
+        color: #6b7280;
+        white-space: nowrap;
+    }
+
+    .state-message {
+        margin: 0;
+        padding: 16px;
+        font-size: 14px;
+        border-radius: 10px;
+    }
+
+    .state-message.loading {
+        color: #6b7280;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+    }
+
+    .state-message.error {
+        color: #b91c1c;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+    }
+
+    .empty-state {
+        padding: 40px 24px;
+        text-align: center;
+        background: #f9fafb;
+        border: 1px dashed #d1d5db;
+        border-radius: 14px;
+    }
+
+    .empty-state-title {
+        margin: 0 0 8px;
+        font-size: 16px;
+        font-weight: 700;
         color: #111827;
     }
-    .loading,
-    .empty,
-    .section-empty {
+
+    .empty-state-desc {
+        margin: 0 0 20px;
+        font-size: 14px;
         color: #6b7280;
-        font-size: 14px;
     }
-    .error {
-        color: #b91c1c;
-        font-size: 14px;
+
+    .summary-strip {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 24px;
+    }
+
+    .stat-card {
+        padding: 14px 16px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+    }
+
+    .stat-card.ok {
+        border-color: #a7f3d0;
+        background: #ecfdf5;
+    }
+
+    .stat-card.attention {
+        border-color: #fed7aa;
+        background: #fffbeb;
+    }
+
+    .stat-card.muted {
+        background: #fafafa;
+    }
+
+    .stat-card-label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        color: #6b7280;
+        letter-spacing: 0.02em;
+    }
+
+    .stat-card-value {
+        font-size: 22px;
+        font-weight: 800;
+        color: #111827;
+        line-height: 1.2;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .stat-card.ok .stat-card-value {
+        color: #047857;
+    }
+
+    .stat-card-value.warn {
+        color: #c2410c;
+    }
+
+    .stat-card-unit {
+        margin-left: 2px;
+        font-size: 13px;
         font-weight: 600;
+        color: #6b7280;
     }
-    .summary-section {
-        margin-bottom: 20px;
+
+    .stat-card-sub {
+        display: block;
+        margin-top: 4px;
+        font-size: 12px;
+        color: #9ca3af;
     }
-    .summary {
+
+    .list-section {
+        margin-bottom: 32px;
+    }
+
+    .attention-section .section-title {
+        color: #9a3412;
+    }
+
+    .list-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 4px;
+    }
+
+    .section-title {
         margin: 0;
-        font-size: 14px;
+        font-size: 17px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .section-badge {
+        padding: 2px 9px;
+        border-radius: 999px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .section-badge.warn {
+        background: #ffedd5;
+        color: #c2410c;
+    }
+
+    .section-desc {
+        margin: 0 0 14px;
+        font-size: 13px;
+        color: #6b7280;
+    }
+
+    .section-empty-card {
+        padding: 28px 20px;
+        text-align: center;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+    }
+
+    .section-empty-card.success {
+        background: #ecfdf5;
+        border-color: #a7f3d0;
+    }
+
+    .section-empty-title {
+        margin: 0 0 6px;
+        font-size: 15px;
+        font-weight: 600;
         color: #374151;
     }
-    .summary-excluded {
+
+    .section-empty-card.success .section-empty-title {
+        color: #047857;
+    }
+
+    .section-empty-desc {
+        margin: 0;
+        font-size: 14px;
         color: #6b7280;
     }
-    .list-section {
-        margin-bottom: 28px;
-    }
-    .section-title {
-        margin: 0 0 12px;
-        font-size: 17px;
-    }
+
     .table-wrap {
         overflow-x: auto;
         border: 1px solid #e5e7eb;
-        border-radius: 10px;
+        border-radius: 12px;
         background: #fff;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
     }
-    .reward-table {
+
+    .data-table {
         width: 100%;
         border-collapse: collapse;
         font-size: 13px;
     }
-    .reward-table th,
-    .reward-table td {
-        padding: 10px 12px;
+
+    .data-table th,
+    .data-table td {
+        padding: 12px 14px;
         border-bottom: 1px solid #f3f4f6;
         text-align: left;
         white-space: nowrap;
     }
-    .reward-table th {
+
+    .data-table th {
         background: #f9fafb;
-        font-weight: 600;
-        color: #374151;
+        font-size: 12px;
+        font-weight: 700;
+        color: #6b7280;
+        letter-spacing: 0.01em;
     }
+
+    .data-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .data-table .sticky-col {
+        position: sticky;
+        left: 0;
+        z-index: 1;
+        background: inherit;
+        box-shadow: 1px 0 0 #f3f4f6;
+    }
+
+    .data-table thead .sticky-col {
+        background: #f9fafb;
+        z-index: 2;
+    }
+
     .clickable-row {
         cursor: pointer;
-        transition: background 0.15s ease;
+        transition: background 0.12s ease;
     }
+
     .clickable-row:hover {
         background: #f8fafc;
     }
+
+    .clickable-row:hover .sticky-col {
+        background: #f8fafc;
+    }
+
     .clickable-row:hover .employee-link-name {
         color: #2563eb;
     }
+
     .clickable-row:hover .employee-link-arrow {
         opacity: 1;
         transform: translateX(2px);
         color: #2563eb;
     }
+
     .name-cell {
-        min-width: 180px;
+        min-width: 200px;
     }
+
+    .office-cell {
+        color: #4b5563;
+        max-width: 140px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
     .employee-link {
         display: inline-flex;
         align-items: center;
         gap: 10px;
         max-width: 100%;
     }
+
     .employee-avatar {
         display: inline-flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
-        width: 34px;
-        height: 34px;
+        width: 36px;
+        height: 36px;
         border-radius: 999px;
         background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
         color: #1d4ed8;
         font-size: 13px;
         font-weight: 800;
     }
+
     .employee-link-body {
         display: flex;
         flex-direction: column;
         gap: 2px;
         min-width: 0;
     }
+
     .employee-link-name {
         font-size: 14px;
         font-weight: 700;
@@ -325,11 +662,13 @@
         line-height: 1.3;
         transition: color 0.15s ease;
     }
+
     .employee-link-meta {
         font-size: 11px;
-        color: #6b7280;
+        color: #9ca3af;
         line-height: 1.3;
     }
+
     .employee-link-arrow {
         flex-shrink: 0;
         margin-left: auto;
@@ -340,45 +679,71 @@
         transform: translateX(0);
         transition: opacity 0.15s ease, transform 0.15s ease, color 0.15s ease;
     }
+
     .num {
         text-align: right;
+        font-variant-numeric: tabular-nums;
     }
+
+    .reward-amount {
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .grade-cell {
+        color: #4b5563;
+        font-weight: 600;
+    }
+
+    .cell-unit {
+        margin-left: 2px;
+        font-size: 11px;
+        color: #9ca3af;
+        font-weight: 500;
+    }
+
     .incomplete-cell {
         color: #6b7280;
         font-size: 12px;
         white-space: normal;
         line-height: 1.4;
     }
+
     .determination-badge {
         display: inline-block;
-        padding: 2px 8px;
+        padding: 3px 9px;
         border-radius: 999px;
         font-size: 11px;
         font-weight: 700;
         white-space: nowrap;
     }
+
     .determination-badge.initial {
         background: #dbeafe;
         color: #1e40af;
     }
+
     .determination-badge.regular {
         background: #ede9fe;
         color: #5b21b6;
     }
+
     .determination-badge.revision {
         background: #ffedd5;
         color: #9a3412;
     }
-    .unregistered-list {
+
+    .card-list {
         list-style: none;
         margin: 0;
         padding: 0;
         display: grid;
         gap: 8px;
     }
-    .unregistered-card {
+
+    .list-card {
         display: flex;
-        align-items: flex-start;
+        align-items: center;
         gap: 12px;
         padding: 14px 16px;
         border: 1px solid #e5e7eb;
@@ -386,64 +751,114 @@
         background: #fff;
         text-decoration: none;
         color: inherit;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
         transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
     }
-    .unregistered-card:hover {
+
+    .list-card:hover {
         border-color: #93c5fd;
         background: #f8fafc;
         box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
         transform: translateY(-1px);
     }
-    .unregistered-card:hover .employee-link-name,
-    .unregistered-card:hover .employee-name {
+
+    .list-card:hover .list-card-name {
         color: #2563eb;
     }
-    .unregistered-card:hover .employee-link-arrow {
+
+    .list-card:hover .list-card-action {
+        background: #2563eb;
+        color: #fff;
+    }
+
+    .list-card:hover .list-card-arrow {
         opacity: 1;
         transform: translateX(2px);
         color: #2563eb;
     }
-    .unregistered-card-body {
+
+    .list-card-body {
         flex: 1;
         min-width: 0;
     }
-    .unregistered-card .employee-link-arrow {
-        align-self: center;
-        opacity: 0.35;
-    }
-    .unregistered-header {
+
+    .list-card-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 8px;
-        margin-bottom: 4px;
+        margin-bottom: 2px;
     }
-    .employee-name {
+
+    .list-card-name {
         font-weight: 700;
         font-size: 15px;
         color: #111827;
         transition: color 0.15s ease;
     }
-    .status-badge {
+
+    .list-card-meta {
+        display: block;
+        font-size: 13px;
+        color: #6b7280;
+        line-height: 1.4;
+    }
+
+    .list-card-note {
+        display: block;
+        margin-top: 4px;
+        font-size: 12px;
+        color: #9ca3af;
+        line-height: 1.4;
+    }
+
+    .list-card-action {
+        flex-shrink: 0;
+        padding: 6px 12px;
+        border-radius: 8px;
+        background: #eff6ff;
+        color: #2563eb;
+        font-size: 12px;
+        font-weight: 700;
+        transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .list-card-arrow {
+        flex-shrink: 0;
+        font-size: 18px;
+        color: #9ca3af;
+        opacity: 0.35;
+        transition: opacity 0.15s ease, transform 0.15s ease, color 0.15s ease;
+    }
+
+    .status-pill {
         flex-shrink: 0;
         padding: 3px 9px;
         border-radius: 999px;
-        background: #fff7ed;
-        border: 1px solid #fed7aa;
-        color: #c2410c;
         font-size: 11px;
         font-weight: 700;
     }
-    .employee-meta {
-        margin: 0 0 4px;
-        font-size: 13px;
-        color: #6b7280;
+
+    .status-pill.warn {
+        background: #fff7ed;
+        border: 1px solid #fed7aa;
+        color: #c2410c;
     }
-    .unregistered-note {
-        margin: 0;
-        font-size: 12px;
-        color: #6b7280;
-        line-height: 1.5;
+
+    @media (max-width: 768px) {
+        .page-header {
+            flex-direction: column;
+        }
+
+        .summary-strip {
+            grid-template-columns: 1fr;
+        }
+
+        .month-display {
+            font-size: 18px;
+        }
+
+        .list-card-action {
+            display: none;
+        }
     }
 </style>

@@ -10,15 +10,11 @@ import {
 describe('age-premium-period.util', () => {
     const birthDate = '1956-06-15';
 
-    it('sets health insurance premium end to month before 75th birthday eve', () => {
-        expect(computeHealthInsurancePremiumEndDate(null, birthDate)).toBe('2031-06-14');
+    it('sets health insurance premium end to 75th birthday', () => {
+        expect(computeHealthInsurancePremiumEndDate(null, birthDate)).toBe('2031-06-15');
     });
 
-    it('sets pension insurance premium end to month before 70th birthday eve', () => {
-        expect(computePensionInsurancePremiumEndDate(null, birthDate)).toBe('2026-06-14');
-    });
-
-    it('calculates health insurance premium until 75 years old', () => {
+    it('calculates health insurance premium until month before 75th birthday month', () => {
         expect(
             isHealthInsurancePremiumTargetMonth(
                 '2031-05',
@@ -35,6 +31,31 @@ describe('age-premium-period.util', () => {
                 birthDate,
             ),
         ).toBeFalse();
+    });
+
+    it('uses 75th birthday for first-of-month birth when calculating health premium end', () => {
+        const firstOfMonthBirth = '1956-03-01';
+        expect(computeHealthInsurancePremiumEndDate(null, firstOfMonthBirth)).toBe('2031-03-01');
+        expect(
+            isHealthInsurancePremiumTargetMonth(
+                '2031-02',
+                '2020-04-01',
+                null,
+                firstOfMonthBirth,
+            ),
+        ).toBeTrue();
+        expect(
+            isHealthInsurancePremiumTargetMonth(
+                '2031-03',
+                '2020-04-01',
+                null,
+                firstOfMonthBirth,
+            ),
+        ).toBeFalse();
+    });
+
+    it('sets pension insurance premium end to month before 70th birthday eve', () => {
+        expect(computePensionInsurancePremiumEndDate(null, birthDate)).toBe('2026-06-14');
     });
 
     it('calculates pension insurance premium until 70 years old', () => {

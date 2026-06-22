@@ -8,7 +8,12 @@ import { UserService } from '../../users/services/user.service';
 import { Employee } from '../../employee/models/employee.models';
 import { EmployeeService } from '../../employee/services/employee.service';
 import { Office } from '../../company/models/office.model';
-import { Company, InsurancePremiumCollectionTiming } from '../../company/models/company.model';
+import {
+    APP_INSURANCE_PREMIUM_COLLECTION_TIMING,
+    Company,
+    INSURANCE_PREMIUM_COLLECTION_TIMING_APP_NOTE,
+    InsurancePremiumCollectionTiming,
+} from '../../company/models/company.model';
 import { CompanyService } from '../../company/services/company.service';
 import {
     formatPayrollDeductionNote,
@@ -61,7 +66,9 @@ import {
 import { findCareInsuranceRate, findHealthInsuranceRate } from '../../insurance-rate/utils/insurance-rate-lookup.util';
 import { KYOKAI_HEALTH_INSURANCE_RATE_FILES } from '../../insurance-rate/data/insurance-rates';
 import { InsuranceRateRow } from '../../insurance-rate/models/insurance-rate.model';
-import { roundInsurancePremium } from '../utils/insurance-premium-rounding.util';
+import { calculateInsurancePremiumShares } from '../utils/insurance-premium-rounding.util';
+import { resolveMonthlyPremiumStandardAmounts } from '../utils/insurance-premium-standard-amount.util';
+import { DEFAULT_PENSION_INSURANCE_TOTAL_RATE } from '../utils/insurance-premium-rate-resolution.util';
 import { insuranceJoinStatusLabel } from '../../social-insurance/utils/social-insurance-status-display.util';
 import { insuranceJoinStatus } from '../../social-insurance/models/social-insurance-status.model';
 import {
@@ -90,7 +97,8 @@ import {
     isPensionInsurancePremiumTargetMonth,
 } from '../../social-insurance/utils/age-premium-period.util';
 
-const PENSION_RATE = 0.0915;
+const PENSION_EMPLOYEE_RATE = 0.0915;
+const PENSION_TOTAL_RATE = DEFAULT_PENSION_INSURANCE_TOTAL_RATE;
 
 type RewardField = {
     label: string;
@@ -104,7 +112,7 @@ type RewardField = {
     templateUrl: './my-insurance-premium-page.component.html',
 })
 export class MyInsurancePremiumPageComponent implements OnInit {
-    readonly pensionRate = PENSION_RATE;
+    readonly pensionRate = PENSION_EMPLOYEE_RATE;
 
     readonly premiumDisplayAmountValue = premiumDisplayAmountValue;
     readonly premiumDisplayShowsZero = premiumDisplayShowsZero;
@@ -125,7 +133,11 @@ export class MyInsurancePremiumPageComponent implements OnInit {
     employee = signal<Employee | null>(null);
     office = signal<Office | null>(null);
     company = signal<Company | null>(null);
-    insurancePremiumCollectionTiming = signal<InsurancePremiumCollectionTiming>('next_month');
+    insurancePremiumCollectionTiming = signal<InsurancePremiumCollectionTiming>(
+        APP_INSURANCE_PREMIUM_COLLECTION_TIMING,
+    );
+
+    readonly insurancePremiumCollectionTimingAppNote = INSURANCE_PREMIUM_COLLECTION_TIMING_APP_NOTE;
     insuranceStatus = signal<SocialInsuranceStatus | null>(null);
     standardReward = signal<StandardMonthlyReward | null>(null);
     allRewards = signal<StandardMonthlyReward[]>([]);
@@ -325,7 +337,16 @@ export class MyInsurancePremiumPageComponent implements OnInit {
 
         const effective = this.effectiveStandardForPremium();
         if (!effective?.isComplete || !effective.calculation?.health) return null;
-        return effective.calculation.health.standardMonthlyAmount;
+        return resolveMonthlyPremiumStandardAmounts(effective.calculation).health;
+    });
+
+    pensionStandardAmount = computed((): number | null => {
+        const liabilityYearMonth = this.premiumLiabilityYearMonth();
+        if (!liabilityYearMonth || !this.liabilityMonthHasConfirmedReward()) return null;
+
+        const effective = this.effectiveStandardForPremium();
+        if (!effective?.isComplete || !effective.calculation?.health) return null;
+        return resolveMonthlyPremiumStandardAmounts(effective.calculation).pension;
     });
 
     liabilityMonthHasConfirmedReward = computed((): boolean => {
@@ -566,12 +587,15 @@ export class MyInsurancePremiumPageComponent implements OnInit {
 
     healthPremium = computed(() => {
         if (!this.isHealthPremiumMonth()) return null;
-        return this.calculatePremium(this.standardAmount(), this.healthRateRow()?.employeeRate ?? null);
+        return this.calculateEmployeePremium(
+            this.standardAmount(),
+            this.healthRateRow()?.totalRate ?? null,
+        );
     });
 
     pensionPremium = computed(() => {
         if (!this.isPensionPremiumMonth()) return null;
-        return this.calculatePremium(this.standardAmount(), PENSION_RATE);
+        return this.calculateEmployeePremium(this.pensionStandardAmount(), PENSION_TOTAL_RATE);
     });
 
     isCarePremiumMonth = computed(() => {
@@ -599,7 +623,10 @@ export class MyInsurancePremiumPageComponent implements OnInit {
 
     carePremium = computed(() => {
         if (!this.isCarePremiumMonth()) return null;
-        return this.calculatePremium(this.standardAmount(), this.careRateRow()?.employeeRate ?? null);
+        return this.calculateEmployeePremium(
+            this.standardAmount(),
+            this.careRateRow()?.totalRate ?? null,
+        );
     });
 
     monthlySocialInsurancePremium = computed((): number | null => {
@@ -623,13 +650,19 @@ export class MyInsurancePremiumPageComponent implements OnInit {
         });
 
         const health = this.isHealthPremiumMonth()
-            ? this.calculatePremium(amounts.healthAndCare, this.healthRateRow()?.employeeRate ?? null) ?? 0
+            ? this.calculateEmployeePremium(
+                amounts.healthAndCare,
+                this.healthRateRow()?.totalRate ?? null,
+            ) ?? 0
             : 0;
         const pension = this.isPensionPremiumMonth()
-            ? this.calculatePremium(amounts.pension, PENSION_RATE) ?? 0
+            ? this.calculateEmployeePremium(amounts.pension, PENSION_TOTAL_RATE) ?? 0
             : 0;
         const care = this.isCarePremiumMonth()
-            ? this.calculatePremium(amounts.healthAndCare, this.careRateRow()?.employeeRate ?? null) ?? 0
+            ? this.calculateEmployeePremium(
+                amounts.healthAndCare,
+                this.careRateRow()?.totalRate ?? null,
+            ) ?? 0
             : 0;
 
         return health + pension + care;
@@ -840,7 +873,7 @@ export class MyInsurancePremiumPageComponent implements OnInit {
             this.allBonuses.set(allBonuses);
             this.company.set(company);
             if (company) {
-                this.insurancePremiumCollectionTiming.set(company.insurancePremiumCollectionTiming);
+                this.insurancePremiumCollectionTiming.set(APP_INSURANCE_PREMIUM_COLLECTION_TIMING);
             }
 
             const allRewards = await this.rewardService.listByEmployee(employee.id);
@@ -939,9 +972,9 @@ export class MyInsurancePremiumPageComponent implements OnInit {
         }
     }
 
-    private calculatePremium(amount: number | null, rate: number | null): number | null {
-        if (amount === null || rate === null) return null;
-        return roundInsurancePremium(amount * rate);
+    private calculateEmployeePremium(amount: number | null, totalRate: number | null): number | null {
+        if (amount === null || totalRate === null) return null;
+        return calculateInsurancePremiumShares(amount, totalRate).employeePremium;
     }
 
     private sumRewardFields(reward: StandardMonthlyReward): number {

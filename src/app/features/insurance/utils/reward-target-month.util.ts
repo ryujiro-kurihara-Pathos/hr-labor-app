@@ -1,6 +1,9 @@
 import { Timestamp } from 'firebase/firestore';
 
-import { InsurancePremiumCollectionTiming } from '../../company/models/company.model';
+import {
+    APP_INSURANCE_PREMIUM_COLLECTION_TIMING,
+    InsurancePremiumCollectionTiming,
+} from '../../company/models/company.model';
 import { Employee } from '../../employee/models/employee.models';
 import {
     resolveInsuredPeriodBounds,
@@ -183,7 +186,7 @@ export function navigableYearMonthMax(
     employee: Employee,
     referenceYearMonth: string = currentYearMonth(),
     scope: YearMonthNavigationScope = 'reward_input',
-    timing: InsurancePremiumCollectionTiming = 'same_month',
+    timing: InsurancePremiumCollectionTiming = APP_INSURANCE_PREMIUM_COLLECTION_TIMING,
     latestConfirmedWorkYearMonth: string | null = null,
 ): string {
     if (scope === 'premium_view') {
@@ -263,7 +266,7 @@ export function clampNavigableYearMonth(
         employee,
         referenceYearMonth,
         options.scope,
-        options.timing ?? 'same_month',
+        options.timing ?? APP_INSURANCE_PREMIUM_COLLECTION_TIMING,
         options.latestConfirmedWorkYearMonth ?? null,
     );
     let ym = targetYearMonth;

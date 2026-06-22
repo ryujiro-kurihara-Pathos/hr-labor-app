@@ -6,13 +6,11 @@ import { Company } from '../models/company.model';
 import { AuthService } from '../../auth/services/auth.service';
 import { UserService } from '../../users/services/user.service';
 import { CompanyService } from '../services/company.service';
+import { insurancePremiumCollectionTimingLabel } from '../utils/company-payroll-settings.util';
 import {
-    insurancePremiumCollectionTimingLabel,
-    isValidInsurancePremiumCollectionSetting,
-    insurancePremiumCollectionSettingErrorMessage,
-    allowedInsurancePremiumCollectionTimings,
-} from '../utils/company-payroll-settings.util';
-import { InsurancePremiumCollectionTiming } from '../models/company.model';
+    APP_INSURANCE_PREMIUM_COLLECTION_TIMING,
+    INSURANCE_PREMIUM_COLLECTION_TIMING_APP_NOTE,
+} from '../models/company.model';
 
 import { OfficeCreateModalComponent, OfficeFormData } from '../components/office-create-modal.component';
 import { OfficeNameDuplicateError, OfficeService } from '../services/office.service';
@@ -48,18 +46,18 @@ export class CompanyPageComponent {
     representativeName = '';
     companyAddress = '';
     payrollPaymentMonthOffset: 0 | 1 = 1;
-    insurancePremiumCollectionTiming: InsurancePremiumCollectionTiming = 'next_month';
 
     readonly insurancePremiumCollectionTimingLabel = insurancePremiumCollectionTimingLabel;
+    readonly insurancePremiumCollectionTimingAppNote = INSURANCE_PREMIUM_COLLECTION_TIMING_APP_NOTE;
 
     readonly payrollPaymentMonthHelpLines = [
         '給与を支払う月です。当月または翌月から選択します。',
     ];
 
     readonly insurancePremiumCollectionHelpLines = [
-        '給与から控除する保険料の対象月（当月徴収 / 翌月徴収）です。',
-        '保険料対象月は給与支払月以前である必要があります。',
-        '給与支払が翌月の場合、当月徴収（支払月の保険料を先に控除）は選べません。',
+        '前月分の保険料を、当月の給与から控除します（翌月徴収）。',
+        '例）5月の給与から控除するのは4月分の保険料です。',
+        INSURANCE_PREMIUM_COLLECTION_TIMING_APP_NOTE,
     ];
 
     // 事業所一覧
@@ -138,15 +136,6 @@ export class CompanyPageComponent {
             return;
         }
 
-        const insuranceSettingError = insurancePremiumCollectionSettingErrorMessage(
-            this.payrollPaymentMonthOffset,
-            this.insurancePremiumCollectionTiming,
-        );
-        if (insuranceSettingError) {
-            this.errorMessage.set(insuranceSettingError);
-            return;
-        }
-
         this.isSavingCompany.set(true);
         this.errorMessage.set('');
 
@@ -156,7 +145,7 @@ export class CompanyPageComponent {
                 representativeName,
                 address,
                 payrollPaymentMonthOffset: this.payrollPaymentMonthOffset,
-                insurancePremiumCollectionTiming: this.insurancePremiumCollectionTiming,
+                insurancePremiumCollectionTiming: APP_INSURANCE_PREMIUM_COLLECTION_TIMING,
             });
             this.company.set({
                 ...company,
@@ -164,7 +153,7 @@ export class CompanyPageComponent {
                 representativeName,
                 address,
                 payrollPaymentMonthOffset: this.payrollPaymentMonthOffset,
-                insurancePremiumCollectionTiming: this.insurancePremiumCollectionTiming,
+                insurancePremiumCollectionTiming: APP_INSURANCE_PREMIUM_COLLECTION_TIMING,
             });
             this.isEditingCompany.set(false);
         } catch (error) {
@@ -180,17 +169,6 @@ export class CompanyPageComponent {
         this.representativeName = company.representativeName;
         this.companyAddress = company.address;
         this.payrollPaymentMonthOffset = company.payrollPaymentMonthOffset;
-        this.insurancePremiumCollectionTiming = company.insurancePremiumCollectionTiming;
-    }
-
-    isInsurancePremiumCollectionTimingAllowed(timing: InsurancePremiumCollectionTiming): boolean {
-        return allowedInsurancePremiumCollectionTimings(this.payrollPaymentMonthOffset).includes(timing);
-    }
-
-    onPayrollPaymentMonthOffsetChange(): void {
-        if (!this.isInsurancePremiumCollectionTimingAllowed(this.insurancePremiumCollectionTiming)) {
-            this.insurancePremiumCollectionTiming = 'next_month';
-        }
     }
 
     formatOfficeAddress(office: Office): string {

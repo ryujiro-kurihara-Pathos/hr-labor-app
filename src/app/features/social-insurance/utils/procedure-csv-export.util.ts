@@ -1,4 +1,4 @@
-import { BonusReward } from '../../bonus/models/bonus-reward.model';
+import { AggregatedMonthlyBonusPayment } from '../../bonus/utils/aggregate-monthly-bonus-payment.util';
 import { Company } from '../../company/models/company.model';
 import { Office } from '../../company/models/office.model';
 import { Dependent, Employee } from '../../employee/models/employee.models';
@@ -21,7 +21,7 @@ import { procedureTypeLabel } from './procedure-display.util';
 export type ProcedureCsvExportContext = {
     lossDate?: string | null;
     dependent?: Dependent | null;
-    bonusReward?: BonusReward | null;
+    bonusPayment?: AggregatedMonthlyBonusPayment | null;
     regularDecision?: {
         averageMonthlyReward: number;
         healthStandardAmount: number;
@@ -144,13 +144,13 @@ export function buildProcedureCsvExport(params: {
             }
 
             case 'bonusPayment': {
-                if (!office || !employee || !context.bonusReward) {
+                if (!office || !employee || !context.bonusPayment) {
                     return { ok: false, error: '賞与支払届の出力データが不足しています' };
                 }
                 const row = createBonusPaymentCsvRow({
                     office,
                     employee,
-                    bonusReward: context.bonusReward,
+                    bonusPayment: context.bonusPayment,
                     procedure,
                 });
                 return success(row, procedure, employee);

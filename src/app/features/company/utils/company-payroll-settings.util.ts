@@ -1,6 +1,7 @@
 import { addMonthsToYearMonth } from '../../insurance/utils/reward-target-month.util';
 import { formatYearMonthLabel } from '../../insurance/utils/standard-remuneration-determination.util';
 import {
+    APP_INSURANCE_PREMIUM_COLLECTION_TIMING,
     Company,
     DEFAULT_COMPANY_PAYROLL_SETTINGS,
     InsurancePremiumCollectionTiming,
@@ -12,18 +13,9 @@ export function normalizeCompanyPayrollSettings(
     const payrollPaymentMonthOffset =
         company.payrollPaymentMonthOffset ?? DEFAULT_COMPANY_PAYROLL_SETTINGS.payrollPaymentMonthOffset;
 
-    const storedTiming = company.insurancePremiumCollectionTiming;
-    let insurancePremiumCollectionTiming =
-        storedTiming
-        ?? resolveInsurancePremiumCollectionTiming(payrollPaymentMonthOffset);
-
-    if (!isValidInsurancePremiumCollectionSetting(payrollPaymentMonthOffset, insurancePremiumCollectionTiming)) {
-        insurancePremiumCollectionTiming = resolveInsurancePremiumCollectionTiming(payrollPaymentMonthOffset);
-    }
-
     return {
         payrollPaymentMonthOffset,
-        insurancePremiumCollectionTiming,
+        insurancePremiumCollectionTiming: APP_INSURANCE_PREMIUM_COLLECTION_TIMING,
     };
 }
 

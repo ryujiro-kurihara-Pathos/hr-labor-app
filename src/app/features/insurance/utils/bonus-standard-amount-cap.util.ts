@@ -43,36 +43,25 @@ function premiumableFiscalYearBonuses(
         .sort(compareBonusChronologically);
 }
 
-function cumulativeHealthCarePremiumableUsed(bonuses: BonusReward[]): number {
-    let used = 0;
-    for (const bonus of bonuses) {
-        const amount = Math.max(0, bonus.standardBonusAmount);
-        const allocatable = Math.min(
-            amount,
-            Math.max(0, HEALTH_CARE_BONUS_STANDARD_AMOUNT_ANNUAL_CAP - used),
-        );
-        used += allocatable;
-    }
-    return used;
-}
-
-function allocateHealthCarePremiumable(
-    bonuses: BonusReward[],
-    startingUsed: number,
+function allocateHealthCarePremiumableForMonth(
+    fiscalBonuses: BonusReward[],
+    monthBonusIds: ReadonlySet<string>,
 ): { total: number; perBonus: Map<string, number> } {
-    let used = startingUsed;
+    let used = 0;
     let total = 0;
     const perBonus = new Map<string, number>();
 
-    for (const bonus of bonuses) {
+    for (const bonus of fiscalBonuses) {
         const amount = Math.max(0, bonus.standardBonusAmount);
         const allocatable = Math.min(
             amount,
             Math.max(0, HEALTH_CARE_BONUS_STANDARD_AMOUNT_ANNUAL_CAP - used),
         );
-        perBonus.set(bonus.id, allocatable);
-        total += allocatable;
         used += allocatable;
+        if (monthBonusIds.has(bonus.id)) {
+            perBonus.set(bonus.id, allocatable);
+            total += allocatable;
+        }
     }
 
     return { total, perBonus };
@@ -99,15 +88,13 @@ export function resolveBonusPremiumableStandardAmounts(params: {
     );
     const pension = Math.min(monthStandardTotal, PENSION_BONUS_STANDARD_AMOUNT_MONTHLY_CAP);
 
-    const fiscalYearStart = healthInsuranceFiscalYearStartYear(liabilityYearMonth);
+    const fiscalYearReferenceMonth = sortedMonthBonuses[0]?.targetYearMonth ?? liabilityYearMonth;
+    const fiscalYearStart = healthInsuranceFiscalYearStartYear(fiscalYearReferenceMonth);
     const fiscalBonuses = premiumableFiscalYearBonuses(allBonuses, fiscalYearStart);
-    const priorBonuses = fiscalBonuses.filter(
-        (bonus) => bonus.targetYearMonth < liabilityYearMonth,
-    );
-    const priorUsed = cumulativeHealthCarePremiumableUsed(priorBonuses);
-    const { total: healthAndCare, perBonus: healthAndCarePerBonus } = allocateHealthCarePremiumable(
-        sortedMonthBonuses,
-        priorUsed,
+    const monthBonusIds = new Set(sortedMonthBonuses.map((bonus) => bonus.id));
+    const { total: healthAndCare, perBonus: healthAndCarePerBonus } = allocateHealthCarePremiumableForMonth(
+        fiscalBonuses,
+        monthBonusIds,
     );
 
     return { healthAndCare, pension, healthAndCarePerBonus };

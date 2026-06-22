@@ -1,7 +1,10 @@
 <div class="my-insurance-premium-page">
     <header class="page-header">
         <h1>保険料</h1>
-        <p class="page-note">あなたの社会保険料と標準報酬月額を確認できます。</p>
+        <p class="page-note">
+            あなたの社会保険料と標準報酬月額を確認できます。
+            {{ insurancePremiumCollectionTimingAppNote }}
+        </p>
     </header>
 
     @if (isLoading()) {

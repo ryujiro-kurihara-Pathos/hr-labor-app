@@ -19,6 +19,7 @@ import { SocialInsuranceProcedureService } from '../../social-insurance/services
 import { CompanyService } from '../../company/services/company.service';
 import { OfficeService } from '../../company/services/office.service';
 import { resolveOfficePrefecture } from '../../company/utils/office-prefecture.util';
+import { APP_INSURANCE_PREMIUM_COLLECTION_TIMING } from '../../company/models/company.model';
 import { resolvePremiumLiabilityYearMonth, resolvePremiumStandardDeterminationYearMonth } from '../../company/utils/company-payroll-settings.util';
 import { StandardMonthlyRewardService } from '../../insurance/services/standard-monthly-reward.service';
 import { StandardRemunerationDeterminationService } from '../../insurance/services/standard-remuneration-determination.service';
@@ -37,7 +38,9 @@ import {
 import { confirmedRewardsByYearMonth } from '../../insurance/utils/reward-status.util';
 import { findCareInsuranceRate, findHealthInsuranceRate } from '../../insurance-rate/utils/insurance-rate-lookup.util';
 import { KYOKAI_HEALTH_INSURANCE_RATE_FILES } from '../../insurance-rate/data/insurance-rates';
-import { roundInsurancePremium } from '../../insurance/utils/insurance-premium-rounding.util';
+import { calculateInsurancePremiumShares } from '../../insurance/utils/insurance-premium-rounding.util';
+import { resolveMonthlyPremiumStandardAmounts } from '../../insurance/utils/insurance-premium-standard-amount.util';
+import { DEFAULT_PENSION_INSURANCE_TOTAL_RATE } from '../../insurance/utils/insurance-premium-rate-resolution.util';
 import { formatYearMonthLabel } from '../../insurance/utils/standard-remuneration-determination.util';
 import { isCareInsurancePremiumTargetMonth } from '../../social-insurance/utils/care-insurance-period.util';
 import {
@@ -331,7 +334,7 @@ export class MyPageComponent implements OnInit {
         const company = user
             ? await this.companyService.getCompanyById(user.companyId)
             : null;
-        const collectionTiming = company?.insurancePremiumCollectionTiming ?? 'same_month';
+        const collectionTiming = company?.insurancePremiumCollectionTiming ?? APP_INSURANCE_PREMIUM_COLLECTION_TIMING;
         const payrollOffset = company?.payrollPaymentMonthOffset ?? 1;
 
         const payYearMonth = this.currentYearMonth();
@@ -366,10 +369,9 @@ export class MyPageComponent implements OnInit {
             )
             : null;
 
-        const standardAmount =
-            effective?.isComplete && effective.calculation?.health
-                ? effective.calculation.health.standardMonthlyAmount
-                : null;
+        const standardAmounts = effective?.isComplete && effective.calculation?.health
+            ? resolveMonthlyPremiumStandardAmounts(effective.calculation)
+            : { health: null, pension: null, care: null };
 
         let healthPremium: number | null = null;
         let pensionPremium: number | null = null;
@@ -396,7 +398,7 @@ export class MyPageComponent implements OnInit {
                 employee.birthDate,
             );
 
-        if (standardAmount && office && (isHealthPremiumMonth || isPensionPremiumMonth)) {
+        if (office && (isHealthPremiumMonth || isPensionPremiumMonth)) {
             const fiscalYear = this.healthInsuranceFiscalYear(premiumTargetYearMonth);
             const fileName = `kyokai-health-insurance-rates-${fiscalYear}-03.ts`;
             const rates =
@@ -409,15 +411,22 @@ export class MyPageComponent implements OnInit {
             });
             const careRate = findCareInsuranceRate(premiumTargetYearMonth);
 
-            if (healthRate && isHealthPremiumMonth) {
-                healthPremium = roundInsurancePremium(standardAmount * healthRate.employeeRate);
+            if (healthRate && isHealthPremiumMonth && standardAmounts.health !== null) {
+                healthPremium = calculateInsurancePremiumShares(
+                    standardAmounts.health,
+                    healthRate.totalRate,
+                ).employeePremium;
             }
-            if (isPensionPremiumMonth) {
-                pensionPremium = roundInsurancePremium(standardAmount * 0.0915);
+            if (isPensionPremiumMonth && standardAmounts.pension !== null) {
+                pensionPremium = calculateInsurancePremiumShares(
+                    standardAmounts.pension,
+                    DEFAULT_PENSION_INSURANCE_TOTAL_RATE,
+                ).employeePremium;
             }
             if (
                 careRate &&
                 employee &&
+                standardAmounts.care !== null &&
                 isCareInsurancePremiumTargetMonth(
                     premiumTargetYearMonth,
                     insuranceStatus.healthInsuranceStartDate,
@@ -425,7 +434,10 @@ export class MyPageComponent implements OnInit {
                     employee.birthDate,
                 )
             ) {
-                carePremium = roundInsurancePremium(standardAmount * careRate.employeeRate);
+                carePremium = calculateInsurancePremiumShares(
+                    standardAmounts.care,
+                    careRate.totalRate,
+                ).employeePremium;
             }
         }
 
@@ -440,7 +452,7 @@ export class MyPageComponent implements OnInit {
             pensionPremium,
             carePremium,
             totalPremium,
-            standardAmount,
+            standardAmount: standardAmounts.health,
             description: effective?.description ?? '',
         });
     }

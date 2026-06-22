@@ -1,9 +1,10 @@
 <div class="insurance-premium-page">
     <header class="page-header">
-        <div>
+        <div class="page-header-main">
             <h1>保険料</h1>
             <p class="page-note">
                 確定済みの報酬・賞与から、給与控除する保険料を確認・CSV出力できます。
+                {{ insurancePremiumCollectionTimingAppNote }}
             </p>
         </div>
         @if (!isLoading() && employees().length > 0) {
@@ -19,7 +20,7 @@
     </header>
 
     @if (csvExportMessage()) {
-        <p class="csv-export-message" [class.error]="csvExportMessage().includes('できません')">
+        <p class="alert-banner" [class.error]="csvExportMessage().includes('できません')">
             {{ csvExportMessage() }}
         </p>
     }
@@ -29,14 +30,21 @@
             ←
         </button>
         <div class="month-picker">
-            <label for="target-year-month" class="month-label">控除する月</label>
-            <input
-                id="target-year-month"
-                type="month"
-                [ngModel]="targetYearMonth()"
-                (ngModelChange)="targetYearMonth.set($event); onTargetYearMonthChange()"
-            />
-            <span class="month-display">{{ targetYearMonthLabel() }}</span>
+            <span class="month-label">控除する月</span>
+            <div class="month-picker-main">
+                <input
+                    id="target-year-month"
+                    type="month"
+                    class="month-input"
+                    [ngModel]="targetYearMonth()"
+                    (ngModelChange)="targetYearMonth.set($event); onTargetYearMonthChange()"
+                />
+                <span class="month-display">{{ targetYearMonthLabel() }}</span>
+            </div>
+            <p class="month-context">
+                保険料対象：<strong>{{ premiumLiabilityYearMonthLabel() }}分</strong>
+                · 報酬参照：<a routerLink="/rewards" [queryParams]="{ ym: rewardInputYearMonthForPremiumBasis() }" class="inline-link">{{ rewardInputYearMonthLabel() }}</a>
+            </p>
         </div>
         <button type="button" class="month-nav-btn" (click)="shiftMonth(1)" [disabled]="isLoading()" aria-label="翌月">
             →
@@ -44,60 +52,73 @@
     </div>
 
     @if (isLoading()) {
-        <p class="loading">読み込み中...</p>
+        <p class="state-message loading">読み込み中...</p>
     } @else if (errorMessage()) {
-        <p class="error">{{ errorMessage() }}</p>
+        <p class="state-message error">{{ errorMessage() }}</p>
     } @else if (employees().length === 0) {
-        <p class="empty">従業員が登録されていません。</p>
-        <a routerLink="/employees/new" class="link">従業員を追加</a>
+        <div class="empty-state">
+            <p class="empty-state-title">従業員が登録されていません</p>
+            <p class="empty-state-desc">保険料を算出するには、先に従業員を登録してください。</p>
+            <a routerLink="/employees/new" class="btn primary-btn">従業員を追加</a>
+        </div>
     } @else {
-        <section class="summary-section">
-            <p class="summary">
-                算出可能 <strong>{{ calculablePremiumRows().length }}</strong> 名
-                @if (uncalculableTargetRowCount() > 0) {
-                    <span class="summary-excluded">
-                        · 算出不可 <strong>{{ uncalculableTargetRowCount() }}</strong> 名
-                    </span>
-                }
-                @if (excludedRowCount() > 0) {
-                    <span class="summary-excluded">
-                        · 対象外 <strong>{{ excludedRowCount() }}</strong> 名
-                    </span>
-                }
-            </p>
-            <div class="company-total-card">
-                <div class="company-total-label">会社負担合計（{{ targetYearMonthLabel() }}給与控除）</div>
-                <div class="company-total-value">{{ companyEmployerPremiumTotal() | number }} 円</div>
-                <p class="company-total-note">
-                    確定済みの報酬・賞与から算出 · {{ calculableEmployerPremiumRowCount() }} 名
-                </p>
+        <section class="summary-strip">
+            <div class="stat-card">
+                <span class="stat-card-label">算出可能</span>
+                <span class="stat-card-value ok">{{ calculablePremiumRows().length }}<span class="stat-card-unit">名</span></span>
+            </div>
+            <div class="stat-card" [class.attention]="uncalculableTargetRowCount() > 0">
+                <span class="stat-card-label">算出不可</span>
+                <span class="stat-card-value" [class.warn]="uncalculableTargetRowCount() > 0">
+                    {{ uncalculableTargetRowCount() }}<span class="stat-card-unit">名</span>
+                </span>
+            </div>
+            <div class="stat-card muted">
+                <span class="stat-card-label">対象外</span>
+                <span class="stat-card-value">{{ excludedRowCount() }}<span class="stat-card-unit">名</span></span>
+            </div>
+            <div class="stat-card highlight">
+                <span class="stat-card-label">本人負担合計</span>
+                <span class="stat-card-value">{{ totalEmployeePremium() | number }}<span class="stat-card-unit">円</span></span>
+            </div>
+            <div class="stat-card highlight accent">
+                <span class="stat-card-label">会社負担合計</span>
+                <span class="stat-card-value">{{ companyEmployerPremiumTotal() | number }}<span class="stat-card-unit">円</span></span>
+                <span class="stat-card-sub">{{ calculableEmployerPremiumRowCount() }}名分</span>
             </div>
         </section>
 
         <section class="list-section">
-            <h2 class="section-title">保険料一覧（{{ targetYearMonthLabel() }}給与控除）</h2>
+            <div class="list-header">
+                <h2 class="section-title">保険料一覧</h2>
+                <span class="section-badge">{{ calculablePremiumRows().length }}名</span>
+            </div>
+            <p class="section-desc">{{ targetYearMonthLabel() }}給与控除分</p>
+
             @if (calculablePremiumRows().length === 0) {
-                <p class="section-empty">
-                    この月に算出できる保険料はありません。
+                <div class="section-empty-card">
+                    <p class="section-empty-title">この月に算出できる保険料はありません</p>
                     @if (unregisteredRows().length > 0) {
-                        <a routerLink="/rewards" [queryParams]="{ ym: rewardInputYearMonthForPremiumBasis() }">報酬入力画面</a>
-                        で報酬を登録してください。
+                        <p class="section-empty-desc">
+                            <a routerLink="/rewards" [queryParams]="{ ym: rewardInputYearMonthForPremiumBasis() }" class="inline-link">報酬入力（{{ rewardInputYearMonthLabel() }}）</a>
+                            で報酬を登録してください。
+                        </p>
                     }
-                </p>
+                </div>
             } @else {
                 <div class="table-wrap">
-                    <table class="reward-table">
+                    <table class="data-table">
                         <thead>
                             <tr>
-                                <th>従業員</th>
+                                <th class="sticky-col">従業員</th>
                                 <th>事業所</th>
-                                <th>本人負担</th>
-                                <th>会社負担</th>
-                                <th>報酬月額（基礎）</th>
-                                <th>健康保険（等級）</th>
-                                <th>健康保険（標準報酬月額）</th>
-                                <th>厚生年金（等級）</th>
-                                <th>厚生年金（標準報酬月額）</th>
+                                <th class="num col-premium">本人負担</th>
+                                <th class="num col-premium">会社負担</th>
+                                <th class="num">報酬月額</th>
+                                <th class="num">健保等級</th>
+                                <th class="num">健保標準</th>
+                                <th class="num">年金等級</th>
+                                <th class="num">年金標準</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -107,7 +128,7 @@
                                     [routerLink]="detailLink(row.employee.id)"
                                     [queryParams]="detailQueryParams()"
                                 >
-                                    <td class="name-cell">
+                                    <td class="sticky-col name-cell">
                                         <span class="employee-link">
                                             <span class="employee-avatar" aria-hidden="true">
                                                 {{ employeeInitial(row.employee) }}
@@ -123,27 +144,27 @@
                                             <span class="employee-link-arrow" aria-hidden="true">›</span>
                                         </span>
                                     </td>
-                                    <td>{{ officeNameById()[row.employee.officeId] || '—' }}</td>
-                                    <td class="num">
+                                    <td class="office-cell">{{ officeNameById()[row.employee.officeId] || '—' }}</td>
+                                    <td class="num col-premium premium-employee">
                                         @if (row.calculatedPremium; as premium) {
-                                            {{ premium.totalEmployeePremium | number }} 円
+                                            {{ premium.totalEmployeePremium | number }}<span class="cell-unit">円</span>
                                         } @else {
-                                            <span class="unsaved-label">—</span>
+                                            <span class="cell-empty">—</span>
                                         }
                                     </td>
-                                    <td class="num">
+                                    <td class="num col-premium premium-employer">
                                         @if (row.calculatedPremium; as premium) {
-                                            {{ premium.totalEmployerPremium | number }} 円
+                                            {{ premium.totalEmployerPremium | number }}<span class="cell-unit">円</span>
                                         } @else {
-                                            <span class="unsaved-label">—</span>
+                                            <span class="cell-empty">—</span>
                                         }
                                     </td>
                                     @if (row.effective.isComplete && row.effective.calculation) {
-                                        <td class="num">{{ row.effective.averageMonthlyReward ?? 0 | number }} 円</td>
-                                        <td class="num">{{ row.effective.calculation.health!.grade }}</td>
-                                        <td class="num">{{ row.effective.calculation.health!.standardMonthlyAmount | number }} 円</td>
-                                        <td class="num">{{ row.effective.calculation.pension!.grade }}</td>
-                                        <td class="num">{{ row.effective.calculation.pension!.standardMonthlyAmount | number }} 円</td>
+                                        <td class="num">{{ row.effective.averageMonthlyReward ?? 0 | number }}<span class="cell-unit">円</span></td>
+                                        <td class="num grade-cell">{{ row.effective.calculation.health!.grade }}</td>
+                                        <td class="num">{{ row.effective.calculation.health!.standardMonthlyAmount | number }}<span class="cell-unit">円</span></td>
+                                        <td class="num grade-cell">{{ row.effective.calculation.pension!.grade }}</td>
+                                        <td class="num">{{ row.effective.calculation.pension!.standardMonthlyAmount | number }}<span class="cell-unit">円</span></td>
                                     } @else {
                                         <td colspan="5" class="incomplete-cell">{{ row.effective.description }}</td>
                                     }
@@ -154,236 +175,554 @@
                 </div>
             }
         </section>
+
+        @if (unregisteredRows().length > 0) {
+            <section class="list-section attention-section">
+                <div class="list-header">
+                    <h2 class="section-title">報酬未入力</h2>
+                    <span class="section-badge warn">{{ unregisteredRows().length }}名</span>
+                </div>
+                <p class="section-desc">
+                    {{ rewardInputYearMonthLabel() }}の報酬が未登録のため、保険料を算出できません。
+                </p>
+                <ul class="card-list">
+                    @for (row of unregisteredRows(); track row.employee.id) {
+                        <li>
+                            <a
+                                [routerLink]="['/rewards', row.employee.id]"
+                                [queryParams]="{ ym: rewardInputYearMonthForPremiumBasis() }"
+                                class="list-card"
+                            >
+                                <span class="employee-avatar" aria-hidden="true">
+                                    {{ employeeInitial(row.employee) }}
+                                </span>
+                                <span class="list-card-body">
+                                    <span class="list-card-header">
+                                        <span class="list-card-name">{{ employeeDisplayName(row.employee) }}</span>
+                                        <span class="status-pill warn">未入力</span>
+                                    </span>
+                                    <span class="list-card-meta">
+                                        {{ officeNameById()[row.employee.officeId] || '—' }}
+                                        · 社員番号 {{ row.employee.employeeNumber || '—' }}
+                                    </span>
+                                </span>
+                                <span class="list-card-arrow" aria-hidden="true">›</span>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
+
+        @if (calculableFailedRows().length > 0) {
+            <section class="list-section">
+                <div class="list-header">
+                    <h2 class="section-title">算出不可（報酬登録済）</h2>
+                    <span class="section-badge muted">{{ calculableFailedRows().length }}名</span>
+                </div>
+                <ul class="card-list compact">
+                    @for (row of calculableFailedRows(); track row.employee.id) {
+                        <li>
+                            <a
+                                [routerLink]="detailLink(row.employee.id)"
+                                [queryParams]="detailQueryParams()"
+                                class="list-card muted-card"
+                            >
+                                <span class="employee-avatar" aria-hidden="true">
+                                    {{ employeeInitial(row.employee) }}
+                                </span>
+                                <span class="list-card-body">
+                                    <span class="list-card-name">{{ employeeDisplayName(row.employee) }}</span>
+                                    <span class="list-card-meta">{{ row.effective.description }}</span>
+                                </span>
+                                <span class="list-card-arrow" aria-hidden="true">›</span>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
     }
 </div>
 
 <style>
     .insurance-premium-page {
-        max-width: 1100px;
+        max-width: 1200px;
         margin: 0 auto;
-        padding: 24px 16px 40px;
+        padding: 24px 16px 48px;
     }
-    .page-header h1 {
-        margin: 0 0 8px;
-        font-size: 22px;
-    }
+
     .page-header {
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
         gap: 16px;
+        margin-bottom: 4px;
     }
-    .csv-export-btn {
-        flex-shrink: 0;
+
+    .page-header-main h1 {
+        margin: 0 0 8px;
+        font-size: 22px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .page-note {
+        margin: 0;
+        max-width: 640px;
+        color: #6b7280;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         height: 40px;
         padding: 0 16px;
-        border: 1px solid #d1d5db;
         border-radius: 8px;
-        background: #fff;
-        color: #374151;
         font-size: 14px;
         font-weight: 600;
+        text-decoration: none;
         cursor: pointer;
         white-space: nowrap;
+        transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
     }
+
+    .primary-btn {
+        border: 1px solid #2563eb;
+        background: #2563eb;
+        color: #fff;
+    }
+
+    .primary-btn:hover {
+        background: #1d4ed8;
+        border-color: #1d4ed8;
+    }
+
+    .csv-export-btn {
+        flex-shrink: 0;
+        border: 1px solid #d1d5db;
+        background: #fff;
+        color: #374151;
+    }
+
     .csv-export-btn:hover:not(:disabled) {
-        border-color: #93c5fd;
+        border-color: #2563eb;
         color: #2563eb;
-        background: #f8fafc;
+        background: #eff6ff;
     }
+
     .csv-export-btn:disabled {
         opacity: 0.5;
         cursor: not-allowed;
     }
-    .csv-export-message {
-        margin: 0 0 16px;
+
+    .alert-banner {
+        margin: 12px 0 0;
         padding: 10px 14px;
         border-radius: 8px;
         background: #ecfdf5;
         border: 1px solid #a7f3d0;
         color: #065f46;
         font-size: 13px;
+        line-height: 1.5;
     }
-    .csv-export-message.error {
+
+    .alert-banner.error {
         background: #fef2f2;
         border-color: #fecaca;
         color: #b91c1c;
     }
-    .page-note {
-        margin: 0;
-        color: #6b7280;
-        font-size: 14px;
-    }
+
     .month-toolbar {
         display: flex;
-        align-items: center;
+        align-items: stretch;
         gap: 12px;
         margin: 20px 0 24px;
-        padding: 16px;
-        background: #f9fafb;
+        padding: 18px 20px;
+        background: #fff;
         border: 1px solid #e5e7eb;
-        border-radius: 12px;
+        border-radius: 14px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
     }
+
     .month-nav-btn {
         flex-shrink: 0;
+        align-self: center;
         width: 40px;
         height: 40px;
         border: 1px solid #d1d5db;
-        border-radius: 8px;
-        background: #fff;
+        border-radius: 10px;
+        background: #f9fafb;
         font-size: 18px;
+        color: #374151;
         cursor: pointer;
+        transition: background 0.15s ease, border-color 0.15s ease;
     }
+
+    .month-nav-btn:hover:not(:disabled) {
+        background: #eff6ff;
+        border-color: #93c5fd;
+        color: #2563eb;
+    }
+
     .month-nav-btn:disabled {
-        opacity: 0.5;
+        opacity: 0.45;
         cursor: not-allowed;
     }
+
     .month-picker {
         flex: 1;
+        min-width: 0;
+    }
+
+    .month-label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #6b7280;
+        letter-spacing: 0.02em;
+    }
+
+    .month-picker-main {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        gap: 10px 16px;
+        gap: 10px 14px;
     }
-    .month-label {
-        font-size: 14px;
-        font-weight: 600;
-    }
-    .month-picker input[type='month'] {
+
+    .month-input {
         padding: 8px 10px;
         border: 1px solid #d1d5db;
         border-radius: 8px;
         font-size: 14px;
+        background: #fff;
     }
+
     .month-display {
-        font-size: 16px;
-        font-weight: 600;
-        color: #111827;
-    }
-    .loading,
-    .empty,
-    .section-empty {
-        color: #6b7280;
-        font-size: 14px;
-    }
-    .error {
-        color: #b91c1c;
-        font-size: 14px;
-        font-weight: 600;
-    }
-    .summary-section {
-        margin-bottom: 20px;
-        display: grid;
-        gap: 12px;
-    }
-    .company-total-card {
-        padding: 16px 20px;
-        border: 1px solid #bfdbfe;
-        border-radius: 12px;
-        background: #eff6ff;
-    }
-    .company-total-label {
-        font-size: 13px;
-        font-weight: 600;
-        color: #1d4ed8;
-        margin-bottom: 4px;
-    }
-    .company-total-value {
-        font-size: 28px;
+        font-size: 22px;
         font-weight: 700;
-        color: #1e3a8a;
-        line-height: 1.2;
+        color: #111827;
+        letter-spacing: -0.01em;
     }
-    .company-total-note {
+
+    .month-context {
         margin: 8px 0 0;
         font-size: 13px;
-        color: #3b82f6;
+        color: #6b7280;
+        line-height: 1.5;
     }
-    .unsaved-label {
-        color: #9ca3af;
-        font-size: 12px;
-    }
-    .summary {
-        margin: 0;
-        font-size: 14px;
+
+    .month-context strong {
         color: #374151;
+        font-weight: 700;
     }
-    .summary-excluded {
+
+    .inline-link {
+        color: #2563eb;
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .inline-link:hover {
+        text-decoration: underline;
+    }
+
+    .state-message {
+        margin: 0;
+        padding: 16px;
+        font-size: 14px;
+        border-radius: 10px;
+    }
+
+    .state-message.loading,
+    .state-message.error {
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+    }
+
+    .state-message.error {
+        color: #b91c1c;
+        background: #fef2f2;
+        border-color: #fecaca;
+    }
+
+    .state-message.loading {
         color: #6b7280;
     }
+
+    .empty-state {
+        padding: 40px 24px;
+        text-align: center;
+        background: #f9fafb;
+        border: 1px dashed #d1d5db;
+        border-radius: 14px;
+    }
+
+    .empty-state-title {
+        margin: 0 0 8px;
+        font-size: 16px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .empty-state-desc {
+        margin: 0 0 20px;
+        font-size: 14px;
+        color: #6b7280;
+    }
+
+    .summary-strip {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 24px;
+    }
+
+    .stat-card {
+        padding: 14px 16px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+    }
+
+    .stat-card.attention {
+        border-color: #fed7aa;
+        background: #fffbeb;
+    }
+
+    .stat-card.highlight {
+        background: #f8fafc;
+    }
+
+    .stat-card.highlight.accent {
+        border-color: #bfdbfe;
+        background: #eff6ff;
+    }
+
+    .stat-card-label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        color: #6b7280;
+        letter-spacing: 0.02em;
+    }
+
+    .stat-card-value {
+        font-size: 22px;
+        font-weight: 800;
+        color: #111827;
+        line-height: 1.2;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .stat-card-value.ok { color: #047857; }
+    .stat-card-value.warn { color: #c2410c; }
+
+    .stat-card-unit {
+        margin-left: 2px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #6b7280;
+    }
+
+    .stat-card-sub {
+        display: block;
+        margin-top: 4px;
+        font-size: 12px;
+        color: #3b82f6;
+    }
+
     .list-section {
-        margin-bottom: 28px;
+        margin-bottom: 32px;
     }
+
+    .attention-section .section-title {
+        color: #9a3412;
+    }
+
+    .list-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 4px;
+    }
+
     .section-title {
-        margin: 0 0 12px;
+        margin: 0;
         font-size: 17px;
+        font-weight: 700;
+        color: #111827;
     }
+
+    .section-badge {
+        padding: 2px 9px;
+        border-radius: 999px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .section-badge.warn {
+        background: #ffedd5;
+        color: #c2410c;
+    }
+
+    .section-badge.muted {
+        background: #f3f4f6;
+        color: #6b7280;
+    }
+
+    .section-desc {
+        margin: 0 0 14px;
+        font-size: 13px;
+        color: #6b7280;
+    }
+
+    .section-empty-card {
+        padding: 28px 20px;
+        text-align: center;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+    }
+
+    .section-empty-title {
+        margin: 0 0 6px;
+        font-size: 15px;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .section-empty-desc {
+        margin: 0;
+        font-size: 14px;
+        color: #6b7280;
+    }
+
     .table-wrap {
         overflow-x: auto;
         border: 1px solid #e5e7eb;
-        border-radius: 10px;
+        border-radius: 12px;
         background: #fff;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
     }
-    .reward-table {
+
+    .data-table {
         width: 100%;
         border-collapse: collapse;
         font-size: 13px;
     }
-    .reward-table th,
-    .reward-table td {
-        padding: 10px 12px;
+
+    .data-table th,
+    .data-table td {
+        padding: 12px 14px;
         border-bottom: 1px solid #f3f4f6;
         text-align: left;
         white-space: nowrap;
     }
-    .reward-table th {
+
+    .data-table th {
         background: #f9fafb;
-        font-weight: 600;
-        color: #374151;
+        font-size: 12px;
+        font-weight: 700;
+        color: #6b7280;
+        letter-spacing: 0.01em;
     }
+
+    .data-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .data-table .sticky-col {
+        position: sticky;
+        left: 0;
+        z-index: 1;
+        background: inherit;
+        box-shadow: 1px 0 0 #f3f4f6;
+    }
+
+    .data-table thead .sticky-col {
+        background: #f9fafb;
+        z-index: 2;
+    }
+
+    .data-table .col-premium {
+        background: #fafbff;
+    }
+
+    .data-table thead .col-premium {
+        background: #f1f5ff;
+        color: #1e40af;
+    }
+
     .clickable-row {
         cursor: pointer;
-        transition: background 0.15s ease;
+        transition: background 0.12s ease;
     }
+
     .clickable-row:hover {
         background: #f8fafc;
     }
+
+    .clickable-row:hover .sticky-col {
+        background: #f8fafc;
+    }
+
     .clickable-row:hover .employee-link-name {
         color: #2563eb;
     }
+
     .clickable-row:hover .employee-link-arrow {
         opacity: 1;
         transform: translateX(2px);
         color: #2563eb;
     }
+
     .name-cell {
-        min-width: 180px;
+        min-width: 200px;
     }
+
+    .office-cell {
+        color: #4b5563;
+        max-width: 140px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
     .employee-link {
         display: inline-flex;
         align-items: center;
         gap: 10px;
         max-width: 100%;
     }
+
     .employee-avatar {
         display: inline-flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
-        width: 34px;
-        height: 34px;
+        width: 36px;
+        height: 36px;
         border-radius: 999px;
         background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
         color: #1d4ed8;
         font-size: 13px;
         font-weight: 800;
     }
+
     .employee-link-body {
         display: flex;
         flex-direction: column;
         gap: 2px;
         min-width: 0;
     }
+
     .employee-link-name {
         font-size: 14px;
         font-weight: 700;
@@ -391,11 +730,13 @@
         line-height: 1.3;
         transition: color 0.15s ease;
     }
+
     .employee-link-meta {
         font-size: 11px;
-        color: #6b7280;
+        color: #9ca3af;
         line-height: 1.3;
     }
+
     .employee-link-arrow {
         flex-shrink: 0;
         margin-left: auto;
@@ -406,45 +747,60 @@
         transform: translateX(0);
         transition: opacity 0.15s ease, transform 0.15s ease, color 0.15s ease;
     }
+
     .num {
         text-align: right;
+        font-variant-numeric: tabular-nums;
     }
+
+    .grade-cell {
+        color: #4b5563;
+        font-weight: 600;
+    }
+
+    .cell-unit {
+        margin-left: 2px;
+        font-size: 11px;
+        color: #9ca3af;
+        font-weight: 500;
+    }
+
+    .cell-empty {
+        color: #d1d5db;
+    }
+
+    .premium-employee {
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .premium-employer {
+        font-weight: 600;
+        color: #1e40af;
+    }
+
     .incomplete-cell {
         color: #6b7280;
         font-size: 12px;
         white-space: normal;
         line-height: 1.4;
     }
-    .determination-badge {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 999px;
-        font-size: 11px;
-        font-weight: 700;
-        white-space: nowrap;
-    }
-    .determination-badge.initial {
-        background: #dbeafe;
-        color: #1e40af;
-    }
-    .determination-badge.regular {
-        background: #ede9fe;
-        color: #5b21b6;
-    }
-    .determination-badge.revision {
-        background: #ffedd5;
-        color: #9a3412;
-    }
-    .unregistered-list {
+
+    .card-list {
         list-style: none;
         margin: 0;
         padding: 0;
         display: grid;
         gap: 8px;
     }
-    .unregistered-card {
+
+    .card-list.compact {
+        gap: 6px;
+    }
+
+    .list-card {
         display: flex;
-        align-items: flex-start;
+        align-items: center;
         gap: 12px;
         padding: 14px 16px;
         border: 1px solid #e5e7eb;
@@ -452,64 +808,104 @@
         background: #fff;
         text-decoration: none;
         color: inherit;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
         transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
     }
-    .unregistered-card:hover {
+
+    .list-card:hover {
         border-color: #93c5fd;
         background: #f8fafc;
         box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
         transform: translateY(-1px);
     }
-    .unregistered-card:hover .employee-link-name,
-    .unregistered-card:hover .employee-name {
+
+    .list-card:hover .list-card-name {
         color: #2563eb;
     }
-    .unregistered-card:hover .employee-link-arrow {
+
+    .list-card:hover .list-card-arrow {
         opacity: 1;
         transform: translateX(2px);
         color: #2563eb;
     }
-    .unregistered-card-body {
+
+    .list-card.muted-card {
+        background: #fafafa;
+    }
+
+    .list-card-body {
         flex: 1;
         min-width: 0;
     }
-    .unregistered-card .employee-link-arrow {
-        align-self: center;
-        opacity: 0.35;
-    }
-    .unregistered-header {
+
+    .list-card-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 8px;
-        margin-bottom: 4px;
+        margin-bottom: 2px;
     }
-    .employee-name {
+
+    .list-card-name {
         font-weight: 700;
         font-size: 15px;
         color: #111827;
         transition: color 0.15s ease;
     }
-    .status-badge {
+
+    .list-card-meta {
+        display: block;
+        font-size: 13px;
+        color: #6b7280;
+        line-height: 1.4;
+    }
+
+    .list-card-arrow {
+        flex-shrink: 0;
+        font-size: 18px;
+        color: #9ca3af;
+        opacity: 0.35;
+        transition: opacity 0.15s ease, transform 0.15s ease, color 0.15s ease;
+    }
+
+    .status-pill {
         flex-shrink: 0;
         padding: 3px 9px;
         border-radius: 999px;
-        background: #fff7ed;
-        border: 1px solid #fed7aa;
-        color: #c2410c;
         font-size: 11px;
         font-weight: 700;
     }
-    .employee-meta {
-        margin: 0 0 4px;
-        font-size: 13px;
-        color: #6b7280;
+
+    .status-pill.warn {
+        background: #fff7ed;
+        border: 1px solid #fed7aa;
+        color: #c2410c;
     }
-    .unregistered-note {
-        margin: 0;
-        font-size: 12px;
-        color: #6b7280;
-        line-height: 1.5;
+
+    @media (max-width: 960px) {
+        .summary-strip {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .stat-card.highlight {
+            grid-column: span 2;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .page-header {
+            flex-direction: column;
+        }
+
+        .month-display {
+            font-size: 18px;
+        }
+
+        .summary-strip {
+            grid-template-columns: 1fr;
+        }
+
+        .stat-card.highlight {
+            grid-column: auto;
+        }
     }
 </style>

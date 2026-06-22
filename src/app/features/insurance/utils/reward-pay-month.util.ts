@@ -216,6 +216,21 @@ export function isJoinPayMonthView(
     return Boolean(joinYm && payYearMonth === joinYm);
 }
 
+/** 入社月表示時の説明（翌月払いで給与支給がない場合） */
+export function joinPayMonthDisplayNote(
+    employee: Employee,
+    payYearMonth: string,
+    payrollPaymentMonthOffset: PayrollPaymentMonthOffset,
+): string | null {
+    if (!isJoinPayMonthView(employee, payYearMonth)) return null;
+    if (payrollPaymentMonthOffset !== 1) return null;
+    if (isSalaryPayMonthTarget(employee, payYearMonth, payrollPaymentMonthOffset)) return null;
+
+    const joinYm = yearMonthFromDateString(employee.joinedDate)!;
+    const nextPayLabel = formatYearMonthLabel(addMonthsToYearMonth(joinYm, 1));
+    return `翌月払いのため、入社月（${formatYearMonthLabel(joinYm)}）の給与支給はありません。資格取得届用の報酬は見込み給与または賞与で登録できます。給与の入力は${nextPayLabel}支給分から行ってください。`;
+}
+
 /** 翌月払いの入社月（給与支給なし・報酬月額0円） */
 export function isJoinMonthWithNextMonthPay(
     employee: Employee,
@@ -235,21 +250,6 @@ export function isJoinMonthZeroPremiumDeductionView(
     collectionTiming: InsurancePremiumCollectionTiming,
 ): boolean {
     return collectionTiming === 'next_month' && isJoinPayMonthView(employee, payYearMonth);
-}
-
-/** 入社月表示時の説明（翌月払いで給与支給がない場合） */
-export function joinPayMonthDisplayNote(
-    employee: Employee,
-    payYearMonth: string,
-    payrollPaymentMonthOffset: PayrollPaymentMonthOffset,
-): string | null {
-    if (!isJoinPayMonthView(employee, payYearMonth)) return null;
-    if (payrollPaymentMonthOffset !== 1) return null;
-    if (isSalaryPayMonthTarget(employee, payYearMonth, payrollPaymentMonthOffset)) return null;
-
-    const joinYm = yearMonthFromDateString(employee.joinedDate)!;
-    const nextPayLabel = formatYearMonthLabel(addMonthsToYearMonth(joinYm, 1));
-    return `翌月払いのため、入社月（${formatYearMonthLabel(joinYm)}）の給与支給はありません。資格取得届用の報酬は見込み給与または賞与で登録できます。給与の入力は${nextPayLabel}支給分から行ってください。`;
 }
 
 export function clampRewardNavigationPayYearMonth(
