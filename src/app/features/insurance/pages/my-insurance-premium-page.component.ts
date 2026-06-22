@@ -25,7 +25,7 @@ import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 import {
     findLatestConfirmedPayYearMonth,
     isJoinMonthZeroPremiumDeductionView,
-    isRewardConfirmedForPayMonth,
+    isPremiumBasisRewardConfirmed,
 } from '../utils/reward-pay-month.util';
 import { StandardMonthlyRewardService } from '../services/standard-monthly-reward.service';
 import { StandardRemunerationDeterminationService } from '../services/standard-remuneration-determination.service';
@@ -282,11 +282,10 @@ export class MyInsurancePremiumPageComponent implements OnInit {
             this.latestConfirmedWorkYearMonth(),
         ).filter(
             (payYearMonth) => {
-                const liabilityYearMonth = resolvePremiumLiabilityYearMonth(payYearMonth, timing);
-                return !isRewardConfirmedForPayMonth(
+                return !isPremiumBasisRewardConfirmed(
                     rewardsByYearMonth,
-                    liabilityYearMonth,
-                    this.company()?.payrollPaymentMonthOffset ?? 1,
+                    payYearMonth,
+                    timing,
                 );
             },
         );
@@ -333,10 +332,10 @@ export class MyInsurancePremiumPageComponent implements OnInit {
         const rewardsByYearMonth = Object.fromEntries(
             this.allRewards().map((item) => [item.targetYearMonth, item]),
         );
-        return isRewardConfirmedForPayMonth(
+        return isPremiumBasisRewardConfirmed(
             rewardsByYearMonth,
             payYearMonth,
-            this.company()?.payrollPaymentMonthOffset ?? 1,
+            this.insurancePremiumCollectionTiming(),
         );
     });
 

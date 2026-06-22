@@ -20,8 +20,8 @@ import { bonusesForStandardBonusPremium } from '../utils/effective-monthly-rewar
 import { resolveBonusPremiumableStandardAmounts } from '../utils/bonus-standard-amount-cap.util';
 import { resolveInsurancePremiumRates } from '../utils/insurance-premium-rate-resolution.util';
 import { roundInsurancePremium } from '../utils/insurance-premium-rounding.util';
-import { lookupExactRewardByPayMonth } from '../utils/reward-pay-month.util';
-import { isRewardConfirmed, savedRewardsForPremiumCalculation } from '../utils/reward-status.util';
+import { isPremiumBasisRewardConfirmed } from '../utils/reward-pay-month.util';
+import { savedRewardsForPremiumCalculation } from '../utils/reward-status.util';
 import { addMonthsToYearMonth } from '../utils/reward-target-month.util';
 import { getQualificationDate, PayrollPaymentMonthOffset } from '../utils/standard-remuneration-determination.util';
 
@@ -102,7 +102,7 @@ export class InsurancePremiumCalculationService {
         const liabilityYearMonth = resolvePremiumLiabilityYearMonth(payYearMonth, collectionTiming);
         if (!liabilityYearMonth) return null;
 
-        if (!isRewardConfirmed(lookupExactRewardByPayMonth(rewardsByYearMonth, payYearMonth))) {
+        if (!isPremiumBasisRewardConfirmed(rewardsByYearMonth, payYearMonth, collectionTiming)) {
             return null;
         }
 

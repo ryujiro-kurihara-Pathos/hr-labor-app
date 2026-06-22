@@ -1,6 +1,9 @@
 import { Company, InsurancePremiumCollectionTiming } from '../../company/models/company.model';
 import { Employee } from '../../employee/models/employee.models';
-import { resolvePayrollDateInYearMonth } from '../../company/utils/company-payroll-settings.util';
+import {
+    resolvePayrollDateInYearMonth,
+    resolvePremiumLiabilityYearMonth,
+} from '../../company/utils/company-payroll-settings.util';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 import { isRewardConfirmed } from './reward-status.util';
 import {
@@ -40,6 +43,43 @@ export function rewardLookupKeysForPayMonth(
         }
     }
     return keys;
+}
+
+/**
+ * 保険料算出の根拠となる報酬の支給年月。
+ * 翌月徴収では給与控除月の前月（保険料対象月）の報酬を参照する。
+ */
+export function resolvePremiumBasisRewardPayYearMonth(
+    deductionPayYearMonth: string,
+    collectionTiming: InsurancePremiumCollectionTiming,
+): string {
+    return resolvePremiumLiabilityYearMonth(deductionPayYearMonth, collectionTiming);
+}
+
+/** 保険料算出の根拠月の報酬が確定済みか */
+export function isPremiumBasisRewardConfirmed(
+    rewardsByYearMonth: Record<string, StandardMonthlyReward>,
+    deductionPayYearMonth: string,
+    collectionTiming: InsurancePremiumCollectionTiming,
+): boolean {
+    const basisPayYearMonth = resolvePremiumBasisRewardPayYearMonth(
+        deductionPayYearMonth,
+        collectionTiming,
+    );
+    return isRewardConfirmed(lookupExactRewardByPayMonth(rewardsByYearMonth, basisPayYearMonth));
+}
+
+/** 保険料算出の根拠となる報酬レコード */
+export function lookupPremiumBasisReward(
+    rewardsByYearMonth: Record<string, StandardMonthlyReward>,
+    deductionPayYearMonth: string,
+    collectionTiming: InsurancePremiumCollectionTiming,
+): StandardMonthlyReward | null {
+    const basisPayYearMonth = resolvePremiumBasisRewardPayYearMonth(
+        deductionPayYearMonth,
+        collectionTiming,
+    );
+    return lookupExactRewardByPayMonth(rewardsByYearMonth, basisPayYearMonth);
 }
 
 /** 支給年月キーに一致する報酬のみ（確定状態の判定に使用） */

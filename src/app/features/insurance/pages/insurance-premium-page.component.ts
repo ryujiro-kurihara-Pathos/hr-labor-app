@@ -24,7 +24,11 @@ import { ManualInsurancePremiumRateService } from '../services/manual-insurance-
 import { ManualInsurancePremiumRates } from '../models/manual-insurance-premium-rate.model';
 import { resolvePremiumLiabilityYearMonth, resolvePremiumStandardDeterminationYearMonth } from '../../company/utils/company-payroll-settings.util';
 import { addMonthsToYearMonth, isPremiumViewableYearMonth } from '../utils/reward-target-month.util';
-import { lookupExactRewardByPayMonth, findLatestConfirmedPayYearMonth } from '../utils/reward-pay-month.util';
+import {
+    findLatestConfirmedPayYearMonth,
+    lookupPremiumBasisReward,
+    resolvePremiumBasisRewardPayYearMonth,
+} from '../utils/reward-pay-month.util';
 import { isRewardConfirmed } from '../utils/reward-status.util';
 import { exportInsurancePremiumCsv } from '../utils/insurance-premium-csv-export.util';
 import { buildSocialInsuranceJoinJudgmentContext } from '../../social-insurance/utils/social-insurance-join-status.util';
@@ -77,14 +81,13 @@ export class InsurancePremiumPageComponent {
 
     targetYearMonthLabel = computed(() => this.formatYearMonth(this.targetYearMonth()));
 
-    /** 保険料算出に必要な報酬の支給年月（翌月徴収時は控除月の前月） */
-    rewardInputYearMonthForPremiumBasis = computed((): string => {
-        const displayYearMonth = this.targetYearMonth();
-        return resolvePremiumLiabilityYearMonth(
-            displayYearMonth,
+    /** 報酬入力リンク先の支給年月（翌月徴収時は保険料対象月＝給与控除月の前月） */
+    rewardInputYearMonthForPremiumBasis = computed((): string =>
+        resolvePremiumBasisRewardPayYearMonth(
+            this.targetYearMonth(),
             this.insurancePremiumCollectionTiming(),
-        ) ?? displayYearMonth;
-    });
+        ),
+    );
 
     registeredRows = computed(() =>
         this.buildRows().filter((row) => row.isTargetMonth && row.isRegistered),
@@ -240,7 +243,7 @@ export class InsurancePremiumPageComponent {
         return this.employees().map((employee) => {
             const employeeRewards = byEmployee[employee.id] ?? {};
             const liabilityYearMonth = resolvePremiumLiabilityYearMonth(payYearMonth, collectionTiming) ?? payYearMonth;
-            const reward = lookupExactRewardByPayMonth(employeeRewards, payYearMonth);
+            const reward = lookupPremiumBasisReward(employeeRewards, payYearMonth, collectionTiming);
             const latestConfirmedWorkYearMonth = findLatestConfirmedPayYearMonth(employeeRewards, offset);
             const isTargetMonth = isPremiumViewableYearMonth(
                 employee,
