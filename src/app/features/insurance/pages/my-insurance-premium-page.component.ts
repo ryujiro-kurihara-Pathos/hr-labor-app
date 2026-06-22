@@ -24,8 +24,8 @@ import { SocialInsuranceStatusService } from '../../social-insurance/services/so
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 import {
     findLatestConfirmedPayYearMonth,
+    isJoinMonthZeroPremiumDeductionView,
     isRewardConfirmedForPayMonth,
-    rewardLookupKeysForPayMonth,
 } from '../utils/reward-pay-month.util';
 import { StandardMonthlyRewardService } from '../services/standard-monthly-reward.service';
 import { StandardRemunerationDeterminationService } from '../services/standard-remuneration-determination.service';
@@ -189,6 +189,18 @@ export class MyInsurancePremiumPageComponent implements OnInit {
         () => this.insurancePremiumCollectionTiming() === 'next_month',
     );
 
+    /** 翌月徴収で控除月が入社月（保険料0円・報酬登録不要） */
+    isJoinMonthZeroPremiumDeductionView = computed((): boolean => {
+        const employee = this.employee();
+        const payYearMonth = this.targetYearMonth();
+        if (!employee || !payYearMonth) return false;
+        return isJoinMonthZeroPremiumDeductionView(
+            employee,
+            payYearMonth,
+            this.insurancePremiumCollectionTiming(),
+        );
+    });
+
     viewableMinYearMonth = computed(() => {
         const employee = this.employee();
         return employee ? viewableYearMonthMin(employee) : null;
@@ -316,14 +328,14 @@ export class MyInsurancePremiumPageComponent implements OnInit {
     });
 
     liabilityMonthHasConfirmedReward = computed((): boolean => {
-        const liabilityYearMonth = this.premiumLiabilityYearMonth();
-        if (!liabilityYearMonth) return false;
+        const payYearMonth = this.targetYearMonth();
+        if (!payYearMonth) return false;
         const rewardsByYearMonth = Object.fromEntries(
             this.allRewards().map((item) => [item.targetYearMonth, item]),
         );
         return isRewardConfirmedForPayMonth(
             rewardsByYearMonth,
-            liabilityYearMonth,
+            payYearMonth,
             this.company()?.payrollPaymentMonthOffset ?? 1,
         );
     });
@@ -375,6 +387,8 @@ export class MyInsurancePremiumPageComponent implements OnInit {
     });
 
     showZeroMonthlyPremiumDueToCollectionTiming = computed((): boolean => {
+        if (this.isJoinMonthZeroPremiumDeductionView()) return true;
+
         if (this.hasMonthlyPremiumDisplay()) return false;
 
         const liabilityYearMonth = this.premiumLiabilityYearMonth();
@@ -456,13 +470,15 @@ export class MyInsurancePremiumPageComponent implements OnInit {
         const enrollment = this.premiumEnrollmentUndeterminedReason();
         if (enrollment) return enrollment;
 
+        if (this.isJoinMonthZeroPremiumDeductionView()) return null;
+
         if (!this.liabilityMonthHasConfirmedReward()) {
             if (this.showZeroMonthlyPremiumDueToCollectionTiming()) return null;
 
             const payLabel = this.targetYearMonthLabel();
             const basisLabel = this.premiumLiabilityYearMonthLabel();
             if (this.isNextMonthCollection() && basisLabel && basisLabel !== payLabel) {
-                return `${payLabel}に払う保険料を表示するには、${basisLabel}の報酬を確定してください。`;
+                return `${payLabel}に払う保険料を表示するには、${payLabel}の報酬を確定してください。`;
             }
             return `${basisLabel || payLabel}の報酬が未確定のため、保険料を判定できません。`;
         }
@@ -472,6 +488,7 @@ export class MyInsurancePremiumPageComponent implements OnInit {
 
     canShowPremiumSummary = computed((): boolean => {
         if (this.isPremiumEnrollmentUndetermined()) return false;
+        if (this.isJoinMonthZeroPremiumDeductionView()) return true;
         if (this.premiumSummaryUndeterminedReason()) return false;
         return this.hasMonthlyPremiumDisplay()
             || this.isMonthlyPremiumNotSubject()
@@ -856,14 +873,7 @@ export class MyInsurancePremiumPageComponent implements OnInit {
                 this.insurancePremiumCollectionTiming(),
             );
 
-            const offset = this.company()?.payrollPaymentMonthOffset ?? 1;
-            let reward: StandardMonthlyReward | null = null;
-            if (liabilityYearMonth) {
-                for (const key of rewardLookupKeysForPayMonth(liabilityYearMonth, offset)) {
-                    reward = await this.rewardService.getByEmployeeAndMonth(employee.id, key);
-                    if (reward) break;
-                }
-            }
+            const reward = await this.rewardService.getByEmployeeAndMonth(employee.id, targetYearMonth);
 
             const allRewards = await this.rewardService.listByEmployee(employee.id);
 

@@ -24,7 +24,7 @@ import { ManualInsurancePremiumRateService } from '../services/manual-insurance-
 import { ManualInsurancePremiumRates } from '../models/manual-insurance-premium-rate.model';
 import { resolvePremiumLiabilityYearMonth, resolvePremiumStandardDeterminationYearMonth } from '../../company/utils/company-payroll-settings.util';
 import { addMonthsToYearMonth, isPremiumViewableYearMonth } from '../utils/reward-target-month.util';
-import { lookupRewardByPayMonth, findLatestConfirmedPayYearMonth } from '../utils/reward-pay-month.util';
+import { lookupExactRewardByPayMonth, findLatestConfirmedPayYearMonth } from '../utils/reward-pay-month.util';
 import { isRewardConfirmed } from '../utils/reward-status.util';
 import { exportInsurancePremiumCsv } from '../utils/insurance-premium-csv-export.util';
 
@@ -239,7 +239,7 @@ export class InsurancePremiumPageComponent {
         return this.employees().map((employee) => {
             const employeeRewards = byEmployee[employee.id] ?? {};
             const liabilityYearMonth = resolvePremiumLiabilityYearMonth(payYearMonth, collectionTiming) ?? payYearMonth;
-            const reward = lookupRewardByPayMonth(employeeRewards, liabilityYearMonth, offset);
+            const reward = lookupExactRewardByPayMonth(employeeRewards, payYearMonth);
             const latestConfirmedWorkYearMonth = findLatestConfirmedPayYearMonth(employeeRewards, offset);
             const isTargetMonth = isPremiumViewableYearMonth(
                 employee,

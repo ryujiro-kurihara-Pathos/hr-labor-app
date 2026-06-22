@@ -19,7 +19,7 @@ import { bonusesForStandardBonusPremium } from '../utils/effective-monthly-rewar
 import { resolveBonusPremiumableStandardAmounts } from '../utils/bonus-standard-amount-cap.util';
 import { resolveInsurancePremiumRates } from '../utils/insurance-premium-rate-resolution.util';
 import { roundInsurancePremium } from '../utils/insurance-premium-rounding.util';
-import { lookupRewardByPayMonth } from '../utils/reward-pay-month.util';
+import { lookupExactRewardByPayMonth } from '../utils/reward-pay-month.util';
 import { isRewardConfirmed, savedRewardsForPremiumCalculation } from '../utils/reward-status.util';
 import { addMonthsToYearMonth } from '../utils/reward-target-month.util';
 import { getQualificationDate, PayrollPaymentMonthOffset } from '../utils/standard-remuneration-determination.util';
@@ -99,12 +99,9 @@ export class InsurancePremiumCalculationService {
         const liabilityYearMonth = resolvePremiumLiabilityYearMonth(payYearMonth, collectionTiming);
         if (!liabilityYearMonth) return null;
 
-        const liabilityReward = lookupRewardByPayMonth(
-            rewardsByYearMonth,
-            liabilityYearMonth,
-            payrollPaymentMonthOffset,
-        );
-        if (!isRewardConfirmed(liabilityReward)) return null;
+        if (!isRewardConfirmed(lookupExactRewardByPayMonth(rewardsByYearMonth, payYearMonth))) {
+            return null;
+        }
 
         const savedRewards = savedRewardsForPremiumCalculation(rewardsByYearMonth);
         const standardDeterminationYearMonth = resolvePremiumStandardDeterminationYearMonth(

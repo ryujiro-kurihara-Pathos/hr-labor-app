@@ -1,4 +1,4 @@
-import { Company } from '../../company/models/company.model';
+import { Company, InsurancePremiumCollectionTiming } from '../../company/models/company.model';
 import { Employee } from '../../employee/models/employee.models';
 import { resolvePayrollDateInYearMonth } from '../../company/utils/company-payroll-settings.util';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
@@ -25,12 +25,29 @@ export function rewardRecordKeyForPayMonth(payYearMonth: string): string {
 export function rewardLookupKeysForPayMonth(
     payYearMonth: string,
     payrollPaymentMonthOffset: PayrollPaymentMonthOffset,
+    joinYearMonth: string | null = null,
 ): string[] {
     const keys = [payYearMonth];
     if (payrollPaymentMonthOffset === 1) {
-        keys.push(addMonthsToYearMonth(payYearMonth, -1));
+        const workMonthKey = addMonthsToYearMonth(payYearMonth, -1);
+        // 翌月払いの入社月キーは資格取得用。初回支給月以降のフォールバック対象にしない
+        const skipJoinMonthQualificationFallback =
+            joinYearMonth !== null
+            && workMonthKey === joinYearMonth
+            && payYearMonth > joinYearMonth;
+        if (!skipJoinMonthQualificationFallback) {
+            keys.push(workMonthKey);
+        }
     }
     return keys;
+}
+
+/** 支給年月キーに一致する報酬のみ（確定状態の判定に使用） */
+export function lookupExactRewardByPayMonth(
+    rewardsByYearMonth: Record<string, StandardMonthlyReward>,
+    payYearMonth: string,
+): StandardMonthlyReward | null {
+    return rewardsByYearMonth[payYearMonth] ?? null;
 }
 
 /** 支給年月で報酬を取得（旧データの勤務月キーにもフォールバック） */
@@ -38,42 +55,36 @@ export function lookupRewardByPayMonth(
     rewardsByYearMonth: Record<string, StandardMonthlyReward>,
     payYearMonth: string,
     payrollPaymentMonthOffset: PayrollPaymentMonthOffset,
+    joinYearMonth: string | null = null,
 ): StandardMonthlyReward | null {
-    for (const key of rewardLookupKeysForPayMonth(payYearMonth, payrollPaymentMonthOffset)) {
+    for (const key of rewardLookupKeysForPayMonth(
+        payYearMonth,
+        payrollPaymentMonthOffset,
+        joinYearMonth,
+    )) {
         const reward = rewardsByYearMonth[key];
         if (reward) return reward;
     }
     return null;
 }
 
-/** 支給年月の報酬が確定済みか */
+/** 支給年月の報酬が確定済みか（当該支給月キーのレコードのみ） */
 export function isRewardConfirmedForPayMonth(
     rewardsByYearMonth: Record<string, StandardMonthlyReward>,
     payYearMonth: string,
-    payrollPaymentMonthOffset: PayrollPaymentMonthOffset,
+    _payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
 ): boolean {
-    const reward = lookupRewardByPayMonth(rewardsByYearMonth, payYearMonth, payrollPaymentMonthOffset);
-    return isRewardConfirmed(reward);
+    return isRewardConfirmed(lookupExactRewardByPayMonth(rewardsByYearMonth, payYearMonth));
 }
 
 /** 確定済み報酬のうち、最も新しい支給年月 */
 export function findLatestConfirmedPayYearMonth(
     rewardsByYearMonth: Record<string, StandardMonthlyReward>,
-    payrollPaymentMonthOffset: PayrollPaymentMonthOffset,
+    _payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
 ): string | null {
-    const candidateKeys = new Set<string>();
-    for (const ym of Object.keys(rewardsByYearMonth)) {
-        candidateKeys.add(ym);
-        if (payrollPaymentMonthOffset === 1) {
-            candidateKeys.add(addMonthsToYearMonth(ym, 1));
-        }
-    }
-
     let latest: string | null = null;
-    for (const payYearMonth of candidateKeys) {
-        if (!isRewardConfirmedForPayMonth(rewardsByYearMonth, payYearMonth, payrollPaymentMonthOffset)) {
-            continue;
-        }
+    for (const payYearMonth of Object.keys(rewardsByYearMonth)) {
+        if (!isRewardConfirmedForPayMonth(rewardsByYearMonth, payYearMonth)) continue;
         if (!latest || payYearMonth > latest) {
             latest = payYearMonth;
         }
@@ -103,6 +114,34 @@ export function resolvePayMonthFromWorkMonth(
     return addMonthsToYearMonth(workYearMonth, 1);
 }
 
+/** 資格取得月の報酬が保存される支給年月キー（翌月払いは翌月キー） */
+export function resolveQualificationRewardPayYearMonth(
+    qualificationYearMonth: string,
+    payrollPaymentMonthOffset: PayrollPaymentMonthOffset,
+): string {
+    return resolvePayMonthFromWorkMonth(qualificationYearMonth, payrollPaymentMonthOffset);
+}
+
+/** 資格取得時決定に使う報酬レコードを取得 */
+export function lookupQualificationInitialReward(
+    rewardsByYearMonth: Record<string, StandardMonthlyReward>,
+    qualificationYearMonth: string,
+    payrollPaymentMonthOffset: PayrollPaymentMonthOffset,
+): StandardMonthlyReward | null {
+    const payYearMonth = resolveQualificationRewardPayYearMonth(
+        qualificationYearMonth,
+        payrollPaymentMonthOffset,
+    );
+    const payMonthReward = rewardsByYearMonth[payYearMonth];
+    if (payMonthReward) return payMonthReward;
+
+    // 旧データ: 入社月キーに保存されている場合
+    if (payrollPaymentMonthOffset === 1) {
+        return rewardsByYearMonth[qualificationYearMonth] ?? null;
+    }
+    return null;
+}
+
 /** 月ナビの最小支給年月（入社月を含む） */
 export function rewardNavigationMinPayYearMonth(
     employee: Employee,
@@ -117,6 +156,27 @@ export function isJoinPayMonthView(
 ): boolean {
     const joinYm = yearMonthFromDateString(employee.joinedDate);
     return Boolean(joinYm && payYearMonth === joinYm);
+}
+
+/** 翌月払いの入社月（給与支給なし・報酬月額0円） */
+export function isJoinMonthWithNextMonthPay(
+    employee: Employee,
+    payYearMonth: string,
+    payrollPaymentMonthOffset: PayrollPaymentMonthOffset,
+): boolean {
+    return payrollPaymentMonthOffset === 1 && isJoinPayMonthView(employee, payYearMonth);
+}
+
+/**
+ * 翌月徴収で入社月を表示中（控除月＝入社月）。
+ * この月の給与から控除する保険料はなく、報酬登録を促さない。
+ */
+export function isJoinMonthZeroPremiumDeductionView(
+    employee: Employee,
+    payYearMonth: string,
+    collectionTiming: InsurancePremiumCollectionTiming,
+): boolean {
+    return collectionTiming === 'next_month' && isJoinPayMonthView(employee, payYearMonth);
 }
 
 /** 入社月表示時の説明（翌月払いで給与支給がない場合） */

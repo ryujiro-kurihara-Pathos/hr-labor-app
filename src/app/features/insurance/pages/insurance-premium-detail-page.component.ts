@@ -178,12 +178,13 @@ import {
     formatPayMonthListFromWorkMonths,
     formatPayYearMonthLabelFromWorkMonth,
     isJoinPayMonthView as isEmployeeJoinPayMonthView,
+    isJoinMonthWithNextMonthPay,
+    isJoinMonthZeroPremiumDeductionView,
     isRewardConfirmedForPayMonth,
     isSalaryPayMonthTarget,
     joinPayMonthDisplayNote,
     lookupRewardByPayMonth,
     resolvePayrollPaymentDate,
-    rewardLookupKeysForPayMonth,
     rewardNavigationMinPayYearMonth,
     rewardRecordKeyForPayMonth,
     salaryPayMonthTargetReason,
@@ -626,11 +627,17 @@ export class InsurancePremiumDetailPageComponent {
     /** 保険料算出の根拠月の報酬が未入力のときの案内 */
     premiumTabLeadRewardHint = computed((): string | null => {
         if (this.isPremiumEnrollmentUndetermined()) return null;
+        if (this.isJoinMonthZeroPremiumDeductionView()) return null;
         if (this.liabilityMonthHasConfirmedReward()) return null;
         if (this.showZeroMonthlyPremiumDueToCollectionTiming()) return null;
 
         const basisLabel = this.premiumLiabilityYearMonthLabel();
         if (!basisLabel) return null;
+
+        const payLabel = this.targetYearMonthLabel();
+        if (this.isNextMonthCollection() && payLabel !== basisLabel) {
+            return `${payLabel}の給与を入力してください。`;
+        }
 
         return `${basisLabel}の給与を入力してください。`;
     });
@@ -639,9 +646,20 @@ export class InsurancePremiumDetailPageComponent {
         (): boolean => this.premiumTabLeadRewardHint() !== null,
     );
 
+    /** 報酬入力リンク先（支給年月キー＝控除月） */
     rewardInputQueryParamsForPremiumBasis = computed((): { ym?: string } => {
-        const ym = this.premiumLiabilityYearMonth() ?? this.targetYearMonth();
+        const ym = this.targetYearMonth();
         return ym ? { ym } : {};
+    });
+
+    /** 未確定時に案内する給与の月（翌月徴収は控除月＝支給月） */
+    premiumUndeterminedRewardMonthLabel = computed((): string => {
+        const payLabel = this.targetYearMonthLabel();
+        const basisLabel = this.premiumLiabilityYearMonthLabel();
+        if (this.isNextMonthCollection() && payLabel && basisLabel && payLabel !== basisLabel) {
+            return payLabel;
+        }
+        return basisLabel || payLabel;
     });
 
     premiumSummaryKicker = computed(
@@ -664,12 +682,17 @@ export class InsurancePremiumDetailPageComponent {
             return enrollmentUndetermined;
         }
 
+        if (this.isJoinMonthZeroPremiumDeductionView()) {
+            const reason = this.premiumZeroMonthlyReason();
+            if (reason) return reason;
+        }
+
         if (!this.liabilityMonthHasConfirmedReward()) {
             const zeroPremiumReason = this.premiumZeroMonthlyReason();
             if (zeroPremiumReason) return zeroPremiumReason;
 
             if (this.isNextMonthCollection() && basisLabel && basisLabel !== payLabel) {
-                return `${payLabel}に払う保険料を表示するには、${basisLabel}の報酬を確定してください。`;
+                return `${payLabel}に払う保険料を表示するには、${payLabel}の報酬を確定してください。`;
             }
             return `${basisLabel || payLabel}の報酬を確定すると、保険料を表示できます。`;
         }
@@ -893,6 +916,18 @@ export class InsurancePremiumDetailPageComponent {
         const payYearMonth = this.targetYearMonth();
         if (!employee || !payYearMonth) return false;
         return isEmployeeJoinPayMonthView(employee, payYearMonth);
+    });
+
+    /** 翌月徴収で控除月が入社月（保険料0円・報酬登録不要） */
+    isJoinMonthZeroPremiumDeductionView = computed((): boolean => {
+        const employee = this.employee();
+        const payYearMonth = this.targetYearMonth();
+        if (!employee || !payYearMonth) return false;
+        return isJoinMonthZeroPremiumDeductionView(
+            employee,
+            payYearMonth,
+            this.insurancePremiumCollectionTiming(),
+        );
     });
 
     joinPayMonthDisplayNote = computed((): string | null => {
@@ -1184,11 +1219,11 @@ export class InsurancePremiumDetailPageComponent {
 
     /** 保険料の根拠月（支給年月）の報酬が確定済みか */
     liabilityMonthHasConfirmedReward = computed((): boolean => {
-        const liabilityYearMonth = this.premiumLiabilityYearMonth();
-        if (!liabilityYearMonth) return false;
+        const payYearMonth = this.targetYearMonth();
+        if (!payYearMonth) return false;
         return isRewardConfirmedForPayMonth(
             this.employeeRewards(),
-            liabilityYearMonth,
+            payYearMonth,
             this.payrollPaymentMonthOffset(),
         );
     });
@@ -1202,6 +1237,8 @@ export class InsurancePremiumDetailPageComponent {
 
     /** 翌月徴収で、対象月の給与控除として月次保険料が0円となる場合 */
     showZeroMonthlyPremiumDueToCollectionTiming = computed((): boolean => {
+        if (this.isJoinMonthZeroPremiumDeductionView()) return true;
+
         if (this.hasMonthlyPremiumDisplay()) return false;
 
         const liabilityYearMonth = this.premiumLiabilityYearMonth();
@@ -1345,6 +1382,16 @@ export class InsurancePremiumDetailPageComponent {
     targetMonthMonthlyReward = computed((): number | null => {
         // フォームの合計を更新
         this.formRewardRevision();
+
+        const employee = this.employee();
+        const payYearMonth = this.targetYearMonth();
+        if (
+            employee
+            && payYearMonth
+            && isJoinMonthWithNextMonthPay(employee, payYearMonth, this.payrollPaymentMonthOffset())
+        ) {
+            return 0;
+        }
 
         const workYearMonth = this.workYearMonth();
         if (this.isLoadingMonth() || !workYearMonth) return null;
@@ -1969,11 +2016,14 @@ export class InsurancePremiumDetailPageComponent {
 
     previousMonthReward(): StandardMonthlyReward | null {
         const payYearMonth = this.workYearMonth();
-        if (!payYearMonth) return null;
+        const employee = this.employee();
+        if (!payYearMonth || !employee) return null;
+        const joinYearMonth = yearMonthFromDateString(employee.joinedDate);
         return lookupRewardByPayMonth(
             this.employeeRewards(),
             addMonthsToYearMonth(payYearMonth, -1),
             this.payrollPaymentMonthOffset(),
+            joinYearMonth,
         );
     }
 
@@ -2050,11 +2100,7 @@ export class InsurancePremiumDetailPageComponent {
         employeeId: string,
         payYearMonth: string,
     ): Promise<StandardMonthlyReward | null> {
-        for (const key of rewardLookupKeysForPayMonth(payYearMonth, this.payrollPaymentMonthOffset())) {
-            const reward = await this.rewardService.getByEmployeeAndMonth(employeeId, key);
-            if (reward) return reward;
-        }
-        return null;
+        return this.rewardService.getByEmployeeAndMonth(employeeId, payYearMonth);
     }
 
     async loadStandardReward() {
@@ -2734,6 +2780,7 @@ export class InsurancePremiumDetailPageComponent {
 
     canShowPremiumSummary = computed(() => {
         if (this.isPremiumEnrollmentUndetermined()) return false;
+        if (this.isJoinMonthZeroPremiumDeductionView()) return true;
         if (this.hasUndeterminedPremiumDueToMissingReward()) return true;
         if (this.hasMonthlyPremiumDisplay() || this.isMonthlyPremiumNotSubject()) {
             return true;
@@ -2791,11 +2838,11 @@ export class InsurancePremiumDetailPageComponent {
             && isPremiumMonth
             && joinStatus === 'active'
         ) {
-            const basisLabel = this.premiumLiabilityYearMonthLabel();
+            const label = this.premiumUndeterminedRewardMonthLabel();
             return {
                 kind: 'undetermined',
-                message: basisLabel
-                    ? `${basisLabel}の給与を入力してください。`
+                message: label
+                    ? `${label}の給与を入力してください。`
                     : '給与を入力してください。',
             };
         }

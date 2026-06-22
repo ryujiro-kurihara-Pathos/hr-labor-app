@@ -21,7 +21,7 @@ import { addMonthsToYearMonth } from '../utils/reward-target-month.util';
 import { isRewardConfirmed } from '../utils/reward-status.util';
 import {
     isSalaryPayMonthTarget,
-    lookupRewardByPayMonth,
+    lookupExactRewardByPayMonth,
 } from '../utils/reward-pay-month.util';
 
 export type RewardInputListRow = {
@@ -191,7 +191,7 @@ export class RewardInputPageComponent {
         const offset = this.payrollPaymentMonthOffset();
         return this.employees().map((employee) => {
             const employeeRewards = byEmployee[employee.id] ?? {};
-            const reward = lookupRewardByPayMonth(employeeRewards, payYearMonth, offset);
+            const reward = lookupExactRewardByPayMonth(employeeRewards, payYearMonth);
             const isTargetMonth = isSalaryPayMonthTarget(employee, payYearMonth, offset);
             const socialInsurance = socialInsuranceByEmployee[employee.id] ?? null;
             const effective = this.determinationService.resolve(

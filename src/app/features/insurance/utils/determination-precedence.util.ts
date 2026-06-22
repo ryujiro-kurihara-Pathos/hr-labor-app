@@ -24,7 +24,7 @@ import {
 } from './revision-determination.util';
 import { SalaryCondition } from '../models/salary-condition.model';
 import { salaryConditionRevisionOriginMonths } from './salary-condition.util';
-import { formatPayMonthRangeFromWorkMonths, formatPayYearMonthLabelFromWorkMonth } from './reward-pay-month.util';
+import { formatPayMonthRangeFromWorkMonths, formatPayYearMonthLabelFromWorkMonth, lookupQualificationInitialReward } from './reward-pay-month.util';
 
 export type WinningDeterminationKind = 'initial' | 'regular' | 'revision';
 
@@ -131,7 +131,11 @@ function resolveGradesFromWinner(
 ): RevisionGradePair | null {
     switch (winner.kind) {
         case 'initial': {
-            const reward = rewardsByYearMonth[qualificationYearMonth];
+            const reward = lookupQualificationInitialReward(
+                rewardsByYearMonth,
+                qualificationYearMonth,
+                payrollPaymentMonthOffset,
+            );
             if (!reward) return null;
             return {
                 health: { grade: reward.healthInsuranceGrade },

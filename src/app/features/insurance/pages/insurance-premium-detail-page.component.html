@@ -872,7 +872,7 @@
                     <section class="premium-empty-state">
                         <h2 class="premium-empty-title">{{ premiumEmptyStateTitle() }}</h2>
                         <p class="premium-empty-note">{{ premiumEmptyStateNote() }}</p>
-                        @if (!isPremiumEnrollmentUndetermined()) {
+                        @if (!isPremiumEnrollmentUndetermined() && !isJoinMonthZeroPremiumDeductionView()) {
                             <a
                                 class="btn primary-btn"
                                 [routerLink]="rewardDetailLink()"
@@ -903,7 +903,7 @@
                             </p>
                             <p class="premium-summary-sub">
                                 @if (hasUndeterminedPremiumDueToMissingReward()) {
-                                    {{ premiumLiabilityYearMonthLabel() }}分の給与が未入力のため、保険料を算出できません
+                                    {{ premiumUndeterminedRewardMonthLabel() }}の給与が未入力のため、保険料を算出できません
                                 } @else if (hasMonthlyPremiumDisplay()) {
                                     @if (bonusSocialInsuranceEmployeePremium() !== null && applicableHealthStandardAmount() !== null) {
                                         {{ premiumLiabilityYearMonthLabel() }}分（標準報酬月額 {{ applicableHealthStandardAmount() | number }}円）＋賞与分

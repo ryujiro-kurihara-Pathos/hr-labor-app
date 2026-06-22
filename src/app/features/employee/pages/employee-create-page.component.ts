@@ -10,6 +10,7 @@ import { UserService } from '../../users/services/user.service';
 import { SocialInsuranceStatusService } from '../../social-insurance/services/social-insurance-status.service';
 import { SocialInsuranceProcedureService } from '../../social-insurance/services/social-insurance-procedure.service';
 import { ConfirmService } from '../../../shared/services/confirm.service';
+import { CompanyService } from '../../company/services/company.service';
 import { OfficeService } from '../../company/services/office.service';
 import { Office } from '../../company/models/office.model';
 import { SocialInsuranceStatusInput } from '../../social-insurance/models/social-insurance-status.model';
@@ -60,6 +61,7 @@ export class EmployeeCreatePageComponent {
     private readonly authService = inject(AuthService);
     private readonly userService = inject(UserService);
     private readonly officeService = inject(OfficeService);
+    private readonly companyService = inject(CompanyService);
     private readonly socialInsuranceStatusService = inject(SocialInsuranceStatusService);
     private readonly procedureService = inject(SocialInsuranceProcedureService);
     private readonly confirmService = inject(ConfirmService);
@@ -229,15 +231,19 @@ export class EmployeeCreatePageComponent {
 
             if (salaryConditionInput) {
                 await this.salaryConditionService.save(salaryConditionInput);
-                const joinMonthRewardInput = buildJoinMonthRewardFromSalaryCondition({
-                    companyId: employee.companyId,
-                    employeeId: employee.id,
-                    joinedDate: employee.joinedDate,
-                    employmentType: employee.employmentType,
-                    condition: salaryConditionInput,
-                });
-                if (joinMonthRewardInput) {
-                    await this.rewardService.saveDraft(joinMonthRewardInput);
+                const company = await this.companyService.getCompanyById(employee.companyId);
+                const payrollPaymentMonthOffset = company?.payrollPaymentMonthOffset ?? 1;
+                if (payrollPaymentMonthOffset !== 1) {
+                    const joinMonthRewardInput = buildJoinMonthRewardFromSalaryCondition({
+                        companyId: employee.companyId,
+                        employeeId: employee.id,
+                        joinedDate: employee.joinedDate,
+                        employmentType: employee.employmentType,
+                        condition: salaryConditionInput,
+                    });
+                    if (joinMonthRewardInput) {
+                        await this.rewardService.saveDraft(joinMonthRewardInput);
+                    }
                 }
             }
 
