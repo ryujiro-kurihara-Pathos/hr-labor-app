@@ -35,7 +35,10 @@ import { SalaryConditionService } from '../../insurance/services/salary-conditio
 import {
     buildInitialSalaryConditionInput,
     buildJoinMonthRewardFromSalaryCondition,
+    buildPartTimeSalaryConditionFormValue,
+    isPartTimeSalaryFormValid,
     isSalaryConditionFormValid,
+    partTimeExpectedSalaryTotal,
 } from '../../insurance/utils/join-month-expected-reward.util';
 import { SalaryConditionFormValue } from '../../insurance/models/salary-condition.model';
 import { fixedWageTotalFromForm } from '../../insurance/utils/salary-condition.util';
@@ -94,6 +97,8 @@ export class EmployeeCreatePageComponent {
     weeklyScheduledWorkHours: number | '' = '';
     monthlyScheduledWorkDays: number | '' = '';
     prescribedWage: number | '' = '';
+    partTimeCommutingAllowance: number | '' = 0;
+    partTimeOtherFixedAllowance: number | '' = 0;
     isStudent = false;
     expectedEmploymentOver2Months = false;
     payrollPaymentMonthOffset: 0 | 1 = 1;
@@ -215,27 +220,32 @@ export class EmployeeCreatePageComponent {
             );
             await this.socialInsuranceStatusService.createSocialInsuranceStatus(syncedSocialInsuranceInput);
 
-            if (!this.isPartTimeEmployment()) {
-                const salaryConditionInput = buildInitialSalaryConditionInput({
+            const salaryConditionForm = this.isPartTimeEmployment()
+                ? buildPartTimeSalaryConditionFormValue({
+                    prescribedWage: this.prescribedWage,
+                    commutingAllowance: this.partTimeCommutingAllowance,
+                    otherFixedAllowance: this.partTimeOtherFixedAllowance,
+                })
+                : this.salaryConditionForm;
+            const salaryConditionInput = buildInitialSalaryConditionInput({
+                companyId: employee.companyId,
+                employeeId: employee.id,
+                joinedDate: employee.joinedDate,
+                payrollPaymentMonthOffset: this.payrollPaymentMonthOffset,
+                form: salaryConditionForm,
+            });
+
+            if (salaryConditionInput) {
+                await this.salaryConditionService.save(salaryConditionInput);
+                const joinMonthRewardInput = buildJoinMonthRewardFromSalaryCondition({
                     companyId: employee.companyId,
                     employeeId: employee.id,
                     joinedDate: employee.joinedDate,
-                    payrollPaymentMonthOffset: this.payrollPaymentMonthOffset,
-                    form: this.salaryConditionForm,
+                    employmentType: employee.employmentType,
+                    condition: salaryConditionInput,
                 });
-
-                if (salaryConditionInput) {
-                    await this.salaryConditionService.save(salaryConditionInput);
-                    const joinMonthRewardInput = buildJoinMonthRewardFromSalaryCondition({
-                        companyId: employee.companyId,
-                        employeeId: employee.id,
-                        joinedDate: employee.joinedDate,
-                        employmentType: employee.employmentType,
-                        condition: salaryConditionInput,
-                    });
-                    if (joinMonthRewardInput) {
-                        await this.rewardService.confirm(joinMonthRewardInput);
-                    }
+                if (joinMonthRewardInput) {
+                    await this.rewardService.confirm(joinMonthRewardInput);
                 }
             }
 
@@ -285,9 +295,21 @@ export class EmployeeCreatePageComponent {
 
     isSalaryInputValid(): boolean {
         if (this.isPartTimeEmployment()) {
-            return true;
+            return isPartTimeSalaryFormValid({
+                prescribedWage: this.prescribedWage,
+                commutingAllowance: this.partTimeCommutingAllowance,
+                otherFixedAllowance: this.partTimeOtherFixedAllowance,
+            });
         }
         return isSalaryConditionFormValid(this.salaryConditionForm);
+    }
+
+    partTimeExpectedSalaryTotal(): number {
+        return partTimeExpectedSalaryTotal({
+            prescribedWage: this.prescribedWage,
+            commutingAllowance: this.partTimeCommutingAllowance,
+            otherFixedAllowance: this.partTimeOtherFixedAllowance,
+        });
     }
 
     salaryConditionTotal(): number {
@@ -307,6 +329,8 @@ export class EmployeeCreatePageComponent {
             this.weeklyScheduledWorkHours = '';
             this.monthlyScheduledWorkDays = '';
             this.prescribedWage = '';
+            this.partTimeCommutingAllowance = 0;
+            this.partTimeOtherFixedAllowance = 0;
             this.isStudent = false;
             this.expectedEmploymentOver2Months = false;
         }

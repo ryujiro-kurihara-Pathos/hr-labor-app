@@ -8,7 +8,7 @@ import { shouldProrateMonthlyRewardByPaymentBaseDays } from '../../insurance/uti
 import { lookupQualificationInitialReward, resolveQualificationRewardPayYearMonth } from '../../insurance/utils/reward-pay-month.util';
 import { yearMonthFromDateString } from '../../insurance/utils/reward-target-month.util';
 import { monthlyRewardTotal } from '../../insurance/utils/revision-determination.util';
-import { resolveSalaryConditionForMonth } from '../../insurance/utils/salary-condition.util';
+import { resolveInitialSalaryConditionForQualification } from '../../insurance/utils/salary-condition.util';
 import { PayrollPaymentMonthOffset } from '../../insurance/utils/standard-remuneration-determination.util';
 
 export type QualificationMonthlyReward = {
@@ -74,7 +74,11 @@ export function resolveQualificationJoinMonthReward(params: {
         return { reward: null, fromExpectedSalaryCondition: false };
     }
 
-    const condition = resolveSalaryConditionForMonth(params.salaryConditions, joinYm);
+    const condition = resolveInitialSalaryConditionForQualification(
+        params.salaryConditions,
+        params.joinedDate,
+        params.payrollPaymentMonthOffset ?? 1,
+    );
     if (condition) {
         const input = buildJoinMonthRewardFromSalaryCondition({
             companyId: params.companyId,

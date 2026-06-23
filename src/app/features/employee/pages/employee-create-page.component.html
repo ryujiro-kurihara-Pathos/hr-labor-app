@@ -51,6 +51,55 @@
                                 <option ngValue="part-time">パート・アルバイト</option>
                             </select>
                         </div>
+                        @if (isPartTimeEmployment()) {
+                            <div class="salary-condition-form-panel form-field-wide">
+                                <div class="salary-condition-form-header">
+                                    <span class="field-group-label">見込み給料 <span class="required">必須</span></span>
+                                    <p class="field-note">所定内賃金・通勤手当・その他固定手当の合計で標準報酬月額を算定します。入社月の報酬入力にも反映されます。</p>
+                                </div>
+                                <div class="salary-condition-form-grid">
+                                    <div class="form-field">
+                                        <label for="part-time-prescribed-wage">所定内賃金（月額）</label>
+                                        <input
+                                            id="part-time-prescribed-wage"
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            name="prescribedWage"
+                                            [(ngModel)]="prescribedWage"
+                                            placeholder="80000"
+                                            required
+                                        />
+                                    </div>
+                                    <div class="form-field">
+                                        <label for="part-time-commuting">通勤手当</label>
+                                        <input
+                                            id="part-time-commuting"
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            name="partTimeCommutingAllowance"
+                                            [(ngModel)]="partTimeCommutingAllowance"
+                                        />
+                                    </div>
+                                    <div class="form-field">
+                                        <label for="part-time-other-fixed">その他固定手当</label>
+                                        <input
+                                            id="part-time-other-fixed"
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            name="partTimeOtherFixedAllowance"
+                                            [(ngModel)]="partTimeOtherFixedAllowance"
+                                        />
+                                    </div>
+                                </div>
+                                <div class="salary-total-field">
+                                    <span class="salary-total-label">見込み給料</span>
+                                    <strong class="salary-total-value">{{ partTimeExpectedSalaryTotal() | number }}円</strong>
+                                </div>
+                            </div>
+                        }
                         @if (!isPartTimeEmployment()) {
                             <div class="salary-condition-form-panel form-field-wide">
                                 <div class="salary-condition-form-header">
@@ -219,18 +268,6 @@
                                     step="1"
                                     [(ngModel)]="monthlyScheduledWorkDays"
                                     placeholder="例: 11"
-                                />
-                            </div>
-                            <div class="form-field">
-                                <label for="prescribed-wage">所定内賃金（月額）</label>
-                                <input
-                                    id="prescribed-wage"
-                                    type="number"
-                                    name="prescribedWage"
-                                    min="0"
-                                    step="1"
-                                    [(ngModel)]="prescribedWage"
-                                    placeholder="例: 88000"
                                 />
                             </div>
                         </div>

@@ -106,6 +106,38 @@ export function formValueFromSalaryCondition(condition: SalaryCondition): Salary
     };
 }
 
+/** 資格取得時決定に使う初回給与条件（翌月払いは入社翌月開始の条件を優先） */
+export function resolveInitialSalaryConditionForQualification(
+    conditions: SalaryCondition[],
+    joinedDate: string,
+    payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+): SalaryCondition | null {
+    if (conditions.length === 0) return null;
+
+    const initialStartMonth = resolveSalaryConditionEffectiveStartMonth(
+        joinedDate,
+        payrollPaymentMonthOffset,
+    );
+    if (initialStartMonth) {
+        const initial = conditions.find(
+            (condition) => condition.effectiveStartMonth === initialStartMonth,
+        );
+        if (initial) return initial;
+    }
+
+    const joinYm = yearMonthFromDateString(joinedDate);
+    if (joinYm) {
+        const joinMonthCondition = conditions.find(
+            (condition) => condition.effectiveStartMonth === joinYm,
+        );
+        if (joinMonthCondition) return joinMonthCondition;
+    }
+
+    return [...conditions].sort((a, b) =>
+        (a.effectiveStartMonth < b.effectiveStartMonth ? -1 : 1),
+    )[0] ?? null;
+}
+
 /** 対象月に適用する給与条件（開始月が最も新しいもの） */
 export function resolveSalaryConditionForMonth(
     conditions: SalaryCondition[],

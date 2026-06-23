@@ -187,18 +187,14 @@ export function lookupQualificationInitialReward(
     qualificationYearMonth: string,
     payrollPaymentMonthOffset: PayrollPaymentMonthOffset,
 ): StandardMonthlyReward | null {
+    const joinMonthReward = rewardsByYearMonth[qualificationYearMonth];
+    if (joinMonthReward) return joinMonthReward;
+
     const payYearMonth = resolveQualificationRewardPayYearMonth(
         qualificationYearMonth,
         payrollPaymentMonthOffset,
     );
-    const payMonthReward = rewardsByYearMonth[payYearMonth];
-    if (payMonthReward) return payMonthReward;
-
-    // 旧データ: 入社月キーに保存されている場合
-    if (payrollPaymentMonthOffset === 1) {
-        return rewardsByYearMonth[qualificationYearMonth] ?? null;
-    }
-    return null;
+    return rewardsByYearMonth[payYearMonth] ?? null;
 }
 
 /** 月ナビの最小支給年月（入社月を含む） */

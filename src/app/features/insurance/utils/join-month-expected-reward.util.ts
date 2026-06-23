@@ -5,6 +5,45 @@ import { fixedWageTotalFromForm, resolveSalaryConditionEffectiveStartMonth } fro
 import { yearMonthFromDateString } from './reward-target-month.util';
 import { PayrollPaymentMonthOffset } from './standard-remuneration-determination.util';
 
+export function buildPartTimeSalaryConditionFormValue(form: {
+    prescribedWage: number | '';
+    commutingAllowance: number | '';
+    otherFixedAllowance: number | '';
+}): SalaryConditionFormValue {
+    return {
+        effectiveStartMonth: '',
+        basicSalary: form.prescribedWage === '' ? '' : form.prescribedWage,
+        commutingAllowance: toNumber(form.commutingAllowance),
+        positionAllowance: 0,
+        housingAllowance: 0,
+        fixedOvertimePay: 0,
+        otherFixedAllowance: toNumber(form.otherFixedAllowance),
+        note: '',
+        changeReason: '初回登録',
+    };
+}
+
+export function partTimeExpectedSalaryTotal(form: {
+    prescribedWage: number | '';
+    commutingAllowance: number | '';
+    otherFixedAllowance: number | '';
+}): number {
+    return (
+        toNumber(form.prescribedWage)
+        + toNumber(form.commutingAllowance)
+        + toNumber(form.otherFixedAllowance)
+    );
+}
+
+export function isPartTimeSalaryFormValid(form: {
+    prescribedWage: number | '';
+    commutingAllowance: number | '';
+    otherFixedAllowance: number | '';
+}): boolean {
+    if (form.prescribedWage === '') return false;
+    return partTimeExpectedSalaryTotal(form) > 0;
+}
+
 export function buildInitialSalaryConditionInput(params: {
     companyId: string;
     employeeId: string;

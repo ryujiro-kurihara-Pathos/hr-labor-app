@@ -108,13 +108,23 @@ describe('reward-pay-month.util', () => {
     });
 
     describe('lookupQualificationInitialReward', () => {
-        it('uses first pay month key for next month payment', () => {
+        it('falls back to pay month key when join month key is missing', () => {
             const rewards = {
                 '2026-03': reward('2026-03'),
             };
             expect(
                 lookupQualificationInitialReward(rewards, '2026-02', 1)?.targetYearMonth,
             ).toBe('2026-03');
+        });
+
+        it('prefers join month key over pay month key when both exist', () => {
+            const rewards = {
+                '2026-02': { ...reward('2026-02'), monthlyReward: 300_000 },
+                '2026-03': { ...reward('2026-03'), monthlyReward: 280_000 },
+            };
+            expect(
+                lookupQualificationInitialReward(rewards, '2026-02', 1)?.monthlyReward,
+            ).toBe(300_000);
         });
 
         it('falls back to join month key for legacy data', () => {

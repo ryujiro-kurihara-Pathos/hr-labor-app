@@ -37,7 +37,18 @@ function salaryCondition(effectiveStartMonth: string, basicSalary = 300_000): Sa
 
 describe('qualification-reward.util', () => {
     describe('lookupQualificationJoinMonthReward', () => {
-        it('finds reward stored under pay year month for next-month payroll', () => {
+        it('prefers join month reward over pay month when both exist', () => {
+            const rewards = {
+                '2026-04': reward('2026-04', 300_000),
+                '2026-05': reward('2026-05', 280_000),
+            };
+
+            expect(
+                lookupQualificationJoinMonthReward('2026-04-01', rewards, 1)?.monthlyReward,
+            ).toBe(300_000);
+        });
+
+        it('finds reward stored under pay year month when join month is missing', () => {
             const rewards = {
                 '2026-05': reward('2026-05'),
             };
@@ -140,6 +151,49 @@ describe('qualification-reward.util', () => {
             expect(result.fromExpectedSalaryCondition).toBe(true);
             expect(result.reward?.basicSalary).toBe(300_000);
             expect(result.reward?.targetYearMonth).toBe('2026-04');
+        });
+
+        it('uses initial salary condition when effective start is first pay month', () => {
+            const rewards = {
+                '2026-05': reward('2026-05', 280_000),
+            };
+
+            const result = resolveQualificationJoinMonthReward({
+                joinedDate: '2026-04-01',
+                companyId: 'c1',
+                employeeId: 'emp-1',
+                employmentType: 'full-time',
+                salaryConditions: [salaryCondition('2026-05', 300_000)],
+                rewardsByYearMonth: rewards,
+                payrollPaymentMonthOffset: 1,
+            });
+
+            expect(result.fromExpectedSalaryCondition).toBe(true);
+            expect(result.reward?.basicSalary).toBe(300_000);
+        });
+
+        it('part-time uses expected salary even when later pay month reward differs', () => {
+            const rewards = {
+                '2026-04': reward('2026-04', 108_000),
+                '2026-05': reward('2026-05', 150_000),
+            };
+
+            const result = resolveQualificationJoinMonthReward({
+                joinedDate: '2026-04-01',
+                companyId: 'c1',
+                employeeId: 'emp-1',
+                employmentType: 'part-time',
+                salaryConditions: [{
+                    ...salaryCondition('2026-05', 100_000),
+                    commutingAllowance: 5000,
+                    otherFixedAllowance: 3000,
+                }],
+                rewardsByYearMonth: rewards,
+                payrollPaymentMonthOffset: 1,
+            });
+
+            expect(result.fromExpectedSalaryCondition).toBe(true);
+            expect(result.reward?.monthlyReward).toBe(108_000);
         });
 
         it('falls back to monthly reward when no salary condition', () => {

@@ -1,4 +1,11 @@
-import { buildInitialSalaryConditionInput, buildJoinMonthExpectedRewardInput, buildJoinMonthRewardFromSalaryCondition } from './join-month-expected-reward.util';
+import {
+    buildInitialSalaryConditionInput,
+    buildJoinMonthExpectedRewardInput,
+    buildJoinMonthRewardFromSalaryCondition,
+    buildPartTimeSalaryConditionFormValue,
+    isPartTimeSalaryFormValid,
+    partTimeExpectedSalaryTotal,
+} from './join-month-expected-reward.util';
 import {
     findEmployeeOldestUnregisteredYearMonth,
     findOldestUnregisteredYearMonth,
@@ -26,6 +33,52 @@ describe('join-month-expected-reward.util', () => {
         });
 
         expect(input?.effectiveStartMonth).toBe('2026-05');
+    });
+
+    it('builds part-time salary condition form from expected salary components', () => {
+        const form = buildPartTimeSalaryConditionFormValue({
+            prescribedWage: 80_000,
+            commutingAllowance: 5_000,
+            otherFixedAllowance: 3_000,
+        });
+
+        expect(form.basicSalary).toBe(80_000);
+        expect(form.commutingAllowance).toBe(5_000);
+        expect(form.otherFixedAllowance).toBe(3_000);
+        expect(partTimeExpectedSalaryTotal({
+            prescribedWage: 80_000,
+            commutingAllowance: 5_000,
+            otherFixedAllowance: 3_000,
+        })).toBe(88_000);
+        expect(isPartTimeSalaryFormValid({
+            prescribedWage: 80_000,
+            commutingAllowance: 5_000,
+            otherFixedAllowance: 3_000,
+        })).toBeTrue();
+    });
+
+    it('builds part-time join month reward with monthlyRewardAmount from components', () => {
+        const condition = buildInitialSalaryConditionInput({
+            companyId: 'c1',
+            employeeId: 'e1',
+            joinedDate: '2026-04-01',
+            payrollPaymentMonthOffset: 1,
+            form: buildPartTimeSalaryConditionFormValue({
+                prescribedWage: 80_000,
+                commutingAllowance: 5_000,
+                otherFixedAllowance: 3_000,
+            }),
+        })!;
+        const input = buildJoinMonthRewardFromSalaryCondition({
+            companyId: 'c1',
+            employeeId: 'e1',
+            joinedDate: '2026-04-01',
+            employmentType: 'part-time',
+            condition,
+        });
+
+        expect(input?.monthlyRewardAmount).toBe(88_000);
+        expect(input?.targetYearMonth).toBe('2026-04');
     });
 
     it('builds full-time join month reward from expected salary', () => {
