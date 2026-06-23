@@ -14,34 +14,49 @@
         </div>
 
         <div class="form-grid">
-            <div class="form-field">
-                <label for="basic-salary">基本給</label>
-                <input id="basic-salary" type="number" min="0" step="1" [(ngModel)]="form.basicSalary" />
-            </div>
-            <div class="form-field">
-                <label for="commuting-allowance">通勤手当</label>
-                <input id="commuting-allowance" type="number" min="0" step="1" [(ngModel)]="form.commutingAllowance" />
-            </div>
-            <div class="form-field">
-                <label for="position-allowance">役職手当</label>
-                <input id="position-allowance" type="number" min="0" step="1" [(ngModel)]="form.positionAllowance" />
-            </div>
-            <div class="form-field">
-                <label for="housing-allowance">住宅手当</label>
-                <input id="housing-allowance" type="number" min="0" step="1" [(ngModel)]="form.housingAllowance" />
-            </div>
-            <div class="form-field">
-                <label for="fixed-overtime-pay">見込み残業代</label>
-                <input id="fixed-overtime-pay" type="number" min="0" step="1" [(ngModel)]="form.fixedOvertimePay" />
-            </div>
-            <div class="form-field">
-                <label for="other-fixed-allowance">その他固定手当</label>
-                <input id="other-fixed-allowance" type="number" min="0" step="1" [(ngModel)]="form.otherFixedAllowance" />
-            </div>
+            @if (isPartTime()) {
+                <div class="form-field">
+                    <label for="basic-salary">月額報酬</label>
+                    <input id="basic-salary" type="number" min="0" step="1" [(ngModel)]="form.basicSalary" />
+                </div>
+                <div class="form-field">
+                    <label for="commuting-allowance">通勤手当</label>
+                    <input id="commuting-allowance" type="number" min="0" step="1" [(ngModel)]="form.commutingAllowance" />
+                </div>
+                <div class="form-field">
+                    <label for="other-fixed-allowance">その他手当</label>
+                    <input id="other-fixed-allowance" type="number" min="0" step="1" [(ngModel)]="form.otherFixedAllowance" />
+                </div>
+            } @else {
+                <div class="form-field">
+                    <label for="basic-salary">基本給</label>
+                    <input id="basic-salary" type="number" min="0" step="1" [(ngModel)]="form.basicSalary" />
+                </div>
+                <div class="form-field">
+                    <label for="commuting-allowance">通勤手当</label>
+                    <input id="commuting-allowance" type="number" min="0" step="1" [(ngModel)]="form.commutingAllowance" />
+                </div>
+                <div class="form-field">
+                    <label for="position-allowance">役職手当</label>
+                    <input id="position-allowance" type="number" min="0" step="1" [(ngModel)]="form.positionAllowance" />
+                </div>
+                <div class="form-field">
+                    <label for="housing-allowance">住宅手当</label>
+                    <input id="housing-allowance" type="number" min="0" step="1" [(ngModel)]="form.housingAllowance" />
+                </div>
+                <div class="form-field">
+                    <label for="fixed-overtime-pay">見込み残業代</label>
+                    <input id="fixed-overtime-pay" type="number" min="0" step="1" [(ngModel)]="form.fixedOvertimePay" />
+                </div>
+                <div class="form-field">
+                    <label for="other-fixed-allowance">その他固定手当</label>
+                    <input id="other-fixed-allowance" type="number" min="0" step="1" [(ngModel)]="form.otherFixedAllowance" />
+                </div>
+            }
         </div>
 
         <div class="fixed-total-row">
-            <span class="fixed-total-label">固定的賃金合計</span>
+            <span class="fixed-total-label">{{ totalLabel() }}</span>
             <strong class="fixed-total-value">{{ fixedWageTotal() | number }}円</strong>
         </div>
 

@@ -1,4 +1,5 @@
 import { Employee } from '../../employee/models/employee.models';
+import { isPartTimeEmployment } from '../../social-insurance/utils/part-time-insurance-judgment.util';
 import {
     SalaryCondition,
     SalaryConditionFixedWageFields,
@@ -13,6 +14,12 @@ import {
     sumFixedWageFields,
 } from './fixed-wage-change.util';
 import { addMonthsToYearMonth, yearMonthFromDateString } from './reward-target-month.util';
+import {
+    arePartTimeSalaryConditionFieldsEqual,
+    PART_TIME_SALARY_CONDITION_FIELD_KEYS,
+    PART_TIME_SALARY_CONDITION_FIELD_LABELS,
+    partTimeSalaryConditionTotalFromForm,
+} from './part-time-reward.util';
 import { formatYearMonthLabel, PayrollPaymentMonthOffset } from './standard-remuneration-determination.util';
 
 /** 給与条件の適用開始月（翌月払いは入社月の翌月から） */
@@ -351,17 +358,24 @@ export function validateSalaryConditionForm(params: {
         return `適用開始月は${formatYearMonthLabel(earliest)}以降を指定してください。`;
     }
 
-    for (const key of FIXED_WAGE_FIELD_KEYS) {
+    const isPartTime = isPartTimeEmployment(params.employee.employmentType);
+    const wageFieldKeys = isPartTime ? PART_TIME_SALARY_CONDITION_FIELD_KEYS : FIXED_WAGE_FIELD_KEYS;
+
+    for (const key of wageFieldKeys) {
         const value = params.form[key];
         if (value === '' || value === null || value === undefined) {
-            return `${fieldLabel(key)}を入力してください（該当なしは0）。`;
+            return `${fieldLabel(key, isPartTime)}を入力してください（該当なしは0）。`;
         }
         if (toNonNegativeNumber(value) < 0) {
-            return `${fieldLabel(key)}は0円以上で入力してください。`;
+            return `${fieldLabel(key, isPartTime)}は0円以上で入力してください。`;
         }
     }
 
-    if (fixedWageTotalFromForm(params.form) <= 0) {
+    if (isPartTime) {
+        if (partTimeSalaryConditionTotalFromForm(params.form) <= 0) {
+            return '見込み給料は1円以上にしてください。';
+        }
+    } else if (fixedWageTotalFromForm(params.form) <= 0) {
         return '固定的賃金合計は1円以上にしてください。';
     }
 
@@ -390,12 +404,21 @@ export function validateSalaryConditionForm(params: {
         return changeBlockReason;
     }
 
-    if (editingMonth && editingMonth === effectiveStartMonth) {
+    const unchangedMessage = '給与条件に変更がありません。金額を変更してから保存してください。';
+
+    if (isPartTime) {
+        const reference = editingMonth && editingMonth === effectiveStartMonth
+            ? params.conditions.find((condition) => condition.effectiveStartMonth === editingMonth) ?? null
+            : resolvePreviousSalaryCondition(params.conditions, effectiveStartMonth);
+        if (reference && arePartTimeSalaryConditionFieldsEqual(params.form, reference)) {
+            return unchangedMessage;
+        }
+    } else if (editingMonth && editingMonth === effectiveStartMonth) {
         const existing = params.conditions.find(
             (condition) => condition.effectiveStartMonth === editingMonth,
         );
         if (existing && areSalaryConditionFixedWageFieldsEqual(params.form, existing)) {
-            return '給与条件に変更がありません。金額を変更してから保存してください。';
+            return unchangedMessage;
         }
     }
 
@@ -468,7 +491,11 @@ export function isConfirmedRewardStatus(status: StandardMonthlyRewardStatus | un
     return status === 'confirmed';
 }
 
-function fieldLabel(key: keyof SalaryConditionFormValue): string {
+function fieldLabel(key: keyof SalaryConditionFormValue, isPartTime = false): string {
+    if (isPartTime && key in PART_TIME_SALARY_CONDITION_FIELD_LABELS) {
+        return PART_TIME_SALARY_CONDITION_FIELD_LABELS[key as keyof typeof PART_TIME_SALARY_CONDITION_FIELD_LABELS];
+    }
+
     const labels: Record<string, string> = {
         basicSalary: '基本給',
         commutingAllowance: '通勤手当',

@@ -16,17 +16,17 @@
     }
 
     <dl class="salary-breakdown">
-        @for (key of fieldKeys; track key) {
-            <div class="salary-row" [class.zero-value]="condition()[key] === 0">
-                <dt>{{ fieldLabels[key] }}</dt>
-                <dd>{{ condition()[key] | number }}<span class="currency">円</span></dd>
+        @for (row of fieldRows(); track row.key) {
+            <div class="salary-row" [class.zero-value]="row.value === 0">
+                <dt>{{ row.label }}</dt>
+                <dd>{{ row.value | number }}<span class="currency">円</span></dd>
             </div>
         }
     </dl>
 
     <div class="salary-total">
-        <span class="salary-total-label">固定的賃金合計</span>
-        <strong class="salary-total-value">{{ condition().fixedWageTotal | number }}<span class="currency">円</span></strong>
+        <span class="salary-total-label">{{ totalLabel() }}</span>
+        <strong class="salary-total-value">{{ totalAmount() | number }}<span class="currency">円</span></strong>
     </div>
 
     @if (showNote() && condition().note) {

@@ -10,13 +10,13 @@
                     <article class="history-item">
                         <header class="history-item-header">
                             <h2>{{ period.displayLabel }}</h2>
-                            <p class="history-total">固定的賃金合計 {{ period.condition.fixedWageTotal | number }}円</p>
+                            <p class="history-total">{{ totalLabel() }} {{ periodTotal(period.condition) | number }}円</p>
                         </header>
                         <dl class="history-breakdown">
-                            @for (key of fieldKeys; track key) {
+                            @for (row of fieldRows(period.condition); track row.key) {
                                 <div class="history-breakdown-row">
-                                    <dt>{{ fieldLabels[key] }}</dt>
-                                    <dd>{{ period.condition[key] | number }}円</dd>
+                                    <dt>{{ row.label }}</dt>
+                                    <dd>{{ row.value | number }}円</dd>
                                 </div>
                             }
                         </dl>

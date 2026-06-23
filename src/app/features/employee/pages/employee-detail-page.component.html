@@ -334,7 +334,11 @@
                     <div class="section-card-header">
                         <div>
                             <h2 class="section-title">給与条件</h2>
-                            <p class="section-card-desc">現在適用中の固定的賃金</p>
+                            @if (isPartTimeEmployment()) {
+                                <p class="section-card-desc">現在適用中の見込み給料（月額報酬・通勤手当・その他手当）</p>
+                            } @else {
+                                <p class="section-card-desc">現在適用中の固定的賃金</p>
+                            }
                         </div>
                         <div class="section-card-actions">
                             <button type="button" class="section-card-action" (click)="openSalaryConditionChangeModal()">
@@ -349,6 +353,7 @@
                         <app-salary-condition-display
                             [condition]="condition"
                             [showEffectiveMonth]="true"
+                            [isPartTime]="isPartTimeEmployment()"
                         />
                     } @else {
                         <p class="section-note">給与条件が未登録です。「給与条件を変更する」から登録できます。</p>
@@ -1066,6 +1071,7 @@
         [title]="salaryConditionEditingMonth() ? '給与条件を編集' : currentSalaryCondition() ? '給与条件を変更' : '給与条件を登録'"
         [initialValue]="salaryConditionModalInitial()"
         [minEffectiveStartMonth]="salaryConditionMinEffectiveMonth()"
+        [isPartTime]="isPartTimeEmployment()"
         [isLoading]="isSavingSalaryCondition()"
         [serverErrorMessage]="salaryConditionSaveError()"
         (close)="closeSalaryConditionModal()"
@@ -1076,6 +1082,7 @@
 @if (showSalaryConditionHistoryModal()) {
     <app-salary-condition-history-modal
         [periods]="salaryConditionPeriods()"
+        [isPartTime]="isPartTimeEmployment()"
         (close)="closeSalaryConditionHistoryModal()"
     />
 }

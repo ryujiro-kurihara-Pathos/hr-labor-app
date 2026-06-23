@@ -221,6 +221,7 @@
                                 [condition]="condition"
                                 [showActions]="true"
                                 [compact]="true"
+                                [isPartTime]="isPartTimeEmployee()"
                                 (changeClick)="openSalaryConditionChangeModal()"
                                 (historyClick)="openSalaryConditionHistoryModal()"
                             />
@@ -1618,6 +1619,7 @@
             [title]="salaryConditionEditingMonth() ? '給与条件を編集' : '給与条件を変更'"
             [initialValue]="salaryConditionModalInitial()"
             [minEffectiveStartMonth]="salaryConditionMinEffectiveMonth()"
+            [isPartTime]="isPartTimeEmployee()"
             [isLoading]="isSavingSalaryCondition()"
             [serverErrorMessage]="salaryConditionSaveError()"
             (close)="closeSalaryConditionModal()"
@@ -1628,6 +1630,7 @@
     @if (showSalaryConditionHistoryModal()) {
         <app-salary-condition-history-modal
             [periods]="salaryConditionPeriods()"
+            [isPartTime]="isPartTimeEmployee()"
             (close)="closeSalaryConditionHistoryModal()"
         />
     }

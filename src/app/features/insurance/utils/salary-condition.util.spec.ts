@@ -296,6 +296,106 @@ describe('salary-condition.util', () => {
 
             expect(reason).toBeNull();
         });
+
+        it('blocks part-time new condition when amounts match previous history', () => {
+            const existing = condition({
+                effectiveStartMonth: '2026-05',
+                id: 'e1_2026-05',
+                basicSalary: 80_000,
+                commutingAllowance: 10_000,
+                otherFixedAllowance: 5_000,
+                positionAllowance: 0,
+                housingAllowance: 0,
+                fixedOvertimePay: 0,
+                fixedWageTotal: 95_000,
+            });
+            const reason = validateSalaryConditionForm({
+                form: {
+                    effectiveStartMonth: '2026-07',
+                    basicSalary: 80_000,
+                    commutingAllowance: 10_000,
+                    positionAllowance: 0,
+                    housingAllowance: 0,
+                    fixedOvertimePay: 0,
+                    otherFixedAllowance: 5_000,
+                    note: '',
+                    changeReason: '変更なし',
+                },
+                employee: employee({ employmentType: 'part-time' }),
+                conditions: [existing],
+                confirmedRewardMonths: [],
+                payrollPaymentMonthOffset: 1,
+            });
+
+            expect(reason).toContain('変更がありません');
+        });
+
+        it('allows part-time new condition when amounts differ from previous history', () => {
+            const existing = condition({
+                effectiveStartMonth: '2026-05',
+                id: 'e1_2026-05',
+                basicSalary: 80_000,
+                commutingAllowance: 10_000,
+                otherFixedAllowance: 5_000,
+                positionAllowance: 0,
+                housingAllowance: 0,
+                fixedOvertimePay: 0,
+                fixedWageTotal: 95_000,
+            });
+            const reason = validateSalaryConditionForm({
+                form: {
+                    effectiveStartMonth: '2026-07',
+                    basicSalary: 85_000,
+                    commutingAllowance: 10_000,
+                    positionAllowance: 0,
+                    housingAllowance: 0,
+                    fixedOvertimePay: 0,
+                    otherFixedAllowance: 5_000,
+                    note: '',
+                    changeReason: '昇給',
+                },
+                employee: employee({ employmentType: 'part-time' }),
+                conditions: [existing],
+                confirmedRewardMonths: [],
+                payrollPaymentMonthOffset: 1,
+            });
+
+            expect(reason).toBeNull();
+        });
+
+        it('blocks part-time edit when amounts are unchanged', () => {
+            const existing = condition({
+                effectiveStartMonth: '2026-07',
+                id: 'e1_2026-07',
+                basicSalary: 80_000,
+                commutingAllowance: 10_000,
+                otherFixedAllowance: 5_000,
+                positionAllowance: 0,
+                housingAllowance: 0,
+                fixedOvertimePay: 0,
+                fixedWageTotal: 95_000,
+            });
+            const reason = validateSalaryConditionForm({
+                form: {
+                    effectiveStartMonth: '2026-07',
+                    basicSalary: 80_000,
+                    commutingAllowance: 10_000,
+                    positionAllowance: 0,
+                    housingAllowance: 0,
+                    fixedOvertimePay: 0,
+                    otherFixedAllowance: 5_000,
+                    note: '備考だけ変更',
+                    changeReason: '理由だけ変更',
+                },
+                employee: employee({ employmentType: 'part-time' }),
+                conditions: [condition({ effectiveStartMonth: '2026-05', id: 'e1_2026-05' }), existing],
+                confirmedRewardMonths: [],
+                editingEffectiveStartMonth: '2026-07',
+                payrollPaymentMonthOffset: 1,
+            });
+
+            expect(reason).toContain('変更がありません');
+        });
     });
 
     describe('resolveSalaryConditionChangeBlockReason', () => {
