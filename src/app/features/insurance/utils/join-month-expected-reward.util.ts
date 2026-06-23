@@ -1,16 +1,21 @@
 import { EmploymentType } from '../../employee/models/employee.models';
 import { SalaryConditionFormValue, SalaryConditionInput } from '../models/salary-condition.model';
 import { StandardMonthlyRewardInput } from '../models/standard-monthly-reward.model';
-import { fixedWageTotalFromForm } from './salary-condition.util';
+import { fixedWageTotalFromForm, resolveSalaryConditionEffectiveStartMonth } from './salary-condition.util';
 import { yearMonthFromDateString } from './reward-target-month.util';
+import { PayrollPaymentMonthOffset } from './standard-remuneration-determination.util';
 
 export function buildInitialSalaryConditionInput(params: {
     companyId: string;
     employeeId: string;
     joinedDate: string;
     form: SalaryConditionFormValue;
+    payrollPaymentMonthOffset?: PayrollPaymentMonthOffset;
 }): SalaryConditionInput | null {
-    const effectiveStartMonth = yearMonthFromDateString(params.joinedDate);
+    const effectiveStartMonth = resolveSalaryConditionEffectiveStartMonth(
+        params.joinedDate,
+        params.payrollPaymentMonthOffset ?? 1,
+    );
     if (!effectiveStartMonth) return null;
 
     return {

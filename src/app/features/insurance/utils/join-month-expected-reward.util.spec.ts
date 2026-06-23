@@ -1,4 +1,4 @@
-import { buildJoinMonthExpectedRewardInput, buildJoinMonthRewardFromSalaryCondition } from './join-month-expected-reward.util';
+import { buildInitialSalaryConditionInput, buildJoinMonthExpectedRewardInput, buildJoinMonthRewardFromSalaryCondition } from './join-month-expected-reward.util';
 import {
     findEmployeeOldestUnregisteredYearMonth,
     findOldestUnregisteredYearMonth,
@@ -6,6 +6,28 @@ import {
 import { Employee } from '../../employee/models/employee.models';
 
 describe('join-month-expected-reward.util', () => {
+    it('builds initial salary condition from month after join for next month payment', () => {
+        const input = buildInitialSalaryConditionInput({
+            companyId: 'c1',
+            employeeId: 'e1',
+            joinedDate: '2026-04-15',
+            payrollPaymentMonthOffset: 1,
+            form: {
+                effectiveStartMonth: '',
+                basicSalary: 250_000,
+                commutingAllowance: 10_000,
+                positionAllowance: 0,
+                housingAllowance: 0,
+                fixedOvertimePay: 0,
+                otherFixedAllowance: 0,
+                note: '',
+                changeReason: '初回登録',
+            },
+        });
+
+        expect(input?.effectiveStartMonth).toBe('2026-05');
+    });
+
     it('builds full-time join month reward from expected salary', () => {
         const input = buildJoinMonthExpectedRewardInput({
             companyId: 'c1',

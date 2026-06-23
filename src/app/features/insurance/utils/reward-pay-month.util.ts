@@ -290,6 +290,19 @@ export function salaryPayYearMonthMax(
     return resolvePayMonthFromWorkMonth(workMax, payrollPaymentMonthOffset);
 }
 
+/** 報酬入力一覧での対象月か（給与入力対象、または入社月の支給年月表示） */
+export function isRewardInputListTargetMonth(
+    employee: Employee,
+    payYearMonth: string,
+    payrollPaymentMonthOffset: PayrollPaymentMonthOffset,
+    referenceYearMonth: string = currentYearMonth(),
+): boolean {
+    if (isSalaryPayMonthTarget(employee, payYearMonth, payrollPaymentMonthOffset, referenceYearMonth)) {
+        return true;
+    }
+    return isJoinPayMonthView(employee, payYearMonth);
+}
+
 /** 支給年月が給与入力対象か（翌月払いの入社月は除外） */
 export function isSalaryPayMonthTarget(
     employee: Employee,

@@ -13,7 +13,33 @@ import {
     sumFixedWageFields,
 } from './fixed-wage-change.util';
 import { addMonthsToYearMonth, yearMonthFromDateString } from './reward-target-month.util';
-import { formatYearMonthLabel } from './standard-remuneration-determination.util';
+import { formatYearMonthLabel, PayrollPaymentMonthOffset } from './standard-remuneration-determination.util';
+
+/** 給与条件の適用開始月（翌月払いは入社月の翌月から） */
+export function resolveSalaryConditionEffectiveStartMonth(
+    joinedDate: string | null | undefined,
+    payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+): string | null {
+    const joinYm = yearMonthFromDateString(joinedDate);
+    if (!joinYm) return null;
+    if (payrollPaymentMonthOffset === 1) {
+        return addMonthsToYearMonth(joinYm, 1);
+    }
+    return joinYm;
+}
+
+/** 履歴表示用：翌月払いでは入社月キーの給与条件を除外 */
+export function filterSalaryConditionsForHistory(
+    conditions: SalaryCondition[],
+    joinedDate: string | null | undefined,
+    payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+): SalaryCondition[] {
+    const joinYm = yearMonthFromDateString(joinedDate);
+    if (!joinYm || payrollPaymentMonthOffset !== 1) {
+        return conditions;
+    }
+    return conditions.filter((condition) => condition.effectiveStartMonth !== joinYm);
+}
 
 export function salaryConditionDocId(employeeId: string, effectiveStartMonth: string): string {
     return `${employeeId}_${effectiveStartMonth}`;
@@ -142,20 +168,24 @@ export function salaryConditionPeriodIncludesConfirmedMonth(params: {
     );
 }
 
-/** 変更対象期間に入社月が含まれるか */
+/** 変更対象期間に初回適用月が含まれるか */
 export function salaryConditionPeriodIncludesJoinMonth(params: {
     effectiveStartMonth: string;
     conditions: SalaryCondition[];
     joinedDate: string | null | undefined;
+    payrollPaymentMonthOffset?: PayrollPaymentMonthOffset;
 }): boolean {
-    const joinYearMonth = yearMonthFromDateString(params.joinedDate);
-    if (!joinYearMonth) return false;
+    const initialStartMonth = resolveSalaryConditionEffectiveStartMonth(
+        params.joinedDate,
+        params.payrollPaymentMonthOffset ?? 1,
+    );
+    if (!initialStartMonth) return false;
     const periodEndMonth = resolveSalaryConditionPeriodEndMonth(
         params.effectiveStartMonth,
         params.conditions,
     );
     return isYearMonthWithinSalaryConditionPeriod(
-        joinYearMonth,
+        initialStartMonth,
         params.effectiveStartMonth,
         periodEndMonth,
     );
@@ -166,6 +196,7 @@ export function resolveSalaryConditionChangeBlockReason(params: {
     conditions: SalaryCondition[];
     confirmedRewardMonths: string[];
     joinedDate?: string | null;
+    payrollPaymentMonthOffset?: PayrollPaymentMonthOffset;
     isEdit: boolean;
 }): string | null {
     if (
@@ -174,9 +205,10 @@ export function resolveSalaryConditionChangeBlockReason(params: {
             effectiveStartMonth: params.effectiveStartMonth,
             conditions: params.conditions,
             joinedDate: params.joinedDate,
+            payrollPaymentMonthOffset: params.payrollPaymentMonthOffset,
         })
     ) {
-        return '入社月を含む給与条件は変更できません。';
+        return '初回適用の給与条件は変更できません。';
     }
 
     if (
@@ -194,8 +226,21 @@ export function resolveSalaryConditionChangeBlockReason(params: {
     return null;
 }
 
-export function buildSalaryConditionPeriods(conditions: SalaryCondition[]): SalaryConditionPeriod[] {
-    const sorted = [...conditions].sort(
+export function buildSalaryConditionPeriods(
+    conditions: SalaryCondition[],
+    options?: {
+        joinedDate?: string | null;
+        payrollPaymentMonthOffset?: PayrollPaymentMonthOffset;
+    },
+): SalaryConditionPeriod[] {
+    const visibleConditions = options
+        ? filterSalaryConditionsForHistory(
+            conditions,
+            options.joinedDate,
+            options.payrollPaymentMonthOffset ?? 1,
+        )
+        : conditions;
+    const sorted = [...visibleConditions].sort(
         (a, b) => (a.effectiveStartMonth < b.effectiveStartMonth ? -1 : 1),
     );
 
@@ -220,13 +265,17 @@ export function buildSalaryConditionPeriods(conditions: SalaryCondition[]): Sala
 export function resolveEarliestSalaryConditionMonth(params: {
     joinedDate: string | null | undefined;
     qualificationDate?: string | null;
+    payrollPaymentMonthOffset?: PayrollPaymentMonthOffset;
 }): string | null {
-    const joinYm = yearMonthFromDateString(params.joinedDate);
+    const salaryStartYm = resolveSalaryConditionEffectiveStartMonth(
+        params.joinedDate,
+        params.payrollPaymentMonthOffset ?? 1,
+    );
     const qualificationYm = yearMonthFromDateString(params.qualificationDate);
-    if (joinYm && qualificationYm) {
-        return joinYm > qualificationYm ? joinYm : qualificationYm;
+    if (salaryStartYm && qualificationYm) {
+        return salaryStartYm > qualificationYm ? salaryStartYm : qualificationYm;
     }
-    return joinYm ?? qualificationYm ?? null;
+    return salaryStartYm ?? qualificationYm ?? null;
 }
 
 function fixedWageFieldValue(
@@ -254,6 +303,7 @@ export function validateSalaryConditionForm(params: {
     confirmedRewardMonths: string[];
     editingEffectiveStartMonth?: string | null;
     qualificationDate?: string | null;
+    payrollPaymentMonthOffset?: PayrollPaymentMonthOffset;
 }): string | null {
     const effectiveStartMonth = params.form.effectiveStartMonth.trim();
     if (!/^\d{4}-\d{2}$/.test(effectiveStartMonth)) {
@@ -263,6 +313,7 @@ export function validateSalaryConditionForm(params: {
     const earliest = resolveEarliestSalaryConditionMonth({
         joinedDate: params.employee.joinedDate,
         qualificationDate: params.qualificationDate,
+        payrollPaymentMonthOffset: params.payrollPaymentMonthOffset,
     });
     if (earliest && effectiveStartMonth < earliest) {
         return `適用開始月は${formatYearMonthLabel(earliest)}以降を指定してください。`;
@@ -300,6 +351,7 @@ export function validateSalaryConditionForm(params: {
         conditions: params.conditions,
         confirmedRewardMonths: params.confirmedRewardMonths,
         joinedDate: params.employee.joinedDate,
+        payrollPaymentMonthOffset: params.payrollPaymentMonthOffset,
         isEdit,
     });
     if (changeBlockReason) {

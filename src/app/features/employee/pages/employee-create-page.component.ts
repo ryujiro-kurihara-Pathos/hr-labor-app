@@ -11,6 +11,7 @@ import { SocialInsuranceStatusService } from '../../social-insurance/services/so
 import { SocialInsuranceProcedureService } from '../../social-insurance/services/social-insurance-procedure.service';
 import { ConfirmService } from '../../../shared/services/confirm.service';
 import { OfficeService } from '../../company/services/office.service';
+import { CompanyService } from '../../company/services/company.service';
 import { Office } from '../../company/models/office.model';
 import { SocialInsuranceStatusInput } from '../../social-insurance/models/social-insurance-status.model';
 import {
@@ -60,6 +61,7 @@ export class EmployeeCreatePageComponent {
     private readonly authService = inject(AuthService);
     private readonly userService = inject(UserService);
     private readonly officeService = inject(OfficeService);
+    private readonly companyService = inject(CompanyService);
     private readonly socialInsuranceStatusService = inject(SocialInsuranceStatusService);
     private readonly procedureService = inject(SocialInsuranceProcedureService);
     private readonly confirmService = inject(ConfirmService);
@@ -78,7 +80,6 @@ export class EmployeeCreatePageComponent {
     nextEmployeeNumber = signal('');
     offices = signal<Office[]>([]);
     employee: EmployeeInput = createEmptyEmployeeInput();
-    expectedMonthlySalary: number | '' = '';
     salaryConditionForm: SalaryConditionFormValue = {
         effectiveStartMonth: '',
         basicSalary: '',
@@ -95,6 +96,7 @@ export class EmployeeCreatePageComponent {
     prescribedWage: number | '' = '';
     isStudent = false;
     expectedEmploymentOver2Months = false;
+    payrollPaymentMonthOffset: 0 | 1 = 1;
     readonly prefectures = PREFECTURES;
 
     async ngOnInit(): Promise<void> {
@@ -120,6 +122,8 @@ export class EmployeeCreatePageComponent {
         }
 
         this.employee.companyId = appUser.companyId;
+        const company = await this.companyService.getCompanyById(appUser.companyId);
+        this.payrollPaymentMonthOffset = company?.payrollPaymentMonthOffset ?? 1;
         await this.loadOffices(appUser.companyId);
         this.nextEmployeeNumber.set(
             await this.employeeService.generateNextEmployeeNumber(appUser.companyId),
@@ -211,40 +215,27 @@ export class EmployeeCreatePageComponent {
             );
             await this.socialInsuranceStatusService.createSocialInsuranceStatus(syncedSocialInsuranceInput);
 
-            const expectedSalary = Number(this.expectedMonthlySalary);
-            const salaryConditionInput = this.isPartTimeEmployment()
-                ? buildInitialSalaryConditionInput({
+            if (!this.isPartTimeEmployment()) {
+                const salaryConditionInput = buildInitialSalaryConditionInput({
                     companyId: employee.companyId,
                     employeeId: employee.id,
                     joinedDate: employee.joinedDate,
-                    form: {
-                        ...this.salaryConditionForm,
-                        basicSalary: expectedSalary,
-                        commutingAllowance: 0,
-                        positionAllowance: 0,
-                        housingAllowance: 0,
-                        fixedOvertimePay: 0,
-                        otherFixedAllowance: 0,
-                    },
-                })
-                : buildInitialSalaryConditionInput({
-                    companyId: employee.companyId,
-                    employeeId: employee.id,
-                    joinedDate: employee.joinedDate,
+                    payrollPaymentMonthOffset: this.payrollPaymentMonthOffset,
                     form: this.salaryConditionForm,
                 });
 
-            if (salaryConditionInput) {
-                await this.salaryConditionService.save(salaryConditionInput);
-                const joinMonthRewardInput = buildJoinMonthRewardFromSalaryCondition({
-                    companyId: employee.companyId,
-                    employeeId: employee.id,
-                    joinedDate: employee.joinedDate,
-                    employmentType: employee.employmentType,
-                    condition: salaryConditionInput,
-                });
-                if (joinMonthRewardInput) {
-                    await this.rewardService.confirm(joinMonthRewardInput);
+                if (salaryConditionInput) {
+                    await this.salaryConditionService.save(salaryConditionInput);
+                    const joinMonthRewardInput = buildJoinMonthRewardFromSalaryCondition({
+                        companyId: employee.companyId,
+                        employeeId: employee.id,
+                        joinedDate: employee.joinedDate,
+                        employmentType: employee.employmentType,
+                        condition: salaryConditionInput,
+                    });
+                    if (joinMonthRewardInput) {
+                        await this.rewardService.confirm(joinMonthRewardInput);
+                    }
                 }
             }
 
@@ -294,7 +285,7 @@ export class EmployeeCreatePageComponent {
 
     isSalaryInputValid(): boolean {
         if (this.isPartTimeEmployment()) {
-            return this.expectedMonthlySalary !== '' && Number(this.expectedMonthlySalary) > 0;
+            return true;
         }
         return isSalaryConditionFormValid(this.salaryConditionForm);
     }

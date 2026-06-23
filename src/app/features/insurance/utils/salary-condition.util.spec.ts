@@ -2,8 +2,11 @@ import { createEmptyEmployeeInput, Employee } from '../../employee/models/employ
 import { SalaryCondition } from '../models/salary-condition.model';
 import {
     buildSalaryConditionPeriods,
+    filterSalaryConditionsForHistory,
+    resolveEarliestSalaryConditionMonth,
     resolvePreviousSalaryCondition,
     resolveSalaryConditionChangeBlockReason,
+    resolveSalaryConditionEffectiveStartMonth,
     salaryConditionPeriodIncludesConfirmedMonth,
     salaryConditionPeriodIncludesJoinMonth,
     resolveSalaryConditionForMonth,
@@ -46,6 +49,36 @@ function condition(overrides: Partial<SalaryCondition> = {}): SalaryCondition {
 }
 
 describe('salary-condition.util', () => {
+    describe('resolveSalaryConditionEffectiveStartMonth', () => {
+        it('returns month after join for next month payment', () => {
+            expect(resolveSalaryConditionEffectiveStartMonth('2026-04-15', 1)).toBe('2026-05');
+        });
+
+        it('returns join month for same month payment', () => {
+            expect(resolveSalaryConditionEffectiveStartMonth('2026-04-15', 0)).toBe('2026-04');
+        });
+    });
+
+    describe('resolveEarliestSalaryConditionMonth', () => {
+        it('uses month after join for next month payment', () => {
+            expect(resolveEarliestSalaryConditionMonth({
+                joinedDate: '2026-04-15',
+                payrollPaymentMonthOffset: 1,
+            })).toBe('2026-05');
+        });
+    });
+
+    describe('filterSalaryConditionsForHistory', () => {
+        it('excludes join month condition for next month payment', () => {
+            const conditions = [
+                condition({ effectiveStartMonth: '2026-04' }),
+                condition({ id: 'e1_2026-05', effectiveStartMonth: '2026-05' }),
+            ];
+            const filtered = filterSalaryConditionsForHistory(conditions, '2026-04-15', 1);
+            expect(filtered.map((item) => item.effectiveStartMonth)).toEqual(['2026-05']);
+        });
+    });
+
     describe('resolveSalaryConditionForMonth', () => {
         it('returns the latest condition that started on or before target month', () => {
             const conditions = [
@@ -70,6 +103,19 @@ describe('salary-condition.util', () => {
             expect(periods[1]?.displayEndMonth).toBeNull();
             expect(periods[1]?.displayLabel).toContain('現在');
         });
+
+        it('hides join month condition for next month payment history', () => {
+            const periods = buildSalaryConditionPeriods(
+                [
+                    condition({ effectiveStartMonth: '2026-04', fixedWageTotal: 300_000 }),
+                    condition({ id: 'e1_2026-05', effectiveStartMonth: '2026-05', fixedWageTotal: 310_000 }),
+                ],
+                { joinedDate: '2026-04-15', payrollPaymentMonthOffset: 1 },
+            );
+
+            expect(periods.length).toBe(1);
+            expect(periods[0]?.condition.effectiveStartMonth).toBe('2026-05');
+        });
     });
 
     describe('shouldTriggerRevisionFromSalaryCondition', () => {
@@ -92,7 +138,7 @@ describe('salary-condition.util', () => {
     });
 
     describe('validateSalaryConditionForm', () => {
-        it('blocks new condition before join month', () => {
+        it('blocks new condition before earliest salary condition month', () => {
             const reason = validateSalaryConditionForm({
                 form: {
                     effectiveStartMonth: '2026-03',
@@ -108,9 +154,10 @@ describe('salary-condition.util', () => {
                 employee: employee(),
                 conditions: [],
                 confirmedRewardMonths: [],
+                payrollPaymentMonthOffset: 1,
             });
 
-            expect(reason).toContain('2026年4月');
+            expect(reason).toContain('2026年5月');
         });
 
         it('blocks new condition that affects confirmed months', () => {
@@ -157,7 +204,7 @@ describe('salary-condition.util', () => {
             expect(reason).toContain('給与確定済み');
         });
 
-        it('blocks edit when change target period includes join month', () => {
+        it('blocks edit when change target period includes initial start month', () => {
             const existing = condition();
             const reason = validateSalaryConditionForm({
                 form: {
@@ -175,9 +222,10 @@ describe('salary-condition.util', () => {
                 conditions: [existing],
                 confirmedRewardMonths: [],
                 editingEffectiveStartMonth: '2026-04',
+                payrollPaymentMonthOffset: 0,
             });
 
-            expect(reason).toContain('入社月');
+            expect(reason).toContain('初回適用');
         });
 
         it('allows edit when later condition period has no confirmed or join months', () => {
@@ -277,9 +325,10 @@ describe('salary-condition.util', () => {
                     conditions,
                     confirmedRewardMonths: [],
                     joinedDate: '2026-04-15',
+                    payrollPaymentMonthOffset: 0,
                     isEdit: true,
                 }),
-            ).toContain('入社月');
+            ).toContain('初回適用');
         });
     });
 

@@ -6,6 +6,7 @@ import { Timestamp } from 'firebase/firestore';
 
 import { EmployeeService } from '../services/employee.service';
 import { OfficeService } from '../../company/services/office.service';
+import { CompanyService } from '../../company/services/company.service';
 import { SocialInsuranceStatusService } from '../../social-insurance/services/social-insurance-status.service';
 import { SocialInsuranceProcedureService } from '../../social-insurance/services/social-insurance-procedure.service';
 
@@ -119,6 +120,7 @@ export class EmployeeDetailPageComponent {
     private readonly router = inject(Router);
     private readonly employeeService = inject(EmployeeService);
     private readonly officeService = inject(OfficeService);
+    private readonly companyService = inject(CompanyService);
     private readonly insuranceStatusService = inject(SocialInsuranceStatusService);
     private readonly procedureService = inject(SocialInsuranceProcedureService);
     private readonly confirmService = inject(ConfirmService);
@@ -130,6 +132,7 @@ export class EmployeeDetailPageComponent {
     employee = signal<Employee | null>(null);
     office = signal<Office | null>(null);
     officeName = signal<string>('');
+    payrollPaymentMonthOffset = signal<0 | 1>(1);
     
     // 取得資格手続きのID
     qualificationProcedure = signal<Procedure | null>(null);
@@ -178,13 +181,17 @@ export class EmployeeDetailPageComponent {
     });
 
     salaryConditionPeriods = computed((): SalaryConditionPeriod[] =>
-        buildSalaryConditionPeriods(this.salaryConditions()),
+        buildSalaryConditionPeriods(this.salaryConditions(), {
+            joinedDate: this.employee()?.joinedDate,
+            payrollPaymentMonthOffset: this.payrollPaymentMonthOffset(),
+        }),
     );
 
     salaryConditionMinEffectiveMonth = computed((): string | null =>
         resolveEarliestSalaryConditionMonth({
             joinedDate: this.employee()?.joinedDate,
             qualificationDate: this.socialInsuranceStatus()?.healthInsuranceStartDate ?? null,
+            payrollPaymentMonthOffset: this.payrollPaymentMonthOffset(),
         }),
     );
 
@@ -352,9 +359,13 @@ export class EmployeeDetailPageComponent {
             }
 
             // 事業所を取得
-            const office = await this.officeService.getOfficeById(employee.officeId);
+            const [office, company] = await Promise.all([
+                this.officeService.getOfficeById(employee.officeId),
+                this.companyService.getCompanyById(employee.companyId),
+            ]);
             this.office.set(office);
             this.officeName.set(office?.name ?? employee.officeId);
+            this.payrollPaymentMonthOffset.set(company?.payrollPaymentMonthOffset ?? 1);
             this.syncFormFromEmployee(employee);
 
             // 社会保険情報を取得
@@ -1469,6 +1480,7 @@ export class EmployeeDetailPageComponent {
             confirmedRewardMonths: this.confirmedRewardMonths(),
             editingEffectiveStartMonth: this.salaryConditionEditingMonth(),
             qualificationDate: this.socialInsuranceStatus()?.healthInsuranceStartDate ?? null,
+            payrollPaymentMonthOffset: this.payrollPaymentMonthOffset(),
         });
         if (validationError) {
             this.salaryConditionSaveError.set(validationError);

@@ -1100,13 +1100,17 @@ export class InsurancePremiumDetailPageComponent {
     });
 
     salaryConditionPeriods = computed((): SalaryConditionPeriod[] =>
-        buildSalaryConditionPeriods(this.salaryConditions()),
+        buildSalaryConditionPeriods(this.salaryConditions(), {
+            joinedDate: this.employee()?.joinedDate,
+            payrollPaymentMonthOffset: this.payrollPaymentMonthOffset(),
+        }),
     );
 
     salaryConditionMinEffectiveMonth = computed((): string | null => {
         return resolveEarliestSalaryConditionMonth({
             joinedDate: this.employee()?.joinedDate,
             qualificationDate: this.resolvedQualificationDate(),
+            payrollPaymentMonthOffset: this.payrollPaymentMonthOffset(),
         });
     });
 
@@ -3988,6 +3992,7 @@ export class InsurancePremiumDetailPageComponent {
             confirmedRewardMonths: this.confirmedRewardMonths(),
             editingEffectiveStartMonth: this.salaryConditionEditingMonth(),
             qualificationDate: this.resolvedQualificationDate(),
+            payrollPaymentMonthOffset: this.payrollPaymentMonthOffset(),
         });
         if (validationError) {
             this.salaryConditionSaveError.set(validationError);

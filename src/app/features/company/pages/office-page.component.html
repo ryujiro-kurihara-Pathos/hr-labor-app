@@ -140,8 +140,11 @@
                         type="number"
                         name="regularWeeklyScheduledWorkHours"
                         [(ngModel)]="regularWeeklyScheduledWorkHours"
+                        min="0.01"
+                        step="0.01"
                         placeholder="例: 40"
                     />
+                    <p class="field-note">小数も入力できます。未入力の場合は絶対基準のみで判定します。</p>
                 </div>
                 <div class="form-field">
                     <label for="regular-monthly-days">月の所定労働日数</label>
@@ -150,8 +153,11 @@
                         type="number"
                         name="regularMonthlyScheduledWorkDays"
                         [(ngModel)]="regularMonthlyScheduledWorkDays"
+                        min="1"
+                        step="1"
                         placeholder="例: 20"
                     />
+                    <p class="field-note">整数のみ入力できます。未入力の場合は絶対基準のみで判定します。</p>
                 </div>
 
                 @if (errorMessage()) {

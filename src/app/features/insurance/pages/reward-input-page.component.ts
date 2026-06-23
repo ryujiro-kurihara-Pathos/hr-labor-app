@@ -27,7 +27,7 @@ import { addMonthsToYearMonth, currentYearMonth as getCurrentYearMonth, listNavi
 import { filterInsuranceListRows } from '../utils/employee-list-filter.util';
 import { isRewardConfirmed } from '../utils/reward-status.util';
 import {
-    isSalaryPayMonthTarget,
+    isRewardInputListTargetMonth,
     lookupExactRewardByPayMonth,
 } from '../utils/reward-pay-month.util';
 import { buildSocialInsuranceJoinJudgmentContext } from '../../social-insurance/utils/social-insurance-join-status.util';
@@ -287,7 +287,7 @@ export class RewardInputPageComponent {
         return this.employees().map((employee) => {
             const employeeRewards = byEmployee[employee.id] ?? {};
             const reward = lookupExactRewardByPayMonth(employeeRewards, payYearMonth);
-            const isTargetMonth = isSalaryPayMonthTarget(employee, payYearMonth, offset);
+            const isTargetMonth = isRewardInputListTargetMonth(employee, payYearMonth, offset);
             const socialInsurance = socialInsuranceByEmployee[employee.id] ?? null;
             const joinJudgmentContext = buildSocialInsuranceJoinJudgmentContext(
                 employee,

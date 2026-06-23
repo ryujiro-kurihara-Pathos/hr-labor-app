@@ -4,6 +4,8 @@ import {
     isJoinMonthWithNextMonthPay,
     isJoinMonthZeroPremiumDeductionView,
     isJoinPayMonthView,
+    isRewardInputListTargetMonth,
+    isSalaryPayMonthTarget,
     isPremiumBasisRewardConfirmed,
     isRewardConfirmedForPayMonth,
     lookupConfirmedExactRewardByPayMonth,
@@ -33,6 +35,20 @@ describe('reward-pay-month.util', () => {
     describe('isJoinPayMonthView', () => {
         it('returns true when pay month equals join month', () => {
             expect(isJoinPayMonthView(employee('2026-02-15'), '2026-02')).toBe(true);
+        });
+    });
+
+    describe('isRewardInputListTargetMonth', () => {
+        it('treats join pay month as target when salary pay month is excluded', () => {
+            const emp = employee('2026-06-01');
+            expect(isSalaryPayMonthTarget(emp, '2026-06', 1, '2026-06')).toBe(false);
+            expect(isRewardInputListTargetMonth(emp, '2026-06', 1, '2026-06')).toBe(true);
+        });
+
+        it('matches salary pay month target for regular months', () => {
+            const emp = employee('2026-06-01');
+            expect(isRewardInputListTargetMonth(emp, '2026-07', 1, '2026-07')).toBe(true);
+            expect(isRewardInputListTargetMonth(emp, '2026-05', 1, '2026-06')).toBe(false);
         });
     });
 

@@ -16,6 +16,7 @@ import { healthInsuranceTypeLabel } from '../utils/office-health-insurance.util'
 import { OfficeDeletionCheck, officeDeletionBlockedMessage } from '../utils/office-usage.util';
 import { PostalCodeLookupService } from '../../../shared/services/postal-code-lookup.service';
 import { applyPostalLookupResult } from '../../../shared/utils/postal-code-lookup.util';
+import { validateOfficeRegularWorkerCriteria } from '../utils/office-regular-worker-criteria.util';
 
 @Component({
     selector: 'app-office-page',
@@ -174,12 +175,21 @@ export class OfficePageComponent {
         const office = this.office();
         if (!office) return;
 
-        this.isSaving.set(true);
         this.errorMessage.set('');
 
+        const criteria = validateOfficeRegularWorkerCriteria(
+            this.regularWeeklyScheduledWorkHours,
+            this.regularMonthlyScheduledWorkDays,
+        );
+        if (!criteria.ok) {
+            this.errorMessage.set(criteria.error);
+            return;
+        }
+
+        this.isSaving.set(true);
+
         try {
-            const regularWeeklyScheduledWorkHours = this.toNullableNumber(this.regularWeeklyScheduledWorkHours);
-            const regularMonthlyScheduledWorkDays = this.toNullableNumber(this.regularMonthlyScheduledWorkDays);
+            const { regularWeeklyScheduledWorkHours, regularMonthlyScheduledWorkDays } = criteria.value;
 
             const officeSymbol = normalizeOfficeSymbol(this.officeSymbol);
 
@@ -362,14 +372,5 @@ export class OfficePageComponent {
 
     private numberToFormValue(value: number | null | undefined): string {
         return value !== null && value !== undefined ? String(value) : '';
-    }
-
-    private toNullableNumber(value: string | number | null | undefined): number | null {
-        if (value === null || value === undefined) return null;
-        if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-        const trimmed = value.trim();
-        if (!trimmed) return null;
-        const num = Number(trimmed);
-        return Number.isFinite(num) ? num : null;
     }
 }
