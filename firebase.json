@@ -3,11 +3,18 @@
     "rules": "firestore.rules"
   },
   "hosting": {
+    "site": "kensyu10143",
     "public": "dist/hr-labor-app/browser",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
     ]
   }
 }
