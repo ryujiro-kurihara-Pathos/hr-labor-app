@@ -3,15 +3,16 @@ import { SalaryCondition } from '../models/salary-condition.model';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 import { getRevisionApplyFromMonth } from './revision-determination.util';
 import {
-    collapseConsecutiveRevisionOrigins,
+    dedupeConsecutiveRevisionOriginsWithSameFixedWage,
     evaluateRevisionAtOrigin,
     evaluateRevisionEligibilityForPayMonth,
     formatRevisionEligibilityWarningMessage,
     hasEligibleRevisionBeforeMonth,
+    listEligibleRevisionCandidates,
+    listEligibleRevisionProcedureContextsForMonth,
     pickWinningDeterminationCandidate,
     resolveRevisionOriginMonths,
     revisionSupersedesRegularDeterminationForBaseYear,
-    listEligibleRevisionCandidates,
 } from './determination-precedence.util';
 import { resolvePremiumStandardDeterminationYearMonth } from '../../company/utils/company-payroll-settings.util';
 
@@ -297,7 +298,7 @@ describe('determination-precedence.util revision apply timing', () => {
         expect(winner?.revisionOriginMonth).toBe('2026-06');
     });
 
-    it('collapses consecutive May and June fixedWageChanged flags to June origin', () => {
+    it('dedupes consecutive origins with the same fixed wage to the later month', () => {
         const rewards = {
             ...buildBaselineRewards(),
             '2026-05': makeReward('2026-05', 400000, { fixedWageChanged: true }),
@@ -306,7 +307,12 @@ describe('determination-precedence.util revision apply timing', () => {
             '2026-08': makeReward('2026-08', 400000),
         };
 
-        expect(collapseConsecutiveRevisionOrigins(['2026-05', '2026-06'])).toEqual(['2026-06']);
+        expect(
+            dedupeConsecutiveRevisionOriginsWithSameFixedWage(
+                ['2026-05', '2026-06'],
+                rewards,
+            ),
+        ).toEqual(['2026-06']);
 
         const augustWinner = pickWinningDeterminationCandidate(
             '2026-08',
@@ -330,6 +336,94 @@ describe('determination-precedence.util revision apply timing', () => {
         );
         expect(septemberWinner?.kind).toBe('revision');
         expect(septemberWinner?.revisionOriginMonth).toBe('2026-06');
+    });
+
+    it('keeps consecutive origins when fixed wages differ and applies both revisions', () => {
+        const tieredCalculate = (monthlyReward: number) => {
+            if (monthlyReward >= 400_000) {
+                return {
+                    health: { grade: 24, standardMonthlyAmount: 420_000 },
+                    pension: { grade: 22, standardMonthlyAmount: 420_000 },
+                };
+            }
+            if (monthlyReward >= 350_000) {
+                return {
+                    health: { grade: 22, standardMonthlyAmount: 360_000 },
+                    pension: { grade: 20, standardMonthlyAmount: 360_000 },
+                };
+            }
+            return {
+                health: { grade: 20, standardMonthlyAmount: 300_000 },
+                pension: { grade: 18, standardMonthlyAmount: 300_000 },
+            };
+        };
+
+        const rewards = {
+            ...buildBaselineRewards(),
+            '2026-04': makeReward('2026-04', 350_000, { fixedWageChanged: true }),
+            '2026-05': makeReward('2026-05', 400_000, { fixedWageChanged: true }),
+            '2026-06': makeReward('2026-06', 400_000),
+            '2026-07': makeReward('2026-07', 400_000),
+            '2026-08': makeReward('2026-08', 400_000),
+        };
+
+        expect(resolveRevisionOriginMonths(rewards)).toEqual(['2026-04', '2026-05']);
+
+        const candidates = listEligibleRevisionCandidates(
+            '2024-04',
+            '2024-09',
+            employee(),
+            '2024-04-01',
+            rewards,
+            tieredCalculate,
+        );
+        expect(candidates.map((item) => item.revisionOriginMonth)).toEqual(['2026-04', '2026-05']);
+
+        const julyWinner = pickWinningDeterminationCandidate(
+            '2026-07',
+            '2024-04',
+            '2024-09',
+            employee(),
+            '2024-04-01',
+            rewards,
+            tieredCalculate,
+        );
+        expect(julyWinner?.kind).toBe('revision');
+        expect(julyWinner?.revisionOriginMonth).toBe('2026-04');
+
+        const augustWinner = pickWinningDeterminationCandidate(
+            '2026-08',
+            '2024-04',
+            '2024-09',
+            employee(),
+            '2024-04-01',
+            rewards,
+            tieredCalculate,
+        );
+        expect(augustWinner?.kind).toBe('revision');
+        expect(augustWinner?.revisionOriginMonth).toBe('2026-05');
+
+        const juneContexts = listEligibleRevisionProcedureContextsForMonth(
+            '2026-06',
+            '2024-04',
+            '2024-09',
+            employee(),
+            '2024-04-01',
+            rewards,
+            tieredCalculate,
+        );
+        expect(juneContexts.map((item) => item.originMonth)).toEqual(['2026-04', '2026-05']);
+
+        const julyContexts = listEligibleRevisionProcedureContextsForMonth(
+            '2026-07',
+            '2024-04',
+            '2024-09',
+            employee(),
+            '2024-04-01',
+            rewards,
+            tieredCalculate,
+        );
+        expect(julyContexts.map((item) => item.originMonth)).toEqual(['2026-05']);
     });
 
     it('rejects revision when payment base days are insufficient in calculation months', () => {
@@ -608,8 +702,9 @@ describe('determination-precedence.util February join revision', () => {
 });
 
 describe('resolveRevisionOriginMonths merge', () => {
-    it('merges reward fixedWageChanged months with salary condition origins and collapses consecutive months', () => {
+    it('merges reward fixedWageChanged months with salary condition origins and dedupes same fixed wage', () => {
         const rewards = {
+            ...buildBaselineRewards(),
             '2026-05': makeReward('2026-05', 300000, { fixedWageChanged: true }),
             '2026-06': makeReward('2026-06', 400000, { fixedWageChanged: true }),
         };

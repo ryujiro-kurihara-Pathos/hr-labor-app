@@ -26,10 +26,11 @@ import {
     revisionCalculationMonthsMeetPaymentBaseDays,
 } from './revision-determination.util';
 import { SalaryCondition } from '../models/salary-condition.model';
-import { mergeFixedWageChangedMonths, salaryConditionRevisionOriginMonths } from './salary-condition.util';
+import { mergeFixedWageChangedMonths, salaryConditionRevisionOriginMonths, resolveSalaryConditionForMonth } from './salary-condition.util';
 import { formatPayMonthRangeFromWorkMonths, formatPayYearMonthLabelFromWorkMonth, isConfirmedExactRewardRegisteredForPayMonth, lookupConfirmedExactRewardByPayMonth, resolveQualificationRewardPayYearMonth } from './reward-pay-month.util';
 import { resolveQualificationJoinMonthReward } from '../../social-insurance/utils/qualification-reward.util';
 import { effectiveMonthlyRewardTotal } from './effective-monthly-reward.util';
+import { sumFixedWageFields } from './fixed-wage-change.util';
 import { yearMonthFromDateString } from './reward-target-month.util';
 import { isRewardConfirmed } from './reward-status.util';
 
@@ -43,29 +44,117 @@ export function resolveRevisionOriginMonths(
     const fromConditions = salaryConditionRevisionOriginMonths(salaryConditions);
     const fromRewards = Object.entries(rewardsByYearMonth)
         .filter(([, reward]) => reward.fixedWageChanged && isRewardConfirmed(reward))
-        .map(([ym]) => ym);
+        .map(([yearMonth]) => yearMonth);
 
-    return collapseConsecutiveRevisionOrigins(
-        mergeFixedWageChangedMonths(fromRewards, fromConditions),
+    const merged = mergeFixedWageChangedMonths(fromRewards, fromConditions);
+    const withoutSpurious = merged.filter(
+        (originMonth) => !isSpuriousRewardRevisionOrigin(originMonth, rewardsByYearMonth, merged),
+    );
+
+    return dedupeConsecutiveRevisionOriginsWithSameFixedWage(
+        withoutSpurious,
+        rewardsByYearMonth,
+        salaryConditions,
     );
 }
 
-/** 随時改定起算月の下限（資格取得後の初回支給月以降の支給年月） */
-export function filterRevisionOriginMonthsAfterQualification(
-    originMonths: string[],
-    qualificationYearMonth: string,
-    payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
-): string[] {
-    const minPayYearMonth = resolveQualificationRewardPayYearMonth(
-        qualificationYearMonth,
-        payrollPaymentMonthOffset,
-    );
-    return originMonths.filter((ym) => ym >= minPayYearMonth);
+/** 起算月時点の固定的賃金合計（確定報酬または給与条件） */
+export function revisionOriginFixedWageTotal(
+    originMonth: string,
+    rewardsByYearMonth: Record<string, StandardMonthlyReward>,
+    salaryConditions: SalaryCondition[] = [],
+): number | null {
+    const reward = lookupConfirmedExactRewardByPayMonth(rewardsByYearMonth, originMonth);
+    if (reward) return sumFixedWageFields(reward);
+
+    const condition = salaryConditions.find(
+        (item) => item.effectiveStartMonth === originMonth,
+    ) ?? resolveSalaryConditionForMonth(salaryConditions, originMonth);
+    if (!condition || condition.effectiveStartMonth !== originMonth) return null;
+
+    return condition.fixedWageTotal;
+}
+
+/** 前月と固定的賃金合計が異なる確定報酬の変更月か */
+export function isDistinctRewardFixedWageChangeMonth(
+    originMonth: string,
+    rewardsByYearMonth: Record<string, StandardMonthlyReward>,
+): boolean {
+    const reward = lookupConfirmedExactRewardByPayMonth(rewardsByYearMonth, originMonth);
+    if (!reward?.fixedWageChanged || !isRewardConfirmed(reward)) return false;
+
+    const priorMonth = addMonthsToYearMonth(originMonth, -1);
+    const priorReward = lookupConfirmedExactRewardByPayMonth(rewardsByYearMonth, priorMonth);
+    if (!priorReward) return true;
+
+    return sumFixedWageFields(reward) !== sumFixedWageFields(priorReward);
 }
 
 /**
+ * 前月と同額なのに fixedWageChanged のみ立っている誤検知月。
+ * 直前月も起算候補にある場合は、同一賃金の連続起算として後段の dedupe に任せる。
+ */
+export function isSpuriousRewardRevisionOrigin(
+    originMonth: string,
+    rewardsByYearMonth: Record<string, StandardMonthlyReward>,
+    originMonths: string[],
+): boolean {
+    const reward = lookupConfirmedExactRewardByPayMonth(rewardsByYearMonth, originMonth);
+    if (!reward?.fixedWageChanged || !isRewardConfirmed(reward)) return false;
+
+    const priorMonth = addMonthsToYearMonth(originMonth, -1);
+    const priorReward = lookupConfirmedExactRewardByPayMonth(rewardsByYearMonth, priorMonth);
+    if (!priorReward) return false;
+    if (sumFixedWageFields(reward) !== sumFixedWageFields(priorReward)) return false;
+
+    return !originMonths.includes(priorMonth);
+}
+
+/**
+ * 連続する起算月で固定的賃金合計が同じ場合は直近のみ残す。
+ * 異なる賃金変更（例: 4月・5月の連続改定）は両方保持する。
+ */
+export function dedupeConsecutiveRevisionOriginsWithSameFixedWage(
+    originMonths: string[],
+    rewardsByYearMonth: Record<string, StandardMonthlyReward>,
+    salaryConditions: SalaryCondition[] = [],
+): string[] {
+    if (originMonths.length <= 1) return originMonths;
+
+    const result: string[] = [];
+    for (const origin of originMonths) {
+        const previous = result[result.length - 1];
+        if (
+            previous
+            && origin === addMonthsToYearMonth(previous, 1)
+        ) {
+            const previousTotal = revisionOriginFixedWageTotal(
+                previous,
+                rewardsByYearMonth,
+                salaryConditions,
+            );
+            const currentTotal = revisionOriginFixedWageTotal(
+                origin,
+                rewardsByYearMonth,
+                salaryConditions,
+            );
+            if (
+                previousTotal !== null
+                && currentTotal !== null
+                && previousTotal === currentTotal
+            ) {
+                result[result.length - 1] = origin;
+                continue;
+            }
+        }
+        result.push(origin);
+    }
+    return result;
+}
+
+/**
+ * @deprecated dedupeConsecutiveRevisionOriginsWithSameFixedWage を使用
  * 連続する起算月（例: 5月・6月）では直近の変更のみ採用する。
- * 給与条件変更の翌月同期などで前月に誤って fixedWageChanged が立つケースを抑える。
  */
 export function collapseConsecutiveRevisionOrigins(originMonths: string[]): string[] {
     if (originMonths.length <= 1) return originMonths;
@@ -80,6 +169,19 @@ export function collapseConsecutiveRevisionOrigins(originMonths: string[]): stri
         result.push(origin);
     }
     return result;
+}
+
+/** 随時改定起算月の下限（資格取得後の初回支給月以降の支給年月） */
+export function filterRevisionOriginMonthsAfterQualification(
+    originMonths: string[],
+    qualificationYearMonth: string,
+    payrollPaymentMonthOffset: PayrollPaymentMonthOffset = 1,
+): string[] {
+    const minPayYearMonth = resolveQualificationRewardPayYearMonth(
+        qualificationYearMonth,
+        payrollPaymentMonthOffset,
+    );
+    return originMonths.filter((ym) => ym >= minPayYearMonth);
 }
 
 export type DeterminationCandidate = {
