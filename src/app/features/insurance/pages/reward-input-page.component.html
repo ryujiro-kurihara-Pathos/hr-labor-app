@@ -11,35 +11,28 @@
         </a>
     </header>
 
-    <div class="month-toolbar">
-        <button type="button" class="month-nav-btn" (click)="shiftMonth(-1)" [disabled]="isLoading()" aria-label="前月">
-            ←
-        </button>
-        <div class="month-picker">
-            <span class="month-label">支給年月</span>
-            <div class="month-picker-main">
-                <input
-                    id="target-year-month"
-                    type="month"
-                    class="month-input"
-                    [ngModel]="targetYearMonth()"
-                    (ngModelChange)="targetYearMonth.set($event); onTargetYearMonthChange()"
-                />
-                <span class="month-display">{{ targetYearMonthLabel() }}</span>
-            </div>
-            @if (targetRowCount() > 0) {
-                <div class="progress-wrap">
-                    <div class="progress-bar" role="progressbar" [attr.aria-valuenow]="registrationRate()" aria-valuemin="0" aria-valuemax="100">
-                        <span class="progress-fill" [style.width.%]="registrationRate()"></span>
-                    </div>
-                    <span class="progress-label">入力率 {{ registrationRate() }}%（{{ registeredRows().length }}/{{ targetRowCount() }}名）</span>
+    <app-month-navigation-bar
+        label="支給年月"
+        inputId="reward-input-target-year-month"
+        [value]="targetYearMonth()"
+        [min]="navigableMinYearMonth()"
+        [max]="navigableMaxYearMonth()"
+        [loading]="isLoading()"
+        [canGoPrev]="canGoPrevMonth()"
+        [canGoNext]="canGoNextMonth()"
+        (valueChange)="targetYearMonth.set($event); onTargetYearMonthChange()"
+        (prevMonth)="shiftMonth(-1)"
+        (nextMonth)="shiftMonth(1)"
+    >
+        @if (targetRowCount() > 0) {
+            <div class="month-nav-progress" monthNavFooter>
+                <div class="month-nav-progress__bar" role="progressbar" [attr.aria-valuenow]="registrationRate()" aria-valuemin="0" aria-valuemax="100">
+                    <span class="month-nav-progress__fill" [style.width.%]="registrationRate()"></span>
                 </div>
-            }
-        </div>
-        <button type="button" class="month-nav-btn" (click)="shiftMonth(1)" [disabled]="isLoading()" aria-label="翌月">
-            →
-        </button>
-    </div>
+                <span class="month-nav-progress__label">入力率 {{ registrationRate() }}%（{{ registeredRows().length }}/{{ targetRowCount() }}名）</span>
+            </div>
+        }
+    </app-month-navigation-bar>
 
     @if (isLoading()) {
         <p class="state-message loading">読み込み中...</p>
@@ -70,14 +63,35 @@
             </div>
         </section>
 
+        <app-insurance-list-filter-bar
+            searchInputId="reward-list-search"
+            officeSelectId="reward-list-office"
+            statusGroupLabel="報酬入力状況で絞り込み"
+            [keyword]="keyword()"
+            [officeId]="selectedOfficeId()"
+            [statusFilter]="statusFilter()"
+            [officeOptions]="officeOptions()"
+            [statusOptions]="rewardStatusFilterOptions"
+            (keywordChange)="keyword.set($event)"
+            (officeIdChange)="selectedOfficeId.set($event)"
+            (statusFilterChange)="setStatusFilter($event)"
+            (clear)="clearListFilters()"
+        />
+        @if (hasActiveListFilters()) {
+            <p class="filter-result-note">
+                {{ filteredVisibleRowCount() }}名を表示（対象 {{ targetRowCount() }}名）
+            </p>
+        }
+
+        @if (showRegisteredSection()) {
         <section class="list-section">
             <div class="list-header">
                 <h2 class="section-title">登録済み</h2>
-                <span class="section-badge">{{ registeredRows().length }}名</span>
+                <span class="section-badge">{{ filteredRegisteredRows().length }}名</span>
             </div>
             <p class="section-desc">{{ targetYearMonthLabel() }}の報酬入力済み従業員</p>
 
-            @if (registeredRows().length === 0) {
+            @if (filteredRegisteredRows().length === 0) {
                 <div class="section-empty-card">
                     <p class="section-empty-title">この月の登録データはありません</p>
                     <p class="section-empty-desc">下の未入力一覧から報酬を登録できます。</p>
@@ -98,7 +112,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @for (row of registeredRows(); track row.employee.id) {
+                            @for (row of filteredRegisteredRows(); track row.employee.id) {
                                 <tr
                                     class="clickable-row"
                                     [routerLink]="detailLink(row.employee.id)"
@@ -147,22 +161,24 @@
                 </div>
             }
         </section>
+        }
 
-        <section class="list-section" [class.attention-section]="unregisteredRows().length > 0">
+        @if (showUnregisteredSection()) {
+        <section class="list-section" [class.attention-section]="filteredUnregisteredRows().length > 0">
             <div class="list-header">
                 <h2 class="section-title">未入力</h2>
-                <span class="section-badge" [class.warn]="unregisteredRows().length > 0">{{ unregisteredRows().length }}名</span>
+                <span class="section-badge" [class.warn]="filteredUnregisteredRows().length > 0">{{ filteredUnregisteredRows().length }}名</span>
             </div>
             <p class="section-desc">{{ targetYearMonthLabel() }}の報酬が未登録の従業員</p>
 
-            @if (unregisteredRows().length === 0) {
+            @if (filteredUnregisteredRows().length === 0) {
                 <div class="section-empty-card success">
                     <p class="section-empty-title">未入力の従業員はいません</p>
                     <p class="section-empty-desc">この月の報酬入力は完了しています。</p>
                 </div>
             } @else {
                 <ul class="card-list">
-                    @for (row of unregisteredRows(); track row.employee.id) {
+                    @for (row of filteredUnregisteredRows(); track row.employee.id) {
                         <li>
                             <a
                                 [routerLink]="detailLink(row.employee.id)"
@@ -191,6 +207,7 @@
                 </ul>
             }
         </section>
+        }
     }
 </div>
 
@@ -263,108 +280,35 @@
         background: #eff6ff;
     }
 
-    .month-toolbar {
+    .month-nav-progress {
         display: flex;
-        align-items: stretch;
-        gap: 12px;
-        margin: 20px 0 24px;
-        padding: 18px 20px;
-        background: #fff;
-        border: 1px solid #e5e7eb;
-        border-radius: 14px;
-        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
-    }
-
-    .month-nav-btn {
-        flex-shrink: 0;
-        align-self: center;
-        width: 40px;
-        height: 40px;
-        border: 1px solid #d1d5db;
-        border-radius: 10px;
-        background: #f9fafb;
-        font-size: 18px;
-        color: #374151;
-        cursor: pointer;
-        transition: background 0.15s ease, border-color 0.15s ease;
-    }
-
-    .month-nav-btn:hover:not(:disabled) {
-        background: #eff6ff;
-        border-color: #93c5fd;
-        color: #2563eb;
-    }
-
-    .month-nav-btn:disabled {
-        opacity: 0.45;
-        cursor: not-allowed;
-    }
-
-    .month-picker {
-        flex: 1;
-        min-width: 0;
-    }
-
-    .month-label {
-        display: block;
-        margin-bottom: 6px;
-        font-size: 12px;
-        font-weight: 700;
-        color: #6b7280;
-        letter-spacing: 0.02em;
-    }
-
-    .month-picker-main {
-        display: flex;
-        flex-wrap: wrap;
+        flex-direction: column;
         align-items: center;
-        gap: 10px 14px;
+        gap: 6px;
+        width: min(100%, 320px);
+        margin: 0 auto;
     }
 
-    .month-input {
-        padding: 8px 10px;
-        border: 1px solid #d1d5db;
-        border-radius: 8px;
-        font-size: 14px;
-        background: #fff;
-    }
-
-    .month-display {
-        font-size: 22px;
-        font-weight: 700;
-        color: #111827;
-        letter-spacing: -0.01em;
-    }
-
-    .progress-wrap {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-top: 10px;
-    }
-
-    .progress-bar {
-        flex: 1;
-        max-width: 200px;
-        height: 6px;
-        background: #e5e7eb;
-        border-radius: 999px;
+    .month-nav-progress__bar {
+        width: 100%;
+        height: 8px;
         overflow: hidden;
+        border-radius: 999px;
+        background: #e5e7eb;
     }
 
-    .progress-fill {
+    .month-nav-progress__fill {
         display: block;
         height: 100%;
+        border-radius: inherit;
         background: linear-gradient(90deg, #34d399 0%, #059669 100%);
-        border-radius: 999px;
         transition: width 0.3s ease;
     }
 
-    .progress-label {
+    .month-nav-progress__label {
         font-size: 12px;
         font-weight: 600;
         color: #6b7280;
-        white-space: nowrap;
     }
 
     .state-message {
@@ -472,6 +416,12 @@
         margin-top: 4px;
         font-size: 12px;
         color: #9ca3af;
+    }
+
+    .filter-result-note {
+        margin: -8px 0 20px;
+        font-size: 13px;
+        color: #6b7280;
     }
 
     .list-section {

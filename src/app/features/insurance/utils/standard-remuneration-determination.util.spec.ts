@@ -1,3 +1,5 @@
+import { Timestamp } from 'firebase/firestore';
+
 import { Employee } from '../../employee/models/employee.models';
 import {
     getPaymentBaseDays,
@@ -125,5 +127,12 @@ describe('isRegularDecisionProcedureRequiredForBaseYear', () => {
 
     it('does not require regular decision before qualification year', () => {
         expect(isRegularDecisionProcedureRequiredForBaseYear('2026-06-15', 2025)).toBeFalse();
+    });
+});
+
+describe('getPaymentBaseDays', () => {
+    it('counts enrolled days through retirement date in retirement month', () => {
+        const retiredDate = Timestamp.fromDate(new Date(2026, 5, 15));
+        expect(getPaymentBaseDays('2026-06', '2026-04-01', retiredDate)).toBe(15);
     });
 });

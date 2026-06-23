@@ -156,6 +156,10 @@ export class SocialInsuranceProceduresPageComponent {
         return resolveProcedureSubjectName(procedure, this.employeeNameById());
     }
 
+    employeeDetailLink(employeeId: string): string[] {
+        return ['/employees', employeeId];
+    }
+
     isOverdue(procedure: Procedure): boolean {
         return isProcedureOverdue(procedure, this.today());
     }

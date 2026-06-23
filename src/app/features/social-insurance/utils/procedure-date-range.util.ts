@@ -270,17 +270,29 @@ export function resolveBonusPaymentDateBounds(params: {
         min = monthStart;
     }
 
-    let max = bounds.lossDate ? subtractOneDay(bounds.lossDate) : params.monthEndDate ?? null;
-    if (params.monthEndDate && max && params.monthEndDate < max) {
-        max = params.monthEndDate;
+    let max = params.monthEndDate ?? null;
+    const retiredDate = resolveRetiredDateString(params.employee);
+    const retireYm = retiredDate ? yearMonthFromDate(retiredDate) : null;
+
+    if (retireYm && params.targetYearMonth > retireYm) {
+        max = params.monthEndDate ?? null;
+    } else if (bounds.lossDate) {
+        const lossCap = subtractOneDay(bounds.lossDate);
+        if (lossCap && (!max || lossCap < max)) {
+            max = lossCap;
+        }
     }
 
-    const retiredDate = resolveRetiredDateString(params.employee);
-    if (retiredDate?.startsWith(params.targetYearMonth) && (!max || retiredDate < max)) {
+    if (retiredDate?.startsWith(params.targetYearMonth) && max && retiredDate < max) {
         max = retiredDate;
     }
 
     return { min, max };
+}
+
+function yearMonthFromDate(date: string): string | null {
+    const ym = date.slice(0, 7);
+    return /^\d{4}-\d{2}$/.test(ym) ? ym : null;
 }
 
 function subtractOneDay(date: string): string | null {

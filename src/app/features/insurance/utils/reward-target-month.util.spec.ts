@@ -4,12 +4,16 @@ import { createEmptyEmployeeInput, Employee } from '../../employee/models/employ
 import {
     bonusPaymentDateReason,
     inputableYearMonthMax,
+    insuranceRatePremiumDeductYearMonthMax,
     isBonusPaymentDateAllowed,
+    isBonusPaymentDatePremiumable,
     isDateWithinEmploymentPeriod,
     isPremiumViewableYearMonth,
     isRewardTargetMonth,
+    listNavigableYearMonthMax,
     premiumViewableYearMonthMax,
 } from './reward-target-month.util';
+import { AUTOMATIC_INSURANCE_RATE_AVAILABLE_TO } from './insurance-premium-rate-resolution.util';
 
 function employee(overrides: Partial<ReturnType<typeof createEmptyEmployeeInput>> = {}): Employee {
     return {
@@ -30,12 +34,13 @@ describe('reward-target-month.util', () => {
             expect(isRewardTargetMonth(employee(), '2026-04')).toBeTrue();
         });
 
-        it('excludes months after retirement month', () => {
+        it('allows input through month after retirement and blocks after that', () => {
             const retired = employee({
                 retiredDate: Timestamp.fromDate(new Date(2026, 5, 30)),
             });
             expect(isRewardTargetMonth(retired, '2026-06', '2026-06')).toBeTrue();
-            expect(isRewardTargetMonth(retired, '2026-07', '2026-06')).toBeFalse();
+            expect(isRewardTargetMonth(retired, '2026-07', '2026-06')).toBeTrue();
+            expect(isRewardTargetMonth(retired, '2026-08', '2026-06')).toBeFalse();
         });
 
         it('allows current month and next month only', () => {
@@ -45,13 +50,14 @@ describe('reward-target-month.util', () => {
             expect(isRewardTargetMonth(employee(), '2026-08', ref)).toBeFalse();
         });
 
-        it('caps at retirement month when earlier than next month', () => {
+        it('caps at month after retirement when earlier than reference next month', () => {
             const retired = employee({
                 retiredDate: Timestamp.fromDate(new Date(2026, 5, 30)),
             });
             const ref = '2026-06';
             expect(isRewardTargetMonth(retired, '2026-06', ref)).toBeTrue();
-            expect(isRewardTargetMonth(retired, '2026-07', ref)).toBeFalse();
+            expect(isRewardTargetMonth(retired, '2026-07', ref)).toBeTrue();
+            expect(isRewardTargetMonth(retired, '2026-08', ref)).toBeFalse();
         });
     });
 
@@ -60,11 +66,30 @@ describe('reward-target-month.util', () => {
             expect(inputableYearMonthMax(employee(), '2026-06')).toBe('2026-07');
         });
 
-        it('returns retirement month when earlier than next month', () => {
+        it('returns month after retirement when earlier than reference next month', () => {
             const retired = employee({
                 retiredDate: Timestamp.fromDate(new Date(2026, 5, 30)),
             });
-            expect(inputableYearMonthMax(retired, '2026-06')).toBe('2026-06');
+            expect(inputableYearMonthMax(retired, '2026-06')).toBe('2026-07');
+        });
+
+        it('caps at automatic insurance rate coverage end', () => {
+            expect(inputableYearMonthMax(employee(), '2027-02')).toBe(AUTOMATIC_INSURANCE_RATE_AVAILABLE_TO);
+            expect(inputableYearMonthMax(employee(), '2027-01')).toBe('2027-02');
+        });
+    });
+
+    describe('listNavigableYearMonthMax', () => {
+        it('caps at rate data end when reference is near fiscal year end', () => {
+            expect(listNavigableYearMonthMax('2027-01')).toBe('2027-02');
+            expect(listNavigableYearMonthMax('2027-02')).toBe('2027-02');
+        });
+    });
+
+    describe('insuranceRatePremiumDeductYearMonthMax', () => {
+        it('extends one month for next_month collection', () => {
+            expect(insuranceRatePremiumDeductYearMonthMax('same_month')).toBe('2027-02');
+            expect(insuranceRatePremiumDeductYearMonthMax('next_month')).toBe('2027-03');
         });
     });
 
@@ -80,7 +105,15 @@ describe('reward-target-month.util', () => {
             expect(premiumViewableYearMonthMax(employee(), ref, 'next_month')).toBe('2026-06');
         });
 
-        it('caps at retirement month + 1 for next_month collection', () => {
+        it('caps premium view at loss-date-based deduct month for next_month collection', () => {
+            const retired = employee({
+                retiredDate: Timestamp.fromDate(new Date(2026, 5, 15)),
+            });
+            const ref = '2026-06';
+            expect(premiumViewableYearMonthMax(retired, ref, 'next_month')).toBe('2026-06');
+        });
+
+        it('caps at month after retirement for end-of-month retirement under next_month collection', () => {
             const retired = employee({
                 retiredDate: Timestamp.fromDate(new Date(2026, 4, 31)),
             });
@@ -134,6 +167,15 @@ describe('reward-target-month.util', () => {
 
         it('returns reason for out-of-period bonus date', () => {
             expect(bonusPaymentDateReason(employee(), '2026-04-01')).toContain('資格取得日');
+        });
+
+        it('allows bonus input after loss date in month after retirement but excludes premium', () => {
+            const retired = employee({
+                retiredDate: Timestamp.fromDate(new Date(2026, 5, 30)),
+            });
+            expect(isBonusPaymentDateAllowed(retired, '2026-07-15')).toBeTrue();
+            expect(isBonusPaymentDatePremiumable(retired, '2026-07-15')).toBeFalse();
+            expect(isBonusPaymentDatePremiumable(retired, '2026-06-30')).toBeTrue();
         });
     });
 });

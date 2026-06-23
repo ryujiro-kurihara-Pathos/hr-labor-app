@@ -1,10 +1,10 @@
-<aside class="sidebar">
+<aside class="sidebar" [class.sidebar--employee]="currentUser?.role === 'employee'">
     <div class="sidebar-top">
         <a [routerLink]="homeRoute()" class="brand" aria-label="ホームへ">
             <span class="brand-icon">社保</span>
             <span class="brand-text">
                 <span class="brand-title">社会保険管理</span>
-                <span class="brand-sub">Labor &amp; Insurance</span>
+                <span class="brand-sub">{{ currentUser?.role === 'employee' ? '従業員ポータル' : 'Labor & Insurance' }}</span>
             </span>
         </a>
 
@@ -139,6 +139,31 @@
     .nav-link.active {
         background: #eff6ff;
         color: #1d4ed8;
+    }
+
+    .sidebar--employee .brand-icon {
+        background: linear-gradient(135deg, #059669 0%, #34d399 100%);
+    }
+
+    .sidebar--employee .nav-link.active {
+        background: #ecfdf5;
+        color: #047857;
+    }
+
+    .sidebar--employee .nav-link.active .nav-icon {
+        background: #059669;
+        color: #fff;
+    }
+
+    .sidebar--employee .user-card:hover,
+    .sidebar--employee .user-card.active {
+        border-color: #a7f3d0;
+        background: #ecfdf5;
+    }
+
+    .sidebar--employee .user-avatar {
+        background: #d1fae5;
+        color: #047857;
     }
 
     .nav-icon {

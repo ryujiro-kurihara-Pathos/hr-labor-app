@@ -1,9 +1,11 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 
 import { AuthService } from '../../auth/services/auth.service';
+import { MonthNavigationBarComponent } from '../../../shared/components/month-navigation-bar.component';
+import { EmployeePortalPageComponent } from '../../../shared/components/employee-portal-page.component';
 import { UserService } from '../../users/services/user.service';
 import { Employee } from '../../employee/models/employee.models';
 import { EmployeeService } from '../../employee/services/employee.service';
@@ -26,11 +28,13 @@ import { OfficeService } from '../../company/services/office.service';
 import { resolveOfficePrefecture } from '../../company/utils/office-prefecture.util';
 import { SocialInsuranceStatus } from '../../social-insurance/models/social-insurance-status.model';
 import { SocialInsuranceStatusService } from '../../social-insurance/services/social-insurance-status.service';
+import { resolveInsuredPeriodBounds } from '../../social-insurance/utils/procedure-date-range.util';
 import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 import {
     findLatestConfirmedPayYearMonth,
     isJoinMonthZeroPremiumDeductionView,
     isPremiumBasisRewardConfirmed,
+    resolvePremiumBasisRewardPayYearMonth,
 } from '../utils/reward-pay-month.util';
 import { StandardMonthlyRewardService } from '../services/standard-monthly-reward.service';
 import { StandardRemunerationDeterminationService } from '../services/standard-remuneration-determination.service';
@@ -108,7 +112,7 @@ type RewardField = {
 @Component({
     selector: 'app-my-insurance-premium',
     standalone: true,
-    imports: [FormsModule, DecimalPipe],
+    imports: [FormsModule, DecimalPipe, RouterLink, RouterLinkActive, MonthNavigationBarComponent, EmployeePortalPageComponent],
     templateUrl: './my-insurance-premium-page.component.html',
 })
 export class MyInsurancePremiumPageComponent implements OnInit {
@@ -179,6 +183,18 @@ export class MyInsurancePremiumPageComponent implements OnInit {
         const ym = this.premiumLiabilityYearMonth();
         return ym ? formatYearMonthLabel(ym) : '';
     });
+
+    rewardBasisPayYearMonth = computed((): string =>
+        resolvePremiumBasisRewardPayYearMonth(
+            this.targetYearMonth(),
+            this.insurancePremiumCollectionTiming(),
+            this.company()?.payrollPaymentMonthOffset ?? 1,
+        ),
+    );
+
+    rewardBasisPayYearMonthLabel = computed(() =>
+        formatYearMonthLabel(this.rewardBasisPayYearMonth()),
+    );
 
     latestConfirmedWorkYearMonth = computed((): string | null => {
         const rewardsByYearMonth = Object.fromEntries(
@@ -635,6 +651,17 @@ export class MyInsurancePremiumPageComponent implements OnInit {
         return (this.healthPremium() ?? 0) + (this.pensionPremium() ?? 0) + (this.carePremium() ?? 0);
     });
 
+    private insuredPeriodBounds = computed(() => {
+        const employee = this.employee();
+        const status = this.insuranceStatus();
+        if (!employee) return null;
+        return resolveInsuredPeriodBounds({
+            employee,
+            healthInsuranceStartDate: status?.healthInsuranceStartDate ?? null,
+            healthInsuranceEndDate: status?.healthInsuranceEndDate ?? null,
+        });
+    });
+
     bonusSocialInsurancePremium = computed((): number | null => {
         if (!this.liabilityMonthHasConfirmedReward()) return null;
 
@@ -647,6 +674,7 @@ export class MyInsurancePremiumPageComponent implements OnInit {
             liabilityYearMonth,
             monthBonuses: bonuses,
             allBonuses: this.allBonuses().filter((bonus) => isBonusConfirmed(bonus)),
+            insuredPeriodBounds: this.insuredPeriodBounds(),
         });
 
         const health = this.isHealthPremiumMonth()

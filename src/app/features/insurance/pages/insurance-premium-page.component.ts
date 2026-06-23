@@ -28,7 +28,13 @@ import { InsurancePremiumCalculationService, CalculatedInsurancePremium } from '
 import { ManualInsurancePremiumRateService } from '../services/manual-insurance-premium-rate.service';
 import { ManualInsurancePremiumRates } from '../models/manual-insurance-premium-rate.model';
 import { resolvePremiumLiabilityYearMonth, resolvePremiumStandardDeterminationYearMonth } from '../../company/utils/company-payroll-settings.util';
-import { addMonthsToYearMonth, isPremiumViewableYearMonth, yearMonthFromDateString } from '../utils/reward-target-month.util';
+import { MonthNavigationBarComponent } from '../../../shared/components/month-navigation-bar.component';
+import {
+    InsuranceListFilterBarComponent,
+    InsuranceListStatusFilterOption,
+} from '../../../shared/components/insurance-list-filter-bar.component';
+import { addMonthsToYearMonth, currentYearMonth as getCurrentYearMonth, isPremiumViewableYearMonth, listNavigableYearMonthMax, listNavigableYearMonthMin, yearMonthFromDateString } from '../utils/reward-target-month.util';
+import { filterInsuranceListRows } from '../utils/employee-list-filter.util';
 import {
     findLatestConfirmedPayYearMonth,
     lookupPremiumBasisReward,
@@ -51,7 +57,7 @@ export type InsurancePremiumListRow = {
 @Component({
     selector: 'app-insurance-premium-page',
     standalone: true,
-    imports: [RouterLink, FormsModule, DecimalPipe],
+    imports: [RouterLink, FormsModule, DecimalPipe, MonthNavigationBarComponent, InsuranceListFilterBarComponent],
     templateUrl: './insurance-premium-page.component.html',
 })
 export class InsurancePremiumPageComponent {
@@ -84,9 +90,31 @@ export class InsurancePremiumPageComponent {
     );
     payrollPaymentMonthOffset = signal<0 | 1>(1);
 
+    keyword = signal('');
+    selectedOfficeId = signal('');
+    statusFilter = signal<'all' | 'calculable' | 'unregistered'>('all');
+
+    readonly premiumStatusFilterOptions: InsuranceListStatusFilterOption[] = [
+        { value: 'all', label: 'すべて' },
+        { value: 'calculable', label: '算出可能' },
+        { value: 'unregistered', label: '報酬未入力', warn: true },
+    ];
+
     readonly insurancePremiumCollectionTimingAppNote = INSURANCE_PREMIUM_COLLECTION_TIMING_APP_NOTE;
 
-    targetYearMonth = signal(this.currentYearMonth());
+    targetYearMonth = signal(getCurrentYearMonth());
+
+    navigableMinYearMonth = computed(() =>
+        listNavigableYearMonthMin(getCurrentYearMonth()),
+    );
+
+    navigableMaxYearMonth = computed(() =>
+        listNavigableYearMonthMax(getCurrentYearMonth()),
+    );
+
+    canGoPrevMonth = computed(() => this.targetYearMonth() > this.navigableMinYearMonth());
+
+    canGoNextMonth = computed(() => this.targetYearMonth() < this.navigableMaxYearMonth());
 
     targetYearMonthLabel = computed(() => this.formatYearMonth(this.targetYearMonth()));
 
@@ -158,6 +186,36 @@ export class InsurancePremiumPageComponent {
         this.buildRows().filter((row) => row.isTargetMonth && row.calculatedPremium === null).length,
     );
 
+    officeOptions = computed(() =>
+        Object.values(this.officeById()).sort((a, b) => a.name.localeCompare(b.name, 'ja')),
+    );
+
+    hasActiveListFilters = computed(
+        () => Boolean(this.keyword().trim() || this.selectedOfficeId() || this.statusFilter() !== 'all'),
+    );
+
+    filteredCalculablePremiumRows = computed(() => this.applyListFilters(this.calculablePremiumRows()));
+
+    filteredUnregisteredRows = computed(() => this.applyListFilters(this.unregisteredRows()));
+
+    filteredCalculableFailedRows = computed(() => this.applyListFilters(this.calculableFailedRows()));
+
+    showCalculableSection = computed(() => this.statusFilter() !== 'unregistered');
+
+    showUnregisteredSection = computed(
+        () => this.statusFilter() === 'all' || this.statusFilter() === 'unregistered',
+    );
+
+    showFailedSection = computed(() => this.statusFilter() === 'all');
+
+    filteredVisibleRowCount = computed(() => {
+        let count = 0;
+        if (this.showCalculableSection()) count += this.filteredCalculablePremiumRows().length;
+        if (this.showUnregisteredSection()) count += this.filteredUnregisteredRows().length;
+        if (this.showFailedSection()) count += this.filteredCalculableFailedRows().length;
+        return count;
+    });
+
     async ngOnInit() {
         await this.loadPage();
     }
@@ -168,6 +226,9 @@ export class InsurancePremiumPageComponent {
     }
 
     async shiftMonth(delta: number) {
+        if ((delta < 0 && !this.canGoPrevMonth()) || (delta > 0 && !this.canGoNextMonth())) {
+            return;
+        }
         this.csvExportMessage.set('');
         this.targetYearMonth.set(addMonthsToYearMonth(this.targetYearMonth(), delta));
         await this.loadRewardsForMonth();
@@ -348,7 +409,8 @@ export class InsurancePremiumPageComponent {
 
     exportCsv() {
         this.csvExportMessage.set('');
-        const items = this.calculablePremiumRows().map((row) => ({
+        const rows = this.showCalculableSection() ? this.filteredCalculablePremiumRows() : [];
+        const items = rows.map((row) => ({
             employee: row.employee,
             officeName: this.officeNameById()[row.employee.officeId] ?? '—',
             payYearMonth: this.targetYearMonth(),
@@ -366,7 +428,10 @@ export class InsurancePremiumPageComponent {
             return;
         }
 
-        this.csvExportMessage.set(`${this.targetYearMonthLabel()}の保険料計算結果をCSVで出力しました（${items.length}名）`);
+        const countLabel = this.hasActiveListFilters()
+            ? `表示中${items.length}名`
+            : `${items.length}名`;
+        this.csvExportMessage.set(`${this.targetYearMonthLabel()}の保険料計算結果をCSVで出力しました（${countLabel}）`);
     }
 
     employeeInitial(employee: Employee): string {
@@ -378,9 +443,29 @@ export class InsurancePremiumPageComponent {
         return `${employee.lastName} ${employee.firstName}`.trim();
     }
 
+    clearListFilters(): void {
+        this.keyword.set('');
+        this.selectedOfficeId.set('');
+        this.statusFilter.set('all');
+    }
+
+    setStatusFilter(value: string): void {
+        if (value === 'calculable' || value === 'unregistered') {
+            this.statusFilter.set(value);
+            return;
+        }
+        this.statusFilter.set('all');
+    }
+
+    private applyListFilters<T extends InsurancePremiumListRow>(rows: T[]): T[] {
+        return filterInsuranceListRows(rows, {
+            keyword: this.keyword(),
+            officeId: this.selectedOfficeId(),
+        });
+    }
+
     private currentYearMonth(): string {
-        const d = new Date();
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        return getCurrentYearMonth();
     }
 
     private formatYearMonth(ym: string): string {

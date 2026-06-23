@@ -8,6 +8,7 @@ import {
     currentYearMonth,
     inputableYearMonthMax,
     isRewardTargetMonth,
+    rewardInputMaxWorkYearMonthFromRetirement,
     yearMonthFromDateString,
     yearMonthFromTimestamp,
 } from './reward-target-month.util';
@@ -327,9 +328,9 @@ export function salaryPayMonthTargetReason(
     }
 
     const workYearMonth = resolveWorkMonthFromPayMonth(payYearMonth, payrollPaymentMonthOffset);
-    const retireYm = yearMonthFromTimestamp(employee.retiredDate);
-    if (retireYm && workYearMonth > retireYm) {
-        return `${formatYearMonthLabel(retireYm)}退職のため、この月は対象外です。`;
+    const retireMax = rewardInputMaxWorkYearMonthFromRetirement(employee.retiredDate);
+    if (retireMax && workYearMonth > retireMax) {
+        return `${formatYearMonthLabel(retireMax)}まで入力できます（退職月の翌月まで）。`;
     }
 
     if (joinYm && workYearMonth < joinYm) {

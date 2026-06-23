@@ -71,10 +71,24 @@
             } @else {
                 <div class="action-list">
                     @for (procedure of actionProcedures(); track procedure.id) {
-                        <a class="action-card" [routerLink]="['/procedures', procedure.id]">
+                        <div class="action-card">
+                            <a
+                                class="action-card-link"
+                                [routerLink]="['/procedures', procedure.id]"
+                                [attr.aria-label]="procedureTypeLabel(procedure.procedureType) + 'の手続き詳細'"
+                            ></a>
                             <div class="action-main">
                                 <p class="action-type">{{ procedureTypeLabel(procedure.procedureType) }}</p>
-                                <p class="action-employee">{{ employeeName(procedure.employeeId) }}</p>
+                                @if (procedure.employeeId) {
+                                    <a
+                                        class="action-employee action-employee-link"
+                                        [routerLink]="['/employees', procedure.employeeId]"
+                                    >
+                                        {{ employeeName(procedure.employeeId) }}
+                                    </a>
+                                } @else {
+                                    <p class="action-employee">{{ employeeName(procedure.employeeId) }}</p>
+                                }
                             </div>
                             <div class="action-side">
                                 <span
@@ -88,7 +102,7 @@
                                     期限 {{ formatDueDate(procedure.dueDate) }}
                                 </p>
                             </div>
-                        </a>
+                        </div>
                     }
                 </div>
             }
@@ -334,6 +348,7 @@
     }
 
     .action-card {
+        position: relative;
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -342,14 +357,26 @@
         background: #fff;
         border: 1px solid #e5e7eb;
         border-radius: 12px;
-        text-decoration: none;
         color: inherit;
         transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .action-card-link {
+        position: absolute;
+        inset: 0;
+        border-radius: 12px;
+        z-index: 0;
     }
 
     .action-card:hover {
         border-color: #93c5fd;
         box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+    }
+
+    .action-main,
+    .action-side {
+        position: relative;
+        z-index: 1;
     }
 
     .action-type {
@@ -363,6 +390,19 @@
         margin: 0;
         font-size: 13px;
         color: #6b7280;
+    }
+
+    .action-employee-link {
+        position: relative;
+        z-index: 2;
+        display: inline-block;
+        text-decoration: none;
+        color: #2563eb;
+        font-weight: 600;
+    }
+
+    .action-employee-link:hover {
+        text-decoration: underline;
     }
 
     .action-side {

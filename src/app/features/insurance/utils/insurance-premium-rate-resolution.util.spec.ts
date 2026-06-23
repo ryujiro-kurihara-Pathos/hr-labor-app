@@ -1,10 +1,13 @@
 import {
     AUTOMATIC_INSURANCE_RATE_AVAILABLE_FROM,
+    AUTOMATIC_INSURANCE_RATE_AVAILABLE_TO,
     DEFAULT_PENSION_INSURANCE_RATE,
     DEFAULT_PENSION_INSURANCE_TOTAL_RATE,
+    healthInsuranceFiscalYearEndYearMonth,
     lookupAutomaticCareInsuranceRate,
     lookupAutomaticHealthInsuranceRate,
     lookupAutomaticPensionInsuranceRate,
+    resolveAutomaticInsuranceRateAvailableTo,
     resolveInsurancePremiumRates,
 } from './insurance-premium-rate-resolution.util';
 
@@ -50,6 +53,10 @@ describe('insurance-premium-rate-resolution.util', () => {
 
         it('returns null before data coverage', () => {
             expect(lookupAutomaticPensionInsuranceRate('2023-12')).toBeNull();
+        });
+
+        it('returns null after data coverage', () => {
+            expect(lookupAutomaticPensionInsuranceRate('2027-03')).toBeNull();
         });
     });
 
@@ -109,5 +116,11 @@ describe('insurance-premium-rate-resolution.util', () => {
 
     it('defines coverage start month', () => {
         expect(AUTOMATIC_INSURANCE_RATE_AVAILABLE_FROM).toBe('2024-03');
+    });
+
+    it('defines coverage end month at latest fiscal year February', () => {
+        expect(healthInsuranceFiscalYearEndYearMonth(2026)).toBe('2027-02');
+        expect(resolveAutomaticInsuranceRateAvailableTo()).toBe('2027-02');
+        expect(AUTOMATIC_INSURANCE_RATE_AVAILABLE_TO).toBe('2027-02');
     });
 });

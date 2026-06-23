@@ -43,7 +43,13 @@ import {
                     <p class="procedure-hero-kicker">{{ procedureTypeLabel(procedure().procedureType) }}</p>
                     <h1 class="procedure-hero-title">{{ formTitle() || procedureTypeLabel(procedure().procedureType) }}</h1>
                     @if (subjectLabel()) {
-                        <p class="procedure-hero-subject">{{ subjectLabel() }}</p>
+                        @if (employeeId()) {
+                            <a class="procedure-hero-subject procedure-hero-subject-link" [routerLink]="employeeDetailLink()">
+                                {{ subjectLabel() }}
+                            </a>
+                        } @else {
+                            <p class="procedure-hero-subject">{{ subjectLabel() }}</p>
+                        }
                     }
                 </div>
             </div>
@@ -178,6 +184,16 @@ import {
             color: #374151;
         }
 
+        .procedure-hero-subject-link {
+            display: inline-block;
+            text-decoration: none;
+            color: #2563eb;
+        }
+
+        .procedure-hero-subject-link:hover {
+            text-decoration: underline;
+        }
+
         .procedure-hero-actions {
             margin-top: 16px;
             padding-top: 16px;
@@ -189,12 +205,18 @@ export class ProcedureDetailHeaderComponent {
     procedure = input.required<Procedure>();
     formTitle = input('');
     subjectLabel = input('');
+    employeeId = input('');
 
     readonly procedureTypeLabel = procedureTypeLabel;
     readonly procedureStatusLabel = procedureStatusLabel;
     readonly dateLabel = dateLabel;
 
     typeMeta = computed(() => procedureTypeMeta(this.procedure().procedureType));
+
+    employeeDetailLink = computed((): string[] => {
+        const id = this.employeeId() || this.procedure().employeeId;
+        return id ? ['/employees', id] : [];
+    });
 
     isOverdue = computed(() =>
         isProcedureOverdue(this.procedure(), todayDateString()),

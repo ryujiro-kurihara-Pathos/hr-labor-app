@@ -176,4 +176,33 @@ describe('bonus-standard-amount-cap.util', () => {
         expect(healthInsuranceFiscalYearStartYear('2026-03')).toBe(2025);
         expect(healthInsuranceFiscalYearStartYear('2026-04')).toBe(2026);
     });
+
+    it('excludes bonuses paid on or after loss date from premium calculation', () => {
+        const premiumable = bonus({
+            id: 'in',
+            targetYearMonth: '2026-06',
+            standardBonusAmount: 100_000,
+            paymentDate: '2026-06-30',
+        });
+        const nonPremiumable = bonus({
+            id: 'out',
+            targetYearMonth: '2026-07',
+            standardBonusAmount: 200_000,
+            paymentDate: '2026-07-15',
+        });
+        const allBonuses = [premiumable, nonPremiumable];
+
+        const result = resolveBonusPremiumableStandardAmounts({
+            liabilityYearMonth: '2026-07',
+            monthBonuses: [nonPremiumable],
+            allBonuses,
+            insuredPeriodBounds: {
+                qualificationDate: '2026-04-15',
+                lossDate: '2026-07-01',
+            },
+        });
+
+        expect(result.pension).toBe(0);
+        expect(result.healthAndCare).toBe(0);
+    });
 });

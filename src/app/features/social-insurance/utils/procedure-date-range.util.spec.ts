@@ -1,5 +1,8 @@
+import { Timestamp } from 'firebase/firestore';
+
 import { Employee } from '../../employee/models/employee.models';
 import {
+    resolveBonusPaymentDateBounds,
     resolveDependencyStartDateBounds,
     resolveInsuredPeriodBounds,
     validateDateWithinInsuredPeriod,
@@ -174,5 +177,20 @@ describe('procedure-date-range.util', () => {
                 dependencyStartDate: '2026-04-10',
             }),
         ).toContain('異動日');
+    });
+
+    it('allows bonus payment through month end in month after retirement', () => {
+        const retired = {
+            ...employee,
+            retiredDate: Timestamp.fromDate(new Date(2026, 5, 30)),
+        } as Employee;
+        const bounds = resolveBonusPaymentDateBounds({
+            employee: retired,
+            targetYearMonth: '2026-07',
+            healthInsuranceStartDate: '2026-04-01',
+            monthEndDate: '2026-07-31',
+        });
+
+        expect(bounds.max).toBe('2026-07-31');
     });
 });

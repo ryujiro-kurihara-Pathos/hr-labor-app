@@ -1,41 +1,57 @@
-<div class="my-page">
+<app-employee-portal-page
+    title="マイページ"
+    note="あなたの基本情報・社会保険・保険料・手続き状況を確認できます。"
+>
     @if (loading()) {
-        <p class="loading">読み込み中...</p>
+        <p class="ep-state ep-state--loading">読み込み中...</p>
     } @else if (message() && !hasEmployeeLink()) {
-        <header class="page-header">
-            <h1>マイページ</h1>
-        </header>
-        <div class="empty-card">
+        <div class="ep-card empty-card">
             <p class="empty-title">{{ message() }}</p>
-            <p class="empty-note">アカウント設定は<a routerLink="/profile" class="text-link">プロフィール</a>から確認できます。</p>
+            <p class="empty-note">管理者にお問い合わせください。</p>
         </div>
     } @else if (currentUser(); as user) {
-        <header class="page-header">
-            <h1>マイページ</h1>
-            <p class="page-note">あなたの基本情報・社会保険・保険料・手続き状況を確認できます。</p>
-        </header>
+        <nav class="ep-quick-nav" aria-label="従業員メニュー">
+            <a
+                routerLink="/my-page"
+                routerLinkActive="is-active"
+                [routerLinkActiveOptions]="{ exact: true }"
+                class="ep-quick-nav__link"
+            >
+                <span class="ep-quick-nav__icon">私</span>
+                マイページ
+            </a>
+            <a
+                routerLink="/my-insurance-premium"
+                routerLinkActive="is-active"
+                class="ep-quick-nav__link"
+            >
+                <span class="ep-quick-nav__icon">算</span>
+                保険料
+            </a>
+        </nav>
 
         @if (message()) {
-            <p class="alert alert-warning">{{ message() }}</p>
+            <p class="ep-state ep-state--warning">{{ message() }}</p>
         }
 
-        <section class="hero-card">
-            <span class="avatar" aria-hidden="true">{{ userInitial() }}</span>
-            <div class="hero-body">
-                <p class="hero-kicker">{{ companyName() }}</p>
-                <h2 class="hero-name">{{ displayName() }}</h2>
-                <p class="hero-sub">{{ displayNameKana() }}</p>
+        <section class="ep-hero">
+            <span class="ep-hero__avatar" aria-hidden="true">{{ userInitial() }}</span>
+            <div class="ep-hero__body">
+                <p class="ep-hero__kicker">{{ companyName() }}</p>
+                <h2 class="ep-hero__name">{{ displayName() }}</h2>
+                <p class="ep-hero__sub">{{ displayNameKana() }}</p>
                 @if (employee(); as emp) {
-                    <div class="hero-badges">
-                        <span class="badge office">{{ officeName() }}</span>
+                    <div class="ep-hero__badges">
+                        <span class="ep-badge ep-badge--neutral">{{ officeName() }}</span>
                         @if (emp.employeeNumber) {
-                            <span class="badge number">社員番号 {{ emp.employeeNumber }}</span>
+                            <span class="ep-badge ep-badge--neutral">社員番号 {{ emp.employeeNumber }}</span>
                         }
                         <span
-                            class="badge status"
-                            [class.before-join]="isBeforeJoin(emp)"
-                            [class.retired]="isFullyRetired(emp)"
-                            [class.pending-retirement]="isPendingRetirement(emp)"
+                            class="ep-badge"
+                            [class.ep-badge--info]="isBeforeJoin(emp)"
+                            [class.ep-badge--danger]="isFullyRetired(emp)"
+                            [class.ep-badge--warning]="isPendingRetirement(emp)"
+                            [class.ep-badge--success]="!isBeforeJoin(emp) && !isFullyRetired(emp) && !isPendingRetirement(emp)"
                         >
                             {{ employeeStatusLabel(emp) }}
                         </span>
@@ -44,10 +60,10 @@
             </div>
         </section>
 
-        <div class="content-grid">
+        <div class="ep-grid-2">
             @if (employee(); as emp) {
-                <section class="info-card">
-                    <h3 class="card-title">基本情報</h3>
+                <section class="ep-card">
+                    <h3 class="ep-card__title">基本情報</h3>
                     <dl class="info-dl">
                         <div class="info-row">
                             <dt>氏名</dt>
@@ -99,8 +115,8 @@
                     </dl>
                 </section>
 
-                <section class="info-card">
-                    <h3 class="card-title">社会保険情報</h3>
+                <section class="ep-card">
+                    <h3 class="ep-card__title">社会保険情報</h3>
                     @if (insuranceStatus(); as status) {
                         <div class="insurance-badges">
                             <div class="insurance-badge-item">
@@ -152,16 +168,16 @@
                             </div>
                         </dl>
                     } @else {
-                        <p class="card-empty">社会保険情報はまだ登録されていません。</p>
+                        <p class="ep-card__empty">社会保険情報はまだ登録されていません。</p>
                     }
                 </section>
             }
         </div>
 
-        <section class="info-card premium-card">
-            <div class="card-header-row">
-                <h3 class="card-title">保険料情報</h3>
-                <span class="card-meta">{{ targetYearMonthLabel() }}</span>
+        <section class="ep-card ep-section-gap premium-card">
+            <div class="ep-card__header">
+                <h3 class="ep-card__title">保険料情報</h3>
+                <span class="ep-card__meta">{{ targetYearMonthLabel() }}</span>
             </div>
             @if (premiumSummary(); as premium) {
                 @if (premium.standardAmount !== null) {
@@ -210,18 +226,21 @@
                             </span>
                         </div>
                     </div>
+                    <p class="premium-detail-link">
+                        <a routerLink="/my-insurance-premium" class="ep-link ep-link--arrow">月別の保険料を詳しく見る</a>
+                    </p>
                 } @else {
-                    <p class="card-empty">{{ premium.description }}</p>
+                    <p class="ep-card__empty">{{ premium.description }}</p>
                 }
             } @else {
-                <p class="card-empty">保険料情報を表示できません。</p>
+                <p class="ep-card__empty">保険料情報を表示できません。</p>
             }
         </section>
 
-        <section class="info-card">
-            <h3 class="card-title">手続き状況</h3>
+        <section class="ep-card ep-section-gap">
+            <h3 class="ep-card__title">手続き状況</h3>
             @if (procedures().length === 0) {
-                <p class="card-empty">関連する手続きはありません。</p>
+                <p class="ep-card__empty">関連する手続きはありません。</p>
             } @else {
                 <div class="procedure-list">
                     @for (item of procedures(); track item.id) {
@@ -250,10 +269,10 @@
             }
         </section>
 
-        <section class="info-card">
-            <h3 class="card-title">扶養家族</h3>
+        <section class="ep-card ep-section-gap">
+            <h3 class="ep-card__title">扶養家族</h3>
             @if (activeDependents().length === 0) {
-                <p class="card-empty">登録されている扶養家族はいません。</p>
+                <p class="ep-card__empty">登録されている扶養家族はいません。</p>
             } @else {
                 <div class="dependent-list">
                     @for (dependent of activeDependents(); track dependent.id) {
@@ -278,51 +297,11 @@
             }
         </section>
     }
-</div>
+</app-employee-portal-page>
 
 <style>
-    .my-page {
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 8px 0 40px;
-    }
-
-    .page-header h1 {
-        margin: 0 0 8px;
-        font-size: 22px;
-    }
-
-    .page-note {
-        margin: 0;
-        color: #6b7280;
-        font-size: 14px;
-        line-height: 1.6;
-    }
-
-    .loading {
-        color: #6b7280;
-        font-size: 14px;
-    }
-
-    .alert {
-        margin: 16px 0 0;
-        padding: 10px 14px;
-        border-radius: 8px;
-        font-size: 14px;
-    }
-
-    .alert-warning {
-        background: #fffbeb;
-        border: 1px solid #fde68a;
-        color: #92400e;
-    }
-
     .empty-card {
-        margin-top: 24px;
-        padding: 32px 24px;
-        border: 1px dashed #d1d5db;
-        border-radius: 12px;
-        background: #f9fafb;
+        margin-top: 20px;
         text-align: center;
     }
 
@@ -330,164 +309,13 @@
         margin: 0 0 8px;
         font-size: 15px;
         font-weight: 600;
-        color: #111827;
+        color: #0f172a;
     }
 
     .empty-note {
         margin: 0;
         font-size: 14px;
-        color: #6b7280;
-    }
-
-    .hero-card {
-        display: flex;
-        align-items: center;
-        gap: 20px;
-        margin-top: 24px;
-        padding: 24px;
-        border: 1px solid #e5e7eb;
-        border-radius: 16px;
-        background: linear-gradient(135deg, #ecfdf5 0%, #f8fafc 55%, #fff 100%);
-        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
-    }
-
-    .avatar {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 72px;
-        height: 72px;
-        border-radius: 999px;
-        background: linear-gradient(135deg, #059669 0%, #34d399 100%);
-        color: #fff;
-        font-size: 28px;
-        font-weight: 800;
-        flex-shrink: 0;
-        box-shadow: 0 8px 20px rgba(5, 150, 105, 0.2);
-    }
-
-    .hero-body {
-        min-width: 0;
-    }
-
-    .hero-kicker {
-        margin: 0 0 4px;
-        font-size: 12px;
-        font-weight: 600;
-        color: #059669;
-    }
-
-    .hero-name {
-        margin: 0;
-        font-size: 24px;
-        line-height: 1.3;
-        color: #111827;
-    }
-
-    .hero-sub {
-        margin: 4px 0 12px;
-        font-size: 14px;
-        color: #6b7280;
-    }
-
-    .hero-badges {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-
-    .badge {
-        display: inline-block;
-        padding: 3px 10px;
-        border-radius: 999px;
-        font-size: 12px;
-        font-weight: 700;
-    }
-
-    .badge.office {
-        background: #e5e7eb;
-        color: #374151;
-    }
-
-    .badge.number {
-        background: #f3f4f6;
-        color: #4b5563;
-    }
-
-    .badge.status {
-        background: #dcfce7;
-        color: #166534;
-    }
-
-    .badge.status.pending-retirement {
-        background: #fef3c7;
-        color: #92400e;
-    }
-
-    .badge.status.before-join {
-        background: #dbeafe;
-        color: #1d4ed8;
-    }
-
-    .badge.status.retired {
-        background: #fee2e2;
-        color: #991b1b;
-    }
-
-    .content-grid {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 16px;
-        margin-top: 20px;
-    }
-
-    @media (min-width: 720px) {
-        .content-grid {
-            grid-template-columns: 1fr 1fr;
-        }
-    }
-
-    .info-card {
-        padding: 20px;
-        border: 1px solid #e5e7eb;
-        border-radius: 12px;
-        background: #fff;
-    }
-
-    .premium-card {
-        margin-top: 16px;
-    }
-
-    .card-header-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 14px;
-    }
-
-    .card-header-row .card-title {
-        margin: 0;
-    }
-
-    .card-title {
-        margin: 0 0 14px;
-        font-size: 15px;
-        font-weight: 700;
-        color: #111827;
-    }
-
-    .card-meta {
-        font-size: 13px;
-        font-weight: 600;
-        color: #6b7280;
-    }
-
-    .card-empty {
-        margin: 0;
-        font-size: 14px;
-        color: #6b7280;
-        line-height: 1.6;
+        color: #64748b;
     }
 
     .info-dl {
@@ -499,7 +327,7 @@
         grid-template-columns: 108px 1fr;
         gap: 12px;
         padding: 10px 0;
-        border-bottom: 1px solid #f3f4f6;
+        border-bottom: 1px solid #f1f5f9;
         font-size: 14px;
     }
 
@@ -514,13 +342,13 @@
 
     .info-row dt {
         margin: 0;
-        color: #6b7280;
+        color: #64748b;
         font-weight: 600;
     }
 
     .info-row dd {
         margin: 0;
-        color: #111827;
+        color: #0f172a;
         word-break: break-word;
     }
 
@@ -528,7 +356,7 @@
         display: block;
         margin-top: 2px;
         font-size: 12px;
-        color: #6b7280;
+        color: #64748b;
     }
 
     .insurance-badges {
@@ -548,7 +376,7 @@
     .insurance-label {
         font-size: 14px;
         font-weight: 600;
-        color: #374151;
+        color: #334155;
     }
 
     .status-pill {
@@ -557,8 +385,8 @@
         border-radius: 999px;
         font-size: 12px;
         font-weight: 700;
-        background: #f3f4f6;
-        color: #4b5563;
+        background: #f1f5f9;
+        color: #475569;
     }
 
     .status-pill.enrolled {
@@ -579,7 +407,7 @@
     .premium-note {
         margin: 0 0 14px;
         font-size: 13px;
-        color: #6b7280;
+        color: #64748b;
     }
 
     .premium-grid {
@@ -596,14 +424,14 @@
 
     .premium-item {
         padding: 14px;
-        border-radius: 10px;
-        background: #f9fafb;
-        border: 1px solid #f3f4f6;
+        border-radius: 12px;
+        background: #f8fafc;
+        border: 1px solid #f1f5f9;
     }
 
     .premium-item.total {
-        background: #eff6ff;
-        border-color: #bfdbfe;
+        background: #ecfdf5;
+        border-color: #bbf7d0;
     }
 
     .premium-label {
@@ -611,17 +439,22 @@
         margin-bottom: 6px;
         font-size: 12px;
         font-weight: 600;
-        color: #6b7280;
+        color: #64748b;
     }
 
     .premium-value {
         font-size: 18px;
         font-weight: 700;
-        color: #111827;
+        color: #0f172a;
     }
 
     .premium-item.total .premium-value {
-        color: #1d4ed8;
+        color: #047857;
+    }
+
+    .premium-detail-link {
+        margin: 16px 0 0;
+        font-size: 14px;
     }
 
     .procedure-list,
@@ -637,22 +470,22 @@
         justify-content: space-between;
         gap: 12px;
         padding: 14px;
-        border-radius: 10px;
-        background: #f9fafb;
-        border: 1px solid #f3f4f6;
+        border-radius: 12px;
+        background: #f8fafc;
+        border: 1px solid #f1f5f9;
     }
 
     .procedure-type {
         margin: 0 0 4px;
         font-size: 14px;
         font-weight: 700;
-        color: #111827;
+        color: #0f172a;
     }
 
     .procedure-date {
         margin: 0;
         font-size: 12px;
-        color: #6b7280;
+        color: #64748b;
     }
 
     .procedure-status {
@@ -664,8 +497,8 @@
     }
 
     .procedure-status.not-started {
-        background: #f3f4f6;
-        color: #4b5563;
+        background: #f1f5f9;
+        color: #475569;
     }
 
     .procedure-status.in-progress {
@@ -680,9 +513,9 @@
 
     .dependent-card {
         padding: 14px;
-        border-radius: 10px;
-        background: #f9fafb;
-        border: 1px solid #f3f4f6;
+        border-radius: 12px;
+        background: #f8fafc;
+        border: 1px solid #f1f5f9;
     }
 
     .dependent-header {
@@ -697,7 +530,7 @@
         margin: 0;
         font-size: 14px;
         font-weight: 700;
-        color: #111827;
+        color: #0f172a;
     }
 
     .dependent-relationship {
@@ -723,21 +556,11 @@
 
     .dependent-row dt {
         margin: 0;
-        color: #6b7280;
+        color: #64748b;
     }
 
     .dependent-row dd {
         margin: 0;
-        color: #111827;
-    }
-
-    .text-link {
-        color: #2563eb;
-        font-weight: 600;
-        text-decoration: none;
-    }
-
-    .text-link:hover {
-        text-decoration: underline;
+        color: #0f172a;
     }
 </style>

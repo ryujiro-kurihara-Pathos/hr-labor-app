@@ -1,22 +1,24 @@
-<div class="company-page">
-    <header class="page-header">
-        <h1>会社・事業所情報</h1>
-        <p class="page-note">会社の基本情報と事業所の一覧を管理します。事業所カードをクリックすると詳細を編集できます。</p>
-    </header>
-
+<app-admin-page-shell
+    title="会社・事業所情報"
+    note="会社の基本情報と事業所の一覧を管理します。事業所カードをクリックすると詳細を編集できます。"
+>
     @if (isLoading()) {
-        <p class="loading">読み込み中...</p>
+        <p class="admin-state admin-state--loading">読み込み中...</p>
     } @else if (errorMessage()) {
-        <p class="error">{{ errorMessage() }}</p>
+        <p class="admin-state admin-state--error">{{ errorMessage() }}</p>
     } @else if (company(); as c) {
-        <section class="company-section">
-            <div class="section-header">
-                <h2 class="section-title">会社情報</h2>
+        <section class="admin-section">
+            <div class="admin-section__header">
+                <div class="admin-section__header-main">
+                    <h2 class="admin-section__title">会社情報</h2>
+                    <p class="admin-section__note">給与支払月や保険料控除の設定もここで管理します</p>
+                </div>
                 @if (!isEditingCompany()) {
-                    <button type="button" class="btn edit-btn" (click)="startCompanyEdit()">編集</button>
+                    <button type="button" class="admin-btn admin-btn--ghost" (click)="startCompanyEdit()">編集</button>
                 }
             </div>
-            <article class="info-card">
+
+            <article class="admin-card admin-card--featured">
                 @if (isEditingCompany()) {
                     <div class="form-field">
                         <label for="company-name">会社名</label>
@@ -46,43 +48,42 @@
                         />
                     </div>
 
-                    <div class="payroll-settings-block">
-                        <h3 class="payroll-settings-title">給与・保険料設定</h3>
-                        <div class="form-field">
-                            <div class="label-row">
-                                <label for="payroll-payment-month-offset">給与支払月 <span class="field-badge required">必須</span></label>
-                                <app-field-help-tooltip
-                                    title="給与支払月"
-                                    [lines]="payrollPaymentMonthHelpLines"
-                                />
-                            </div>
-                            <select
-                                id="payroll-payment-month-offset"
-                                name="payrollPaymentMonthOffset"
-                                [(ngModel)]="payrollPaymentMonthOffset"
-                                required
-                            >
-                                <option [ngValue]="0">当月</option>
-                                <option [ngValue]="1">翌月</option>
-                            </select>
+                    <hr class="admin-card__divider" />
+                    <h3 class="admin-card__subheading">給与・保険料設定</h3>
+                    <div class="form-field">
+                        <div class="label-row">
+                            <label for="payroll-payment-month-offset">給与支払月 <span class="field-badge required">必須</span></label>
+                            <app-field-help-tooltip
+                                title="給与支払月"
+                                [lines]="payrollPaymentMonthHelpLines"
+                            />
                         </div>
-                        <div class="form-field">
-                            <div class="label-row">
-                                <label>保険料の給与控除</label>
-                                <app-field-help-tooltip
-                                    title="保険料の給与控除"
-                                    [lines]="insurancePremiumCollectionHelpLines"
-                                />
-                            </div>
-                            <p class="field-value">翌月徴収（前月分を控除）</p>
-                            <p class="field-note">{{ insurancePremiumCollectionTimingAppNote }}</p>
+                        <select
+                            id="payroll-payment-month-offset"
+                            name="payrollPaymentMonthOffset"
+                            [(ngModel)]="payrollPaymentMonthOffset"
+                            required
+                        >
+                            <option [ngValue]="0">当月</option>
+                            <option [ngValue]="1">翌月</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <div class="label-row">
+                            <label>保険料の給与控除</label>
+                            <app-field-help-tooltip
+                                title="保険料の給与控除"
+                                [lines]="insurancePremiumCollectionHelpLines"
+                            />
                         </div>
+                        <p class="field-value">翌月徴収（前月分を控除）</p>
+                        <p class="field-note">{{ insurancePremiumCollectionTimingAppNote }}</p>
                     </div>
 
-                    <div class="form-actions">
+                    <div class="admin-form-actions">
                         <button
                             type="button"
-                            class="btn primary-btn"
+                            class="admin-btn admin-btn--primary"
                             (click)="saveCompany()"
                             [disabled]="isSavingCompany()"
                         >
@@ -90,7 +91,7 @@
                         </button>
                         <button
                             type="button"
-                            class="btn secondary-btn"
+                            class="admin-btn admin-btn--secondary"
                             (click)="cancelCompanyEdit()"
                             [disabled]="isSavingCompany()"
                         >
@@ -98,45 +99,51 @@
                         </button>
                     </div>
                 } @else {
-                    <div class="company-name-row">
-                        <p class="company-name">{{ c.name }}</p>
+                    <div class="company-hero">
+                        <span class="company-icon" aria-hidden="true">社</span>
+                        <div class="company-hero-body">
+                            <p class="company-name">{{ c.name }}</p>
+                            @if (c.representativeName) {
+                                <p class="company-sub">代表：{{ c.representativeName }}</p>
+                            }
+                        </div>
                     </div>
-                    <dl class="info-meta">
-                        <div class="meta-row">
+
+                    <dl class="admin-meta company-meta">
+                        <div class="admin-meta__row">
                             <dt>代表者</dt>
                             <dd>{{ c.representativeName || '—' }}</dd>
                         </div>
-                        <div class="meta-row">
+                        <div class="admin-meta__row">
                             <dt>所在地</dt>
                             <dd>{{ c.address || '—' }}</dd>
                         </div>
                     </dl>
 
-                    <div class="payroll-settings-view">
-                        <h3 class="payroll-settings-title">給与・保険料設定</h3>
-                        <dl class="info-meta">
-                            <div class="meta-row">
-                                <dt>給与支払月</dt>
-                                <dd>{{ c.payrollPaymentMonthOffset === 1 ? '翌月' : '当月' }}</dd>
-                            </div>
-                            <div class="meta-row">
-                                <dt>保険料の給与控除</dt>
-                                <dd>
-                                    {{ insurancePremiumCollectionTimingLabel(c.insurancePremiumCollectionTiming) }}
-                                    <span class="field-note inline">{{ insurancePremiumCollectionTimingAppNote }}</span>
-                                </dd>
-                            </div>
-                        </dl>
-                    </div>
+                    <hr class="admin-card__divider" />
+                    <h3 class="admin-card__subheading">給与・保険料設定</h3>
+                    <dl class="admin-meta">
+                        <div class="admin-meta__row">
+                            <dt>給与支払月</dt>
+                            <dd>{{ c.payrollPaymentMonthOffset === 1 ? '翌月' : '当月' }}</dd>
+                        </div>
+                        <div class="admin-meta__row">
+                            <dt>保険料の給与控除</dt>
+                            <dd>
+                                {{ insurancePremiumCollectionTimingLabel(c.insurancePremiumCollectionTiming) }}
+                                <span class="field-note inline">{{ insurancePremiumCollectionTimingAppNote }}</span>
+                            </dd>
+                        </div>
+                    </dl>
                 }
             </article>
         </section>
 
-        <section class="offices-section">
-            <div class="section-header">
-                <div>
-                    <h2 class="section-title">事業所一覧</h2>
-                    <p class="section-note">
+        <section class="admin-section">
+            <div class="admin-section__header">
+                <div class="admin-section__header-main">
+                    <h2 class="admin-section__title">事業所一覧</h2>
+                    <p class="admin-section__note">
                         @if (isLoadingOffices()) {
                             読み込み中...
                         } @else {
@@ -144,7 +151,7 @@
                         }
                     </p>
                 </div>
-                <button type="button" class="btn primary-btn" (click)="openOfficeModal()">
+                <button type="button" class="admin-btn admin-btn--primary" (click)="openOfficeModal()">
                     事業所を登録
                 </button>
             </div>
@@ -159,37 +166,41 @@
             }
 
             @if (isLoadingOffices()) {
-                <p class="loading">事業所を読み込み中...</p>
+                <p class="admin-state admin-state--loading">事業所を読み込み中...</p>
             } @else if (errorMessageOffices()) {
-                <p class="error">{{ errorMessageOffices() }}</p>
+                <p class="admin-state admin-state--error">{{ errorMessageOffices() }}</p>
             } @else if (offices().length === 0) {
-                <div class="empty-state">
-                    <p class="empty-title">事業所がまだ登録されていません</p>
-                    <p class="empty-note">「事業所を登録」から最初の事業所を追加してください。</p>
+                <div class="admin-empty">
+                    <p class="admin-empty__title">事業所がまだ登録されていません</p>
+                    <p class="admin-empty__note">「事業所を登録」から最初の事業所を追加してください。</p>
                 </div>
             } @else {
-                <div class="office-list">
+                <div class="office-grid">
                     @for (office of offices(); track office.id) {
-                        <a class="office-card" [routerLink]="['/company/offices', office.id]">
-                            <div class="office-card-header">
-                                <p class="office-name">{{ office.name }}</p>
-                                @if (office.status === 'disabled') {
-                                    <span class="status-badge disabled">無効化</span>
-                                } @else {
-                                    <span class="status-badge active">有効</span>
-                                }
+                        <a class="office-tile" [routerLink]="['/company/offices', office.id]">
+                            <div class="office-tile__top">
+                                <span class="office-tile__icon" aria-hidden="true">{{ officeInitial(office.name) }}</span>
+                                <div class="office-tile__head">
+                                    <p class="office-tile__name">{{ office.name }}</p>
+                                    @if (office.status === 'disabled') {
+                                        <span class="admin-badge admin-badge--muted">無効化</span>
+                                    } @else {
+                                        <span class="admin-badge admin-badge--success">有効</span>
+                                    }
+                                </div>
+                                <span class="office-tile__chevron" aria-hidden="true">›</span>
                             </div>
-                            <dl class="office-meta">
-                                <div class="meta-row">
+                            <dl class="office-tile__meta">
+                                <div class="office-tile__row">
                                     <dt>所在地</dt>
                                     <dd>{{ formatOfficeAddress(office) }}</dd>
                                 </div>
-                                <div class="meta-row">
+                                <div class="office-tile__row">
                                     <dt>健保</dt>
                                     <dd>{{ healthInsuranceLabel(office.healthInsuranceType) }}</dd>
                                 </div>
                                 @if (office.officeSymbol || office.officeNumber) {
-                                    <div class="meta-row">
+                                    <div class="office-tile__row">
                                         <dt>整理記号</dt>
                                         <dd>
                                             {{ office.officeSymbol || '—' }}
@@ -206,51 +217,51 @@
             }
         </section>
     }
-</div>
+</app-admin-page-shell>
 
 <style>
-    .company-page {
-        max-width: 900px;
-        margin: 0 auto;
-        padding: 24px 16px 40px;
-    }
-
-    .page-header h1 {
-        margin: 0 0 8px;
-        font-size: 22px;
-    }
-
-    .page-note {
-        margin: 0;
-        color: #6b7280;
-        font-size: 14px;
-        line-height: 1.5;
-    }
-
-    .company-section {
-        margin-top: 24px;
-    }
-
-    .company-section .section-header {
+    .company-hero {
         display: flex;
-        justify-content: space-between;
         align-items: center;
         gap: 16px;
-        margin-bottom: 12px;
+        margin-bottom: 16px;
     }
 
-    .company-section .section-title {
+    .company-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+        color: #fff;
+        font-size: 20px;
+        font-weight: 800;
+        flex-shrink: 0;
+        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.2);
+    }
+
+    .company-hero-body {
+        min-width: 0;
+    }
+
+    .company-name {
         margin: 0;
+        font-size: 22px;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1.3;
     }
 
-    .edit-btn {
-        background: #fff;
-        color: #2563eb;
-        border: 1px solid #2563eb;
+    .company-sub {
+        margin: 4px 0 0;
+        font-size: 14px;
+        color: #64748b;
     }
 
-    .edit-btn:hover {
-        background: #eff6ff;
+    .company-meta {
+        margin-bottom: 4px;
     }
 
     .form-field {
@@ -262,18 +273,19 @@
         margin-bottom: 6px;
         font-size: 13px;
         font-weight: 600;
-        color: #374151;
+        color: #334155;
     }
 
     .field-value {
         margin: 0;
         font-size: 14px;
-        color: #111827;
+        color: #0f172a;
+        font-weight: 600;
     }
 
     .field-note {
         margin: 6px 0 0;
-        color: #6b7280;
+        color: #64748b;
         font-size: 13px;
         line-height: 1.5;
     }
@@ -281,6 +293,7 @@
     .field-note.inline {
         display: block;
         margin-top: 4px;
+        font-weight: 400;
     }
 
     .form-field input,
@@ -289,7 +302,7 @@
         height: 40px;
         padding: 0 12px;
         border: 1px solid #d1d5db;
-        border-radius: 8px;
+        border-radius: 10px;
         font-size: 14px;
         box-sizing: border-box;
         background: #fff;
@@ -300,88 +313,6 @@
         outline: none;
         border-color: #2563eb;
         box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
-    }
-
-    .payroll-settings-block,
-    .payroll-settings-view {
-        margin-top: 20px;
-        padding-top: 20px;
-        border-top: 1px solid #f3f4f6;
-    }
-
-    .payroll-settings-title {
-        margin: 0 0 8px;
-        font-size: 15px;
-        font-weight: 700;
-        color: #111827;
-    }
-
-    .payroll-settings-note {
-        margin: 0 0 16px;
-        color: #6b7280;
-        font-size: 13px;
-        line-height: 1.5;
-    }
-
-    .inline-field-row {
-        display: grid;
-        grid-template-columns: 120px 1fr;
-        gap: 8px;
-    }
-
-    .form-actions {
-        display: flex;
-        gap: 8px;
-        margin-top: 20px;
-        padding-top: 16px;
-        border-top: 1px solid #f3f4f6;
-    }
-
-    .secondary-btn {
-        background: #fff;
-        color: #374151;
-        border: 1px solid #d1d5db;
-    }
-
-    .secondary-btn:hover:not(:disabled) {
-        background: #f9fafb;
-    }
-
-    .btn:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-    }
-
-    .offices-section {
-        margin-top: 32px;
-    }
-
-    .section-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 16px;
-        margin-bottom: 12px;
-    }
-
-    .section-title {
-        margin: 0 0 4px;
-        font-size: 17px;
-    }
-
-    .section-note {
-        margin: 0;
-        color: #6b7280;
-        font-size: 13px;
-    }
-
-    .info-card {
-        padding: 20px;
-        background: #fff;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-        overflow: visible;
     }
 
     .label-row {
@@ -409,174 +340,113 @@
         color: #b91c1c;
     }
 
-    .field-badge.optional {
-        background: #f3f4f6;
-        color: #6b7280;
-        font-weight: 600;
+    .office-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
     }
 
-    .company-name-row {
-        margin-bottom: 16px;
-        padding-bottom: 16px;
-        border-bottom: 1px solid #f3f4f6;
+    @media (min-width: 720px) {
+        .office-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
     }
 
-    .company-name {
+    .office-tile {
+        display: block;
+        padding: 18px 20px;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        background: #fff;
+        text-decoration: none;
+        color: inherit;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+        transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+    }
+
+    .office-tile:hover {
+        border-color: #93c5fd;
+        box-shadow: 0 8px 20px rgba(37, 99, 235, 0.1);
+        transform: translateY(-1px);
+    }
+
+    .office-tile__top {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 14px;
+    }
+
+    .office-tile__icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: #eff6ff;
+        color: #2563eb;
+        font-size: 16px;
+        font-weight: 800;
+        flex-shrink: 0;
+    }
+
+    .office-tile__head {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .office-tile__name {
         margin: 0;
-        font-size: 20px;
+        font-size: 16px;
         font-weight: 700;
-        color: #111827;
+        color: #0f172a;
     }
 
-    .info-meta,
-    .office-meta {
+    .office-tile__chevron {
+        flex-shrink: 0;
+        color: #94a3b8;
+        font-size: 22px;
+        line-height: 1;
+        transition: color 0.15s, transform 0.15s;
+    }
+
+    .office-tile:hover .office-tile__chevron {
+        color: #2563eb;
+        transform: translateX(2px);
+    }
+
+    .office-tile__meta {
         margin: 0;
         display: grid;
         gap: 8px;
     }
 
-    .meta-row {
-        display: flex;
-        gap: 12px;
-        font-size: 14px;
+    .office-tile__row {
+        display: grid;
+        grid-template-columns: 64px 1fr;
+        gap: 8px;
+        font-size: 13px;
         line-height: 1.5;
     }
 
-    .meta-row dt {
-        flex-shrink: 0;
-        width: 72px;
+    .office-tile__row dt {
         margin: 0;
-        color: #6b7280;
-        font-weight: 500;
+        color: #64748b;
+        font-weight: 600;
     }
 
-    .meta-row dd {
+    .office-tile__row dd {
         margin: 0;
-        color: #111827;
-        word-break: break-all;
+        color: #334155;
+        word-break: break-word;
     }
 
     .office-number {
-        color: #6b7280;
-    }
-
-    .loading,
-    .empty-note {
-        color: #6b7280;
-        font-size: 14px;
-    }
-
-    .error {
-        margin: 16px 0 0;
-        color: #b91c1c;
-        font-size: 14px;
-        font-weight: 600;
-    }
-
-    .empty-state {
-        padding: 32px 20px;
-        text-align: center;
-        background: #f9fafb;
-        border: 1px dashed #d1d5db;
-        border-radius: 8px;
-    }
-
-    .empty-title {
-        margin: 0 0 6px;
-        font-size: 15px;
-        font-weight: 600;
-        color: #374151;
-    }
-
-    .empty-note {
-        margin: 0;
-    }
-
-    .office-list {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-    }
-
-    .office-card {
-        display: block;
-        padding: 16px;
-        background: #fff;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-        text-decoration: none;
-        color: inherit;
-        cursor: pointer;
-        transition: border-color 0.15s, box-shadow 0.15s;
-    }
-
-    .office-card:hover {
-        border-color: #93c5fd;
-        box-shadow: 0 4px 10px rgba(59, 130, 246, 0.12);
-    }
-
-    .office-card-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        margin-bottom: 12px;
-    }
-
-    .office-name {
-        margin: 0;
-        font-size: 16px;
-        font-weight: 600;
-    }
-
-    .status-badge {
-        flex-shrink: 0;
-        padding: 2px 8px;
-        border-radius: 999px;
-        font-size: 11px;
-        font-weight: 700;
-    }
-
-    .status-badge.active {
-        background: #dcfce7;
-        color: #166534;
-    }
-
-    .status-badge.disabled {
-        background: #f3f4f6;
-        color: #4b5563;
-    }
-
-    .btn {
-        flex-shrink: 0;
-        height: 40px;
-        padding: 0 16px;
-        border: none;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        white-space: nowrap;
-    }
-
-    .primary-btn {
-        background: #2563eb;
-        color: #fff;
-    }
-
-    .primary-btn:hover {
-        background: #1d4ed8;
-    }
-
-    @media (max-width: 640px) {
-        .section-header {
-            flex-direction: column;
-            align-items: stretch;
-        }
-
-        .primary-btn {
-            width: 100%;
-        }
+        color: #64748b;
     }
 </style>

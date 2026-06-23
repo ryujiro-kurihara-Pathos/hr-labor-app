@@ -1,41 +1,42 @@
-<div class="office-page">
-    <a routerLink="/company" class="back-link">← 会社・事業所一覧へ</a>
-
-    @if(isLoading()) {
-        <p class="loading">読み込み中...</p>
-    } @else if (!office()) {
-        <p class="error-message">{{ errorMessage() || '事業所が見つかりませんでした' }}</p>
-    } @else {
-        <div class="office-card">
-            <div class="page-header">
-                <div class="page-header-title">
-                    <h1>{{ office()!.name }}</h1>
-                    @if (office()?.status === 'disabled') {
-                        <span class="status-badge disabled">無効化</span>
-                    } @else {
-                        <span class="status-badge active">有効</span>
-                    }
-                </div>
-                <div class="page-header-actions">
-                    @if (!isEditing()) {
-                        <button type="button" class="btn edit-btn" (click)="startEdit()">編集</button>
-                    }
-                    @if (office()?.status === 'disabled') {
-                        <button type="button" class="btn enable-btn" (click)="enableOffice()">有効化</button>
-                    }
-                </div>
+@if (isLoading()) {
+    <app-admin-page-shell title="事業所" note="">
+        <p class="admin-state admin-state--loading">読み込み中...</p>
+    </app-admin-page-shell>
+} @else if (!office()) {
+    <app-admin-page-shell title="事業所" backLink="/company" backLabel="会社・事業所一覧へ">
+        <p class="admin-state admin-state--error">{{ errorMessage() || '事業所が見つかりませんでした' }}</p>
+    </app-admin-page-shell>
+} @else {
+    <app-admin-page-shell
+        [title]="office()!.name"
+        backLink="/company"
+        backLabel="会社・事業所一覧へ"
+    >
+        <div class="detail-toolbar">
+            <div class="detail-toolbar__main">
+                <span class="detail-icon" aria-hidden="true">{{ officeInitial(office()!.name) }}</span>
+                @if (office()?.status === 'disabled') {
+                    <span class="admin-badge admin-badge--muted">無効化</span>
+                } @else {
+                    <span class="admin-badge admin-badge--success">有効</span>
+                }
             </div>
+            <div class="detail-toolbar__actions">
+                @if (!isEditing()) {
+                    <button type="button" class="admin-btn admin-btn--ghost" (click)="startEdit()">編集</button>
+                }
+                @if (office()?.status === 'disabled') {
+                    <button type="button" class="admin-btn admin-btn--success" (click)="enableOffice()">有効化</button>
+                }
+            </div>
+        </div>
 
-            @if (isEditing()) {
+        @if (isEditing()) {
+            <section class="admin-card">
                 <h2 class="section-title">基本情報</h2>
                 <div class="form-field">
                     <label for="office-name">事業所名</label>
-                    <input
-                        id="office-name"
-                        type="text"
-                        name="name"
-                        [(ngModel)]="name"
-                    />
+                    <input id="office-name" type="text" name="name" [(ngModel)]="name" />
                 </div>
 
                 <div class="form-field">
@@ -52,7 +53,7 @@
                         />
                         <button
                             type="button"
-                            class="postal-search-btn"
+                            class="admin-btn admin-btn--secondary postal-search-btn"
                             (click)="lookupAddressFromPostalCode()"
                             [disabled]="isPostalLookupLoading()"
                         >
@@ -87,23 +88,19 @@
                 <div class="form-field">
                     <div class="label-row">
                         <label>健康保険</label>
-                        <app-field-help-tooltip
-                            title="健康保険"
-                            [lines]="healthInsuranceHelpLines"
-                        />
+                        <app-field-help-tooltip title="健康保険" [lines]="healthInsuranceHelpLines" />
                     </div>
                     <p class="fixed-value">協会けんぽ</p>
                     <p class="field-note">組合健保には未対応です。保険料は協会けんぽの都道府県別料率で計算します。</p>
                 </div>
+            </section>
 
+            <section class="admin-card admin-card-gap">
                 <h2 class="section-title">社会保険番号</h2>
                 <div class="form-field">
                     <div class="label-row">
                         <label for="health-insurance-office-symbol">事業所整理記号</label>
-                        <app-field-help-tooltip
-                            title="事業所整理記号"
-                            [lines]="officeSymbolHelpLines"
-                        />
+                        <app-field-help-tooltip title="事業所整理記号" [lines]="officeSymbolHelpLines" />
                     </div>
                     <input
                         id="health-insurance-office-symbol"
@@ -117,10 +114,7 @@
                 <div class="form-field">
                     <div class="label-row">
                         <label for="pension-office-number">事業所番号</label>
-                        <app-field-help-tooltip
-                            title="事業所番号"
-                            [lines]="officeNumberHelpLines"
-                        />
+                        <app-field-help-tooltip title="事業所番号" [lines]="officeNumberHelpLines" />
                     </div>
                     <input
                         id="pension-office-number"
@@ -132,15 +126,14 @@
                         maxlength="5"
                     />
                 </div>
+            </section>
 
+            <section class="admin-card admin-card-gap">
                 <h2 class="section-title">社会保険（通常の労働者の基準）</h2>
                 <div class="form-field">
                     <div class="label-row">
                         <label for="regular-weekly-hours">週の所定労働時間</label>
-                        <app-field-help-tooltip
-                            title="通常の労働者の基準"
-                            [lines]="regularWorkerHelpLines"
-                        />
+                        <app-field-help-tooltip title="通常の労働者の基準" [lines]="regularWorkerHelpLines" />
                     </div>
                     <input
                         id="regular-weekly-hours"
@@ -162,222 +155,242 @@
                 </div>
 
                 @if (errorMessage()) {
-                    <p class="error-message">{{ errorMessage() }}</p>
+                    <p class="admin-state admin-state--error">{{ errorMessage() }}</p>
                 }
 
-                <div class="button-area">
-                    <button
-                        type="button"
-                        class="btn sub-btn"
-                        (click)="cancelEdit()"
-                        [disabled]="isSaving()"
-                    >
+                <div class="admin-form-actions">
+                    <button type="button" class="admin-btn admin-btn--secondary" (click)="cancelEdit()" [disabled]="isSaving()">
                         キャンセル
                     </button>
-                    <button
-                        type="button"
-                        class="btn primary-btn"
-                        (click)="saveOffice()"
-                        [disabled]="isSaving()"
-                    >
-                        @if (isSaving()) {
-                            保存中...
-                        } @else {
-                            保存する
-                        }
+                    <button type="button" class="admin-btn admin-btn--primary" (click)="saveOffice()" [disabled]="isSaving()">
+                        {{ isSaving() ? '保存中...' : '保存する' }}
                     </button>
                 </div>
-            } @else {
+            </section>
+        } @else {
+            <section class="admin-card">
                 <h2 class="section-title">基本情報</h2>
-                <dl class="detail-list">
-                    <div class="detail-row">
+                <dl class="admin-meta">
+                    <div class="admin-meta__row">
                         <dt>所在地</dt>
                         <dd>{{ formatAddress(office()!) }}</dd>
                     </div>
-                    <div class="detail-row">
+                    <div class="admin-meta__row">
                         <dt>電話番号</dt>
                         <dd>{{ displayValue(office()!.phoneNumber) }}</dd>
                     </div>
-                    <div class="detail-row">
+                    <div class="admin-meta__row">
                         <dt>健康保険</dt>
                         <dd>{{ healthInsuranceLabel(office()!.healthInsuranceType) }}</dd>
                     </div>
                 </dl>
+            </section>
 
+            <section class="admin-card admin-card-gap">
                 <h2 class="section-title">社会保険番号</h2>
-                <dl class="detail-list">
-                    <div class="detail-row">
+                <dl class="admin-meta">
+                    <div class="admin-meta__row">
                         <dt>事業所整理記号</dt>
                         <dd>{{ displayValue(office()!.officeSymbol) }}</dd>
                     </div>
-                    <div class="detail-row">
+                    <div class="admin-meta__row">
                         <dt>事業所番号</dt>
                         <dd>{{ displayValue(office()!.officeNumber) }}</dd>
                     </div>
                 </dl>
+            </section>
 
+            <section class="admin-card admin-card-gap">
                 <h2 class="section-title">社会保険（通常の労働者の基準）</h2>
-                <dl class="detail-list">
-                    <div class="detail-row">
+                <dl class="admin-meta">
+                    <div class="admin-meta__row">
                         <dt>週の所定労働時間</dt>
                         <dd>{{ displayNumber(office()!.regularWeeklyScheduledWorkHours) }}</dd>
                     </div>
-                    <div class="detail-row">
+                    <div class="admin-meta__row">
                         <dt>月の所定労働日数</dt>
                         <dd>{{ displayNumber(office()!.regularMonthlyScheduledWorkDays) }}</dd>
                     </div>
                 </dl>
+            </section>
 
-                @if (errorMessage()) {
-                    <p class="error-message">{{ errorMessage() }}</p>
-                }
-
-                <div class="danger-zone">
-                    <div class="danger-zone-header">
-                        <h2 class="section-title danger-title">管理操作</h2>
-                        <span class="help-mark" tabindex="0" aria-label="管理操作の説明">
-                            <span class="help-icon" aria-hidden="true">
-                                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="10" cy="10" r="8.25" stroke="currentColor" stroke-width="1.5" />
-                                    <path d="M10 9.2V14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-                                    <circle cx="10" cy="6.4" r="0.9" fill="currentColor" />
-                                </svg>
-                            </span>
-                            <span class="help-tooltip" role="tooltip">
-                                <span class="help-tooltip-title">操作について</span>
-                                <ul class="help-tooltip-list">
-                                    @for (line of managementHelpLines(); track line) {
-                                        <li>{{ line }}</li>
-                                    }
-                                </ul>
-                            </span>
-                        </span>
-                    </div>
-
-                    <div class="danger-actions">
-                        <button
-                            type="button"
-                            class="mgmt-btn mgmt-btn-disable"
-                            (click)="disableOffice()"
-                            [disabled]="office()?.status === 'disabled'"
-                        >
-                            <span class="mgmt-btn-label">事業所を無効化</span>
-                            <span class="mgmt-btn-note">新規登録・手続きで選択不可にします</span>
-                        </button>
-                        <button
-                            type="button"
-                            class="mgmt-btn mgmt-btn-delete"
-                            (click)="deleteOffice()"
-                            [disabled]="!deletionCheck()?.canDelete"
-                        >
-                            <span class="mgmt-btn-label">事業所を削除する</span>
-                            <span class="mgmt-btn-note">未使用の事業所のみ削除できます</span>
-                        </button>
-                    </div>
-                </div>
+            @if (errorMessage()) {
+                <p class="admin-state admin-state--error admin-card-gap">{{ errorMessage() }}</p>
             }
-        </div>
-    }
-</div>
+
+            <section class="danger-zone admin-card-gap">
+                <div class="danger-zone-header">
+                    <h2 class="section-title danger-title">管理操作</h2>
+                    <span class="help-mark" tabindex="0" aria-label="管理操作の説明">
+                        <span class="help-icon" aria-hidden="true">
+                            <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="10" cy="10" r="8.25" stroke="currentColor" stroke-width="1.5" />
+                                <path d="M10 9.2V14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                                <circle cx="10" cy="6.4" r="0.9" fill="currentColor" />
+                            </svg>
+                        </span>
+                        <span class="help-tooltip" role="tooltip">
+                            <span class="help-tooltip-title">操作について</span>
+                            <ul class="help-tooltip-list">
+                                @for (line of managementHelpLines(); track line) {
+                                    <li>{{ line }}</li>
+                                }
+                            </ul>
+                        </span>
+                    </span>
+                </div>
+
+                <div class="danger-actions">
+                    <button
+                        type="button"
+                        class="mgmt-btn mgmt-btn-disable"
+                        (click)="disableOffice()"
+                        [disabled]="office()?.status === 'disabled'"
+                    >
+                        <span class="mgmt-btn-label">事業所を無効化</span>
+                        <span class="mgmt-btn-note">新規登録・手続きで選択不可にします</span>
+                    </button>
+                    <button
+                        type="button"
+                        class="mgmt-btn mgmt-btn-delete"
+                        (click)="deleteOffice()"
+                        [disabled]="!deletionCheck()?.canDelete"
+                    >
+                        <span class="mgmt-btn-label">事業所を削除する</span>
+                        <span class="mgmt-btn-note">未使用の事業所のみ削除できます</span>
+                    </button>
+                </div>
+            </section>
+        }
+    </app-admin-page-shell>
+}
 
 <style>
-    .office-page {
-        max-width: 720px;
-        margin: 0 auto;
-        padding: 24px 16px 40px;
-    }
-
-    .back-link {
-        display: inline-block;
-        margin-bottom: 16px;
-        color: #2563eb;
-        font-size: 14px;
-        font-weight: 500;
-        text-decoration: none;
-    }
-
-    .back-link:hover {
-        text-decoration: underline;
-    }
-
-    .loading {
-        margin: 0;
-        color: #6b7280;
-        font-size: 14px;
-    }
-
-    .office-card {
-        padding: 24px;
-        background: #fff;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-        overflow: visible;
-    }
-
-    .page-header {
+    .detail-toolbar {
         display: flex;
+        align-items: center;
         justify-content: space-between;
-        align-items: flex-start;
         gap: 12px;
-        margin-bottom: 24px;
-        padding-bottom: 20px;
-        border-bottom: 1px solid #f3f4f6;
+        margin-top: 16px;
+        margin-bottom: 4px;
     }
 
-    .page-header-actions {
+    .detail-toolbar__main {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .detail-toolbar__actions {
         display: flex;
         align-items: center;
         gap: 8px;
         flex-shrink: 0;
     }
 
-    .page-header-title {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 10px;
-    }
-
-    h1 {
-        margin: 0;
-        font-size: 22px;
-    }
-
-    .status-badge {
+    .detail-icon {
         display: inline-flex;
         align-items: center;
-        padding: 2px 8px;
-        border-radius: 999px;
-        font-size: 11px;
-        font-weight: 700;
-    }
-
-    .status-badge.active {
-        background: #dcfce7;
-        color: #166534;
-    }
-
-    .status-badge.disabled {
-        background: #f3f4f6;
-        color: #4b5563;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+        color: #fff;
+        font-size: 18px;
+        font-weight: 800;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.18);
     }
 
     .section-title {
-        margin: 28px 0 10px;
-        font-size: 17px;
+        margin: 0 0 14px;
+        font-size: 16px;
+        font-weight: 700;
+        color: #0f172a;
     }
 
-    .section-title:first-of-type {
-        margin-top: 0;
+    .form-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 16px;
+    }
+
+    .form-field:last-child {
+        margin-bottom: 0;
+    }
+
+    .form-field label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #334155;
+    }
+
+    .label-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .fixed-value {
+        margin: 0;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        font-size: 14px;
+        font-weight: 600;
+        color: #1e293b;
+    }
+
+    .field-note {
+        margin: 6px 0 0;
+        color: #64748b;
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
+    .field-note.warn {
+        color: #b45309;
+    }
+
+    .postal-code-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .postal-code-row input {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .postal-search-btn {
+        flex-shrink: 0;
+        height: 40px;
+    }
+
+    input,
+    select {
+        height: 40px;
+        padding: 0 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        font-size: 14px;
+        background: #fff;
+    }
+
+    input:focus {
+        outline: none;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
     }
 
     .danger-zone {
-        margin-top: 32px;
-        padding: 20px;
-        border-radius: 12px;
+        padding: 20px 22px;
+        border-radius: 16px;
         background: linear-gradient(180deg, #fafbfc 0%, #f8fafc 100%);
-        border: 1px solid #e8edf3;
+        border: 1px solid #e2e8f0;
         overflow: visible;
     }
 
@@ -508,7 +521,7 @@
         gap: 4px;
         min-height: 72px;
         padding: 14px 16px;
-        border-radius: 10px;
+        border-radius: 12px;
         text-align: left;
         cursor: pointer;
         transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.15s;
@@ -565,183 +578,21 @@
     }
 
     @media (max-width: 560px) {
+        .detail-toolbar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .detail-toolbar__actions {
+            justify-content: stretch;
+        }
+
+        .detail-toolbar__actions .admin-btn {
+            flex: 1;
+        }
+
         .danger-actions {
             grid-template-columns: 1fr;
         }
-    }
-
-    .section-note {
-        margin: 0 0 14px;
-        color: #6b7280;
-        font-size: 13px;
-        line-height: 1.5;
-    }
-
-    .detail-list {
-        margin: 0 0 24px;
-    }
-
-    .detail-row {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        padding: 14px 0;
-        border-bottom: 1px solid #f3f4f6;
-    }
-
-    .detail-row:last-child {
-        border-bottom: none;
-    }
-
-    .detail-row dt {
-        margin: 0;
-        color: #6b7280;
-        font-size: 13px;
-        font-weight: 600;
-    }
-
-    .detail-row dd {
-        margin: 0;
-        font-size: 15px;
-        line-height: 1.5;
-    }
-
-    .form-field {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        margin-bottom: 16px;
-    }
-
-    .form-field label {
-        font-size: 14px;
-        font-weight: 600;
-    }
-
-    .label-row {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-    }
-
-    .fixed-value {
-        margin: 0;
-        padding: 10px 12px;
-        border-radius: 8px;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        font-size: 14px;
-        font-weight: 600;
-        color: #1e293b;
-    }
-
-    .field-note {
-        margin: 6px 0 0;
-        color: #6b7280;
-        font-size: 12px;
-        line-height: 1.5;
-    }
-
-    .field-note.warn {
-        color: #b45309;
-    }
-
-    .postal-code-row {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-    }
-
-    .postal-code-row input {
-        flex: 1;
-        min-width: 0;
-    }
-
-    .postal-search-btn {
-        flex-shrink: 0;
-        height: 40px;
-        padding: 0 14px;
-        border: 1px solid #d1d5db;
-        border-radius: 8px;
-        background: #fff;
-        color: #374151;
-        font-size: 13px;
-        font-weight: 600;
-        cursor: pointer;
-        white-space: nowrap;
-    }
-
-    .postal-search-btn:hover:not(:disabled) {
-        background: #f9fafb;
-        border-color: #93c5fd;
-        color: #2563eb;
-    }
-
-    .postal-search-btn:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-    }
-
-    input,
-    select {
-        height: 40px;
-        padding: 0 12px;
-        border: 1px solid #d1d5db;
-        border-radius: 8px;
-        font-size: 14px;
-    }
-
-    select {
-        cursor: pointer;
-        background: #fff;
-    }
-
-    .error-message {
-        margin: 0 0 12px;
-        color: #dc2626;
-        font-size: 14px;
-    }
-
-    .button-area {
-        display: flex;
-        gap: 12px;
-        margin-top: 8px;
-    }
-
-    .btn {
-        height: 42px;
-        padding: 0 16px;
-        border: none;
-        border-radius: 8px;
-        font-size: 15px;
-        font-weight: 600;
-        cursor: pointer;
-    }
-
-    .btn:disabled {
-        opacity: 0.7;
-        cursor: not-allowed;
-    }
-
-    .edit-btn {
-        background: #e5e7eb;
-        color: #333;
-    }
-
-    .enable-btn {
-        background: #dcfce7;
-        color: #166534;
-    }
-
-    .primary-btn {
-        flex: 1;
-        background: #2563eb;
-        color: #fff;
-    }
-
-    .sub-btn {
-        flex: 1;
-        background: #e5e7eb;
-        color: #333;
     }
 </style>

@@ -18,6 +18,7 @@ import { StandardMonthlyReward } from '../models/standard-monthly-reward.model';
 import { StandardRemunerationDeterminationService } from './standard-remuneration-determination.service';
 import { bonusesForStandardBonusPremium } from '../utils/effective-monthly-reward.util';
 import { resolveBonusPremiumableStandardAmounts } from '../utils/bonus-standard-amount-cap.util';
+import { resolveInsuredPeriodBounds } from '../../social-insurance/utils/procedure-date-range.util';
 import { resolveInsurancePremiumRates } from '../utils/insurance-premium-rate-resolution.util';
 import { calculateInsurancePremiumShares } from '../utils/insurance-premium-rounding.util';
 import { resolveMonthlyPremiumStandardAmounts } from '../utils/insurance-premium-standard-amount.util';
@@ -199,10 +200,16 @@ export class InsurancePremiumCalculationService {
         let bonusCareInsuranceEmployerPremium = 0;
         if (bonusTargets.length > 0) {
             const confirmedBonuses = bonuses.filter((item) => isBonusConfirmed(item));
+            const insuredPeriodBounds = resolveInsuredPeriodBounds({
+                employee,
+                healthInsuranceStartDate,
+                healthInsuranceEndDate,
+            });
             const premiumableAmounts = resolveBonusPremiumableStandardAmounts({
                 liabilityYearMonth,
                 monthBonuses: bonusTargets,
                 allBonuses: confirmedBonuses,
+                insuredPeriodBounds,
             });
 
             const bonusHealthShares = isHealthMonth && rates.healthTotalRate !== null

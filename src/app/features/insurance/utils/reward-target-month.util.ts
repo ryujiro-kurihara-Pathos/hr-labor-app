@@ -9,6 +9,11 @@ import {
     resolveInsuredPeriodBounds,
     validateDateWithinInsuredPeriod,
 } from '../../social-insurance/utils/procedure-date-range.util';
+import { premiumEndYearMonthFromLossDate } from '../../social-insurance/utils/insurance-premium-period.util';
+import {
+    AUTOMATIC_INSURANCE_RATE_AVAILABLE_FROM,
+    AUTOMATIC_INSURANCE_RATE_AVAILABLE_TO,
+} from './insurance-premium-rate-resolution.util';
 
 const YEAR_MONTH_PATTERN = /^\d{4}-\d{2}$/;
 
@@ -64,7 +69,35 @@ export function employmentPeriodDateReason(employee: Employee, date: string): st
     return '在籍期間外の日付です。';
 }
 
-/** 賞与支給日が入力可能な期間か（対象年月＋被保険者の資格期間） */
+/** 退職者の報酬・賞与入力における勤務月上限（退職月の翌月まで） */
+export function rewardInputMaxWorkYearMonthFromRetirement(
+    retiredDate: Timestamp | null | undefined,
+): string | null {
+    const retireYm = yearMonthFromTimestamp(retiredDate);
+    if (!retireYm) return null;
+    return addMonthsToYearMonth(retireYm, 1);
+}
+
+/** 賞与支給日が社会保険料の対象か（資格取得日以上・資格喪失日未満） */
+export function isBonusPaymentDatePremiumable(
+    employee: Employee,
+    paymentDate: string,
+    insuranceDates?: {
+        healthInsuranceStartDate?: string | null;
+        healthInsuranceEndDate?: string | null;
+    },
+): boolean {
+    if (!isBonusPaymentDateAllowed(employee, paymentDate, insuranceDates)) return false;
+
+    const bounds = resolveInsuredPeriodBounds({
+        employee,
+        healthInsuranceStartDate: insuranceDates?.healthInsuranceStartDate,
+        healthInsuranceEndDate: insuranceDates?.healthInsuranceEndDate,
+    });
+    return validateDateWithinInsuredPeriod(paymentDate, bounds) === null;
+}
+
+/** 賞与支給日が入力可能な期間か（対象年月。資格喪失日以降も入力可だが保険料対象外） */
 export function isBonusPaymentDateAllowed(
     employee: Employee,
     paymentDate: string,
@@ -81,7 +114,16 @@ export function isBonusPaymentDateAllowed(
         healthInsuranceStartDate: insuranceDates?.healthInsuranceStartDate,
         healthInsuranceEndDate: insuranceDates?.healthInsuranceEndDate,
     });
-    return validateDateWithinInsuredPeriod(paymentDate, bounds) === null;
+    const qualification = bounds.qualificationDate?.trim();
+    if (qualification && paymentDate < qualification) return false;
+
+    const retiredDate = dateStringFromTimestamp(employee.retiredDate);
+    const retireYm = yearMonthFromTimestamp(employee.retiredDate);
+    if (retiredDate && retireYm && targetYearMonth === retireYm && paymentDate > retiredDate) {
+        return false;
+    }
+
+    return true;
 }
 
 export function bonusPaymentDateReason(
@@ -103,18 +145,66 @@ export function bonusPaymentDateReason(
         healthInsuranceStartDate: insuranceDates?.healthInsuranceStartDate,
         healthInsuranceEndDate: insuranceDates?.healthInsuranceEndDate,
     });
-    return validateDateWithinInsuredPeriod(paymentDate, bounds);
+    const qualification = bounds.qualificationDate?.trim();
+    if (qualification && paymentDate < qualification) {
+        return `資格取得日（${formatDateLabel(qualification)}）以降の日付を指定してください。`;
+    }
+
+    const retiredDate = dateStringFromTimestamp(employee.retiredDate);
+    const retireYm = yearMonthFromTimestamp(employee.retiredDate);
+    if (retiredDate && retireYm && targetYearMonth === retireYm && paymentDate > retiredDate) {
+        return `${formatDateLabel(retiredDate)}退職のため、この日付は対象外です。`;
+    }
+
+    return null;
 }
 
 export function currentYearMonth(date: Date = new Date()): string {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
-/** 給与入力の上限：現在月の翌月。退職予定月がそれより前なら退職月まで */
-export function inputableYearMonthMax(employee: Employee, referenceYearMonth: string): string {
+function minYearMonth(a: string, b: string): string {
+    return a <= b ? a : b;
+}
+
+function maxYearMonth(a: string, b: string): string {
+    return a >= b ? a : b;
+}
+
+/** 保険料の給与控除月の上限（翌月徴収は根拠月+1まで） */
+export function insuranceRatePremiumDeductYearMonthMax(
+    timing: InsurancePremiumCollectionTiming,
+): string {
+    if (timing === 'next_month') {
+        return addMonthsToYearMonth(AUTOMATIC_INSURANCE_RATE_AVAILABLE_TO, 1);
+    }
+    return AUTOMATIC_INSURANCE_RATE_AVAILABLE_TO;
+}
+
+/** 一覧画面の月ナビ下限（過去60か月と料率データ開始月の遅い方） */
+export function listNavigableYearMonthMin(
+    referenceYearMonth: string = currentYearMonth(),
+): string {
+    const backwardLimit = addMonthsToYearMonth(referenceYearMonth, -60);
+    return maxYearMonth(backwardLimit, AUTOMATIC_INSURANCE_RATE_AVAILABLE_FROM);
+}
+
+/** 一覧画面の月ナビ上限（翌月先行入力と料率データ終了月の早い方） */
+export function listNavigableYearMonthMax(
+    referenceYearMonth: string = currentYearMonth(),
+): string {
     const forwardLimit = addMonthsToYearMonth(referenceYearMonth, 1);
-    const retireYm = yearMonthFromTimestamp(employee.retiredDate);
-    if (retireYm && retireYm < forwardLimit) return retireYm;
+    return minYearMonth(forwardLimit, AUTOMATIC_INSURANCE_RATE_AVAILABLE_TO);
+}
+
+/** 給与入力の上限：現在月の翌月。退職予定月の翌月がそれより前なら退職月の翌月まで */
+export function inputableYearMonthMax(employee: Employee, referenceYearMonth: string): string {
+    let forwardLimit = addMonthsToYearMonth(referenceYearMonth, 1);
+    if (forwardLimit > AUTOMATIC_INSURANCE_RATE_AVAILABLE_TO) {
+        forwardLimit = AUTOMATIC_INSURANCE_RATE_AVAILABLE_TO;
+    }
+    const retireMax = rewardInputMaxWorkYearMonthFromRetirement(employee.retiredDate);
+    if (retireMax && retireMax < forwardLimit) return retireMax;
     return forwardLimit;
 }
 
@@ -141,9 +231,10 @@ export function premiumViewableYearMonthMax(
     );
     if (!latestConfirmedWorkYearMonth) return calendarMax;
 
-    const rewardMax = premiumDeductYearMonthForWorkMonth(
-        latestConfirmedWorkYearMonth,
-        timing,
+    const ratePremiumCap = insuranceRatePremiumDeductYearMonthMax(timing);
+    const rewardMax = minYearMonth(
+        premiumDeductYearMonthForWorkMonth(latestConfirmedWorkYearMonth, timing),
+        ratePremiumCap,
     );
     return rewardMax > calendarMax ? rewardMax : calendarMax;
 }
@@ -170,11 +261,15 @@ function premiumViewableYearMonthMaxFromCalendar(
     const inputMax = inputableYearMonthMax(employee, referenceYearMonth);
     let premiumMax = addMonthsToYearMonth(inputMax, 1);
 
-    const retireYm = yearMonthFromTimestamp(employee.retiredDate);
-    if (retireYm) {
-        const retirePremiumCap = addMonthsToYearMonth(retireYm, 1);
-        if (premiumMax > retirePremiumCap) premiumMax = retirePremiumCap;
+    const insuredBounds = resolveInsuredPeriodBounds({ employee });
+    const premiumEndWorkYm = premiumEndYearMonthFromLossDate(insuredBounds.lossDate);
+    if (premiumEndWorkYm) {
+        const lossBasedCap = premiumDeductYearMonthForWorkMonth(premiumEndWorkYm, timing);
+        if (premiumMax > lossBasedCap) premiumMax = lossBasedCap;
     }
+
+    const ratePremiumCap = insuranceRatePremiumDeductYearMonthMax(timing);
+    if (premiumMax > ratePremiumCap) premiumMax = ratePremiumCap;
 
     return premiumMax;
 }
@@ -384,7 +479,7 @@ export function premiumViewableYearMonthReason(
     return 'この月は保険料表示の対象外です。';
 }
 
-/** 入社月〜現在月の翌月（退職予定月があればその月まで）なら報酬登録対象 */
+/** 入社月〜現在月の翌月（退職予定月の翌月まで）なら報酬登録対象 */
 export function isRewardTargetMonth(
     employee: Employee,
     targetYearMonth: string,
@@ -395,8 +490,8 @@ export function isRewardTargetMonth(
     const joinYm = yearMonthFromDateString(employee.joinedDate);
     if (joinYm && targetYearMonth < joinYm) return false;
 
-    const retireYm = yearMonthFromTimestamp(employee.retiredDate);
-    if (retireYm && targetYearMonth > retireYm) return false;
+    const retireMax = rewardInputMaxWorkYearMonthFromRetirement(employee.retiredDate);
+    if (retireMax && targetYearMonth > retireMax) return false;
 
     if (targetYearMonth > inputableYearMonthMax(employee, referenceYearMonth)) return false;
 
@@ -415,9 +510,9 @@ export function rewardTargetMonthReason(
         return `${formatYearMonthLabel(joinYm)}入社のため、この月は対象外です。`;
     }
 
-    const retireYm = yearMonthFromTimestamp(employee.retiredDate);
-    if (retireYm && targetYearMonth > retireYm) {
-        return `${formatYearMonthLabel(retireYm)}退職のため、この月は対象外です。`;
+    const retireMax = rewardInputMaxWorkYearMonthFromRetirement(employee.retiredDate);
+    if (retireMax && targetYearMonth > retireMax) {
+        return `${formatYearMonthLabel(retireMax)}まで入力できます（退職月の翌月まで）。`;
     }
 
     const maxYm = inputableYearMonthMax(employee, referenceYearMonth);

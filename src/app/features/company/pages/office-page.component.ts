@@ -1,11 +1,12 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 
 import { Office } from '../models/office.model';
 import { OfficeDeletionError, OfficeService } from '../services/office.service';
 import { ConfirmService } from '../../../shared/services/confirm.service';
 import { FieldHelpTooltipComponent } from '../../../shared/components/field-help-tooltip.component';
+import { AdminPageShellComponent } from '../../../shared/components/admin-page-shell.component';
 import {
     formatOfficeAddress,
     normalizeOfficeNumber,
@@ -19,7 +20,7 @@ import { applyPostalLookupResult } from '../../../shared/utils/postal-code-looku
 @Component({
     selector: 'app-office-page',
     standalone: true,
-    imports: [FormsModule, RouterLink, FieldHelpTooltipComponent],
+    imports: [FormsModule, FieldHelpTooltipComponent, AdminPageShellComponent],
     templateUrl: './office-page.component.html',
 })
 
@@ -122,6 +123,10 @@ export class OfficePageComponent {
 
     formatAddress(office: Office): string {
         return formatOfficeAddress(office);
+    }
+
+    officeInitial(name: string): string {
+        return name.trim().charAt(0) || '事';
     }
 
     displayNumber(value: number | null | undefined): string {

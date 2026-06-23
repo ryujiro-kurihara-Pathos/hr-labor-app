@@ -33,7 +33,7 @@ import {
     viewableYearMonthMin,
     yearMonthFromDateString,
 } from '../utils/reward-target-month.util';
-import { resolveBonusPaymentDateBounds } from '../../social-insurance/utils/procedure-date-range.util';
+import { resolveBonusPaymentDateBounds, resolveInsuredPeriodBounds } from '../../social-insurance/utils/procedure-date-range.util';
 import {
     FIXED_WAGE_FIELD_KEYS,
     FIXED_WAGE_FIELD_LABELS,
@@ -142,6 +142,7 @@ import {
 } from '../models/manual-insurance-premium-rate.model';
 import {
     AUTOMATIC_INSURANCE_RATE_AVAILABLE_FROM,
+    AUTOMATIC_INSURANCE_RATE_AVAILABLE_TO,
     healthInsuranceFiscalYear,
     manualRatePairFromPercent,
     manualRatesMissingMessage,
@@ -172,6 +173,7 @@ import {
     partTimeOtherAllowanceTotal,
 } from '../utils/part-time-reward.util';
 import { FieldHelpTooltipComponent } from '../../../shared/components/field-help-tooltip.component';
+import { MonthNavigationBarComponent } from '../../../shared/components/month-navigation-bar.component';
 import { SalaryConditionModalComponent } from '../components/salary-condition-modal.component';
 import { SalaryConditionHistoryModalComponent } from '../components/salary-condition-history-modal.component';
 import { SalaryConditionDisplayComponent } from '../components/salary-condition-display.component';
@@ -212,6 +214,7 @@ import {
     joinPayMonthDisplayNote,
     lookupRewardByPayMonth,
     rewardNavigationMinPayYearMonth,
+    resolvePremiumBasisRewardPayYearMonth,
     rewardRecordKeyForPayMonth,
     salaryPayMonthTargetReason,
     salaryPayYearMonthMax,
@@ -235,6 +238,7 @@ type PremiumPageMode = 'input' | 'premium';
         SalaryConditionDisplayComponent,
         CollapsibleWageSectionComponent,
         RewardProcedureNudgeComponent,
+        MonthNavigationBarComponent,
     ],
     templateUrl: './insurance-premium-detail-page.component.html',
 })
@@ -390,7 +394,7 @@ export class InsurancePremiumDetailPageComponent {
     isLoadingMonth = signal(false);
     isSaving = signal(false);
     showVariableWageFields = signal(false);
-    showFixedWageFields = signal(true);
+    showFixedWageFields = signal(false);
     isConfirmingMonth = signal(false);
     isLoadingBonus = signal(false);
     isSavingBonus = signal(false);
@@ -406,7 +410,7 @@ export class InsurancePremiumDetailPageComponent {
     manualRateMessage = signal('');
     manualRateErrorMessage = signal('');
     readonly manualRateHelpLines = [
-        `${formatYearMonthLabel(AUTOMATIC_INSURANCE_RATE_AVAILABLE_FROM)}より前の根拠月は、協会けんぽ等の料率データがアプリ内にないため自動取得できません。`,
+        `アプリ内の自動料率は${formatYearMonthLabel(AUTOMATIC_INSURANCE_RATE_AVAILABLE_FROM)}〜${formatYearMonthLabel(AUTOMATIC_INSURANCE_RATE_AVAILABLE_TO)}（令和8年度2月分）の根拠月に対応しています。範囲外は手動入力が必要です。`,
         'その月に適用される健康保険・介護保険・厚生年金の料率（%）を入力してください。保存後、保険料の計算に使用されます。',
         '本人負担と会社負担は折半のため、同じ料率を入力します。',
     ];
@@ -506,6 +510,18 @@ export class InsurancePremiumDetailPageComponent {
         const ym = this.premiumLiabilityYearMonth();
         return ym ? formatYearMonthLabel(ym) : '';
     });
+
+    rewardBasisPayYearMonth = computed((): string =>
+        resolvePremiumBasisRewardPayYearMonth(
+            this.targetYearMonth(),
+            this.insurancePremiumCollectionTiming(),
+            this.payrollPaymentMonthOffset(),
+        ),
+    );
+
+    rewardBasisPayYearMonthLabel = computed(() =>
+        formatYearMonthLabel(this.rewardBasisPayYearMonth()),
+    );
 
     latestConfirmedWorkYearMonth = computed((): string | null => {
         return findLatestConfirmedPayYearMonth(
@@ -627,25 +643,28 @@ export class InsurancePremiumDetailPageComponent {
     });
 
     canGoNextMonth = computed(() => {
-        const employee = this.employee();
+        const maxYm = this.viewableMaxYearMonth();
         const ym = this.targetYearMonth();
-        if (!employee || !ym) return false;
+        return Boolean(maxYm && ym && ym < maxYm);
+    });
+
+    viewableMaxYearMonth = computed((): string | null => {
+        const employee = this.employee();
+        if (!employee) return null;
         if (this.pageMode() === 'input') {
-            const maxYm = salaryPayYearMonthMax(
+            return salaryPayYearMonthMax(
                 employee,
                 this.currentYearMonth(),
                 this.payrollPaymentMonthOffset(),
             );
-            return ym < maxYm;
         }
-        const maxYm = navigableYearMonthMax(
+        return navigableYearMonthMax(
             employee,
             this.currentYearMonth(),
             'premium_view',
             this.insurancePremiumCollectionTiming(),
             this.latestConfirmedWorkYearMonth(),
         );
-        return ym < maxYm;
     });
 
     /** 保険料タブ：選択月＝給与から控除する月 */
@@ -2422,7 +2441,8 @@ export class InsurancePremiumDetailPageComponent {
             commissionPay: isPartTime ? '' : reward.commissionPay,
             otherVariablePay: isPartTime ? '' : reward.otherVariablePay,
         };
-        this.showVariableWageFields.set(this.hasVariableWageValues());
+        this.showVariableWageFields.set(false);
+        this.showFixedWageFields.set(false);
         this.applyActiveSalaryConditionToForm();
     }
 
@@ -2440,17 +2460,6 @@ export class InsurancePremiumDetailPageComponent {
             fixedOvertimePay: fixed.fixedOvertimePay,
             otherFixedAllowance: fixed.otherFixedAllowance,
         };
-    }
-
-    private hasVariableWageValues(): boolean {
-        const fields = [
-            this.rewardForm.overtimePay,
-            this.rewardForm.holidayPay,
-            this.rewardForm.nightPay,
-            this.rewardForm.commissionPay,
-            this.rewardForm.otherVariablePay,
-        ];
-        return fields.some((value) => this.toNumber(value) > 0);
     }
 
     toggleVariableWageFields(): void {
@@ -2478,7 +2487,7 @@ export class InsurancePremiumDetailPageComponent {
             otherVariablePay: '',
         };
         this.showVariableWageFields.set(false);
-        this.showFixedWageFields.set(true);
+        this.showFixedWageFields.set(false);
     }
 
     hasRewardFormInput(): boolean {
@@ -3350,6 +3359,17 @@ export class InsurancePremiumDetailPageComponent {
             liabilityYearMonth,
             monthBonuses,
             allBonuses: this.confirmedEmployeeBonuses(),
+            insuredPeriodBounds: this.insuredPeriodBounds(),
+        });
+    });
+
+    private insuredPeriodBounds = computed(() => {
+        const employee = this.employee();
+        if (!employee) return null;
+        return resolveInsuredPeriodBounds({
+            employee,
+            healthInsuranceStartDate: this.healthInsuranceStartDate(),
+            healthInsuranceEndDate: this.healthInsuranceEndDate(),
         });
     });
 
@@ -3877,6 +3897,7 @@ export class InsurancePremiumDetailPageComponent {
             liabilityYearMonth,
             monthBonuses: bonuses,
             allBonuses: this.confirmedEmployeeBonuses(),
+            insuredPeriodBounds: this.insuredPeriodBounds(),
         });
 
         const healthShares = this.isHealthPremiumMonth()

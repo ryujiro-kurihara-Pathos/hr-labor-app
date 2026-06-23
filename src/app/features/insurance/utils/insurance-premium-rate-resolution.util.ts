@@ -9,6 +9,40 @@ import { insuranceTotalRateFromEmployeeRate } from './insurance-premium-rounding
 /** 組み込み料率データの適用開始月（これより前は自動料率なし） */
 export const AUTOMATIC_INSURANCE_RATE_AVAILABLE_FROM = '2024-03';
 
+/** 保険年度（3月分〜翌2月分）の終了月 */
+export function healthInsuranceFiscalYearEndYearMonth(fiscalStartCalendarYear: number): string {
+    const endYear = fiscalStartCalendarYear + 1;
+    return `${endYear}-02`;
+}
+
+/** 組み込み健保料率ファイルから、自動料率が効く最終の根拠月を求める */
+export function resolveAutomaticInsuranceRateAvailableTo(): string {
+    let latestEnd = AUTOMATIC_INSURANCE_RATE_AVAILABLE_FROM;
+
+    for (const file of KYOKAI_HEALTH_INSURANCE_RATE_FILES) {
+        const match = file.fileName.match(/kyokai-health-insurance-rates-(\d{4})-03/);
+        if (!match) continue;
+
+        const fiscalStartYear = Number(match[1]);
+        const hasOpenEndedRate = file.rates.some((row) => row.effectiveTo === null);
+        const fileEnd = hasOpenEndedRate
+            ? healthInsuranceFiscalYearEndYearMonth(fiscalStartYear)
+            : file.rates.reduce((max, row) => {
+                if (!row.effectiveTo || row.effectiveTo <= max) return max;
+                return row.effectiveTo;
+            }, latestEnd);
+
+        if (fileEnd > latestEnd) {
+            latestEnd = fileEnd;
+        }
+    }
+
+    return latestEnd;
+}
+
+/** 組み込み料率データの適用終了月（最新の保険年度2月分） */
+export const AUTOMATIC_INSURANCE_RATE_AVAILABLE_TO = resolveAutomaticInsuranceRateAvailableTo();
+
 export const DEFAULT_PENSION_INSURANCE_RATE = 0.0915;
 export const DEFAULT_PENSION_INSURANCE_TOTAL_RATE = DEFAULT_PENSION_INSURANCE_RATE * 2;
 
@@ -37,6 +71,8 @@ export function lookupAutomaticHealthInsuranceRate(params: {
     office: Office | null;
     employee: Employee;
 }): { employeeRate: number; employerRate: number; totalRate: number } | null {
+    if (params.liabilityYearMonth > AUTOMATIC_INSURANCE_RATE_AVAILABLE_TO) return null;
+
     const fiscalYear = healthInsuranceFiscalYear(params.liabilityYearMonth);
     const fileName = `kyokai-health-insurance-rates-${fiscalYear}-03.ts`;
     const rates =
@@ -56,6 +92,8 @@ export function lookupAutomaticHealthInsuranceRate(params: {
 export function lookupAutomaticCareInsuranceRate(
     liabilityYearMonth: string,
 ): { employeeRate: number; employerRate: number; totalRate: number } | null {
+    if (liabilityYearMonth > AUTOMATIC_INSURANCE_RATE_AVAILABLE_TO) return null;
+
     const row = findCareInsuranceRate(liabilityYearMonth);
     if (!row) return null;
     return { employeeRate: row.employeeRate, employerRate: row.employerRate, totalRate: row.totalRate };
@@ -65,6 +103,7 @@ export function lookupAutomaticPensionInsuranceRate(
     liabilityYearMonth: string,
 ): { employeeRate: number; totalRate: number } | null {
     if (liabilityYearMonth < AUTOMATIC_INSURANCE_RATE_AVAILABLE_FROM) return null;
+    if (liabilityYearMonth > AUTOMATIC_INSURANCE_RATE_AVAILABLE_TO) return null;
     return {
         employeeRate: DEFAULT_PENSION_INSURANCE_RATE,
         totalRate: DEFAULT_PENSION_INSURANCE_TOTAL_RATE,

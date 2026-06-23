@@ -1,6 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
-import { Router, RouterLink } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 
 import { AuthService } from '../../auth/services/auth.service';
 import { UserService } from '../services/user.service';
@@ -48,6 +48,7 @@ import {
     isPensionInsurancePremiumTargetMonth,
 } from '../../social-insurance/utils/age-premium-period.util';
 import { buildSocialInsuranceJoinJudgmentContext } from '../../social-insurance/utils/social-insurance-join-status.util';
+import { EmployeePortalPageComponent } from '../../../shared/components/employee-portal-page.component';
 
 type MyPageProcedureItem = {
     id: string;
@@ -77,7 +78,7 @@ const RELATIONSHIP_LABELS: Record<Dependent['relationship'], string> = {
 @Component({
     selector: 'app-my-page',
     standalone: true,
-    imports: [RouterLink, DecimalPipe],
+    imports: [RouterLink, RouterLinkActive, DecimalPipe, EmployeePortalPageComponent],
     templateUrl: './my-page.component.html',
 })
 export class MyPageComponent implements OnInit {

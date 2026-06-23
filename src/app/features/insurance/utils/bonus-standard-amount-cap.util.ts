@@ -1,5 +1,6 @@
 import { BonusReward } from '../../bonus/models/bonus-reward.model';
 import { isBonusConfirmed } from '../../bonus/utils/bonus-status.util';
+import { InsuredPeriodBounds } from '../../social-insurance/utils/procedure-date-range.util';
 import { shouldTreatBonusAsMonthlyRemuneration } from './effective-monthly-reward.util';
 
 /** 健康保険・介護保険の標準賞与額 年度累計上限（4月1日〜翌年3月31日） */
@@ -26,18 +27,33 @@ function compareBonusChronologically(a: BonusReward, b: BonusReward): number {
     return a.paymentDate.localeCompare(b.paymentDate);
 }
 
-function isPremiumableBonus(bonus: BonusReward, allBonuses: BonusReward[]): boolean {
+function isPremiumableBonus(
+    bonus: BonusReward,
+    allBonuses: BonusReward[],
+    insuredPeriodBounds?: InsuredPeriodBounds | null,
+): boolean {
     if (!isBonusConfirmed(bonus)) return false;
-    return !shouldTreatBonusAsMonthlyRemuneration(allBonuses, bonus.targetYearMonth);
+    if (shouldTreatBonusAsMonthlyRemuneration(allBonuses, bonus.targetYearMonth)) return false;
+
+    if (insuredPeriodBounds) {
+        const qualification = insuredPeriodBounds.qualificationDate?.trim();
+        if (qualification && bonus.paymentDate < qualification) return false;
+
+        const loss = insuredPeriodBounds.lossDate?.trim();
+        if (loss && bonus.paymentDate >= loss) return false;
+    }
+
+    return true;
 }
 
 function premiumableFiscalYearBonuses(
     allBonuses: BonusReward[],
     fiscalYearStart: number,
+    insuredPeriodBounds?: InsuredPeriodBounds | null,
 ): BonusReward[] {
     return allBonuses
         .filter((bonus) => {
-            if (!isPremiumableBonus(bonus, allBonuses)) return false;
+            if (!isPremiumableBonus(bonus, allBonuses, insuredPeriodBounds)) return false;
             return healthInsuranceFiscalYearStartYear(bonus.targetYearMonth) === fiscalYearStart;
         })
         .sort(compareBonusChronologically);
@@ -76,10 +92,11 @@ export function resolveBonusPremiumableStandardAmounts(params: {
     liabilityYearMonth: string;
     monthBonuses: BonusReward[];
     allBonuses: BonusReward[];
+    insuredPeriodBounds?: InsuredPeriodBounds | null;
 }): BonusPremiumableStandardAmounts {
-    const { liabilityYearMonth, monthBonuses, allBonuses } = params;
+    const { liabilityYearMonth, monthBonuses, allBonuses, insuredPeriodBounds = null } = params;
     const sortedMonthBonuses = [...monthBonuses]
-        .filter((bonus) => isPremiumableBonus(bonus, allBonuses))
+        .filter((bonus) => isPremiumableBonus(bonus, allBonuses, insuredPeriodBounds))
         .sort(compareBonusChronologically);
 
     const monthStandardTotal = sortedMonthBonuses.reduce(
@@ -90,7 +107,7 @@ export function resolveBonusPremiumableStandardAmounts(params: {
 
     const fiscalYearReferenceMonth = sortedMonthBonuses[0]?.targetYearMonth ?? liabilityYearMonth;
     const fiscalYearStart = healthInsuranceFiscalYearStartYear(fiscalYearReferenceMonth);
-    const fiscalBonuses = premiumableFiscalYearBonuses(allBonuses, fiscalYearStart);
+    const fiscalBonuses = premiumableFiscalYearBonuses(allBonuses, fiscalYearStart, insuredPeriodBounds);
     const monthBonusIds = new Set(sortedMonthBonuses.map((bonus) => bonus.id));
     const { total: healthAndCare, perBonus: healthAndCarePerBonus } = allocateHealthCarePremiumableForMonth(
         fiscalBonuses,

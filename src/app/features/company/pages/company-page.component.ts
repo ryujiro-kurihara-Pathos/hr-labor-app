@@ -19,11 +19,12 @@ import { formatOfficeAddress } from '../utils/office-format.util';
 import { healthInsuranceTypeLabel } from '../utils/office-health-insurance.util';
 import { isDuplicateOfficeName } from '../utils/office-name.util';
 import { FieldHelpTooltipComponent } from '../../../shared/components/field-help-tooltip.component';
+import { AdminPageShellComponent } from '../../../shared/components/admin-page-shell.component';
 
 @Component({
     selector: 'app-company-page',
     standalone: true,
-    imports: [RouterLink, FormsModule, OfficeCreateModalComponent, FieldHelpTooltipComponent],
+    imports: [RouterLink, FormsModule, OfficeCreateModalComponent, FieldHelpTooltipComponent, AdminPageShellComponent],
     templateUrl: './company-page.component.html',
 })
 
@@ -173,6 +174,10 @@ export class CompanyPageComponent {
 
     formatOfficeAddress(office: Office): string {
         return formatOfficeAddress(office);
+    }
+
+    officeInitial(name: string): string {
+        return name.trim().charAt(0) || '事';
     }
 
     healthInsuranceLabel(type: Office['healthInsuranceType']): string {

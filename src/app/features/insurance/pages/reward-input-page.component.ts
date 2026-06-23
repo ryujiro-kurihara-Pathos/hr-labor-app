@@ -18,7 +18,13 @@ import { BonusRewardService } from '../../bonus/services/bonus-reward.service';
 import { StandardMonthlyRewardService } from '../services/standard-monthly-reward.service';
 import { StandardRemunerationDeterminationService } from '../services/standard-remuneration-determination.service';
 import { SocialInsuranceStatusService } from '../../social-insurance/services/social-insurance-status.service';
-import { addMonthsToYearMonth } from '../utils/reward-target-month.util';
+import { MonthNavigationBarComponent } from '../../../shared/components/month-navigation-bar.component';
+import {
+    InsuranceListFilterBarComponent,
+    InsuranceListStatusFilterOption,
+} from '../../../shared/components/insurance-list-filter-bar.component';
+import { addMonthsToYearMonth, currentYearMonth as getCurrentYearMonth, listNavigableYearMonthMax, listNavigableYearMonthMin } from '../utils/reward-target-month.util';
+import { filterInsuranceListRows } from '../utils/employee-list-filter.util';
 import { isRewardConfirmed } from '../utils/reward-status.util';
 import {
     isSalaryPayMonthTarget,
@@ -37,7 +43,7 @@ export type RewardInputListRow = {
 @Component({
     selector: 'app-reward-input-page',
     standalone: true,
-    imports: [RouterLink, FormsModule, DecimalPipe],
+    imports: [RouterLink, FormsModule, DecimalPipe, MonthNavigationBarComponent, InsuranceListFilterBarComponent],
     templateUrl: './reward-input-page.component.html',
 })
 export class RewardInputPageComponent {
@@ -62,8 +68,36 @@ export class RewardInputPageComponent {
     socialInsuranceByEmployeeId = signal<Record<string, SocialInsuranceStatus | null>>({});
     payrollPaymentMonthOffset = signal<0 | 1>(1);
 
+    keyword = signal('');
+    selectedOfficeId = signal('');
+    statusFilter = signal<'all' | 'unregistered' | 'registered'>('all');
+
+    readonly rewardStatusFilterOptions: InsuranceListStatusFilterOption[] = [
+        { value: 'all', label: 'すべて' },
+        { value: 'unregistered', label: '未入力のみ', warn: true },
+        { value: 'registered', label: '登録済みのみ' },
+    ];
+
     /** 支給年月 */
-    targetYearMonth = signal(this.currentYearMonth());
+    targetYearMonth = signal(getCurrentYearMonth());
+
+    navigableMinYearMonth = computed(() =>
+        listNavigableYearMonthMin(getCurrentYearMonth()),
+    );
+
+    navigableMaxYearMonth = computed(() =>
+        listNavigableYearMonthMax(getCurrentYearMonth()),
+    );
+
+    canGoPrevMonth = computed(() => {
+        const minYm = this.navigableMinYearMonth();
+        return this.targetYearMonth() > minYm;
+    });
+
+    canGoNextMonth = computed(() => {
+        const maxYm = this.navigableMaxYearMonth();
+        return this.targetYearMonth() < maxYm;
+    });
 
     targetYearMonthLabel = computed(() => this.formatYearMonth(this.targetYearMonth()));
 
@@ -89,6 +123,26 @@ export class RewardInputPageComponent {
         return Math.round((this.registeredRows().length / target) * 100);
     });
 
+    officeOptions = computed(() =>
+        Object.values(this.officeById()).sort((a, b) => a.name.localeCompare(b.name, 'ja')),
+    );
+
+    hasActiveListFilters = computed(
+        () => Boolean(this.keyword().trim() || this.selectedOfficeId() || this.statusFilter() !== 'all'),
+    );
+
+    filteredRegisteredRows = computed(() => this.applyListFilters(this.registeredRows()));
+
+    filteredUnregisteredRows = computed(() => this.applyListFilters(this.unregisteredRows()));
+
+    showRegisteredSection = computed(() => this.statusFilter() !== 'unregistered');
+
+    showUnregisteredSection = computed(() => this.statusFilter() !== 'registered');
+
+    filteredVisibleRowCount = computed(
+        () => this.filteredRegisteredRows().length + this.filteredUnregisteredRows().length,
+    );
+
     async ngOnInit() {
         await this.loadPage();
     }
@@ -98,6 +152,9 @@ export class RewardInputPageComponent {
     }
 
     async shiftMonth(delta: number) {
+        if ((delta < 0 && !this.canGoPrevMonth()) || (delta > 0 && !this.canGoNextMonth())) {
+            return;
+        }
         this.targetYearMonth.set(addMonthsToYearMonth(this.targetYearMonth(), delta));
         await this.loadRewardsForMonth();
     }
@@ -117,6 +174,27 @@ export class RewardInputPageComponent {
 
     employeeDisplayName(employee: Employee): string {
         return `${employee.lastName} ${employee.firstName}`.trim();
+    }
+
+    clearListFilters(): void {
+        this.keyword.set('');
+        this.selectedOfficeId.set('');
+        this.statusFilter.set('all');
+    }
+
+    setStatusFilter(value: string): void {
+        if (value === 'unregistered' || value === 'registered') {
+            this.statusFilter.set(value);
+            return;
+        }
+        this.statusFilter.set('all');
+    }
+
+    private applyListFilters<T extends RewardInputListRow>(rows: T[]): T[] {
+        return filterInsuranceListRows(rows, {
+            keyword: this.keyword(),
+            officeId: this.selectedOfficeId(),
+        });
     }
 
     private async loadPage() {
@@ -237,8 +315,7 @@ export class RewardInputPageComponent {
     }
 
     private currentYearMonth(): string {
-        const d = new Date();
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        return getCurrentYearMonth();
     }
 
     private formatYearMonth(ym: string): string {
